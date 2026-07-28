@@ -57,7 +57,8 @@ export class MockSigner implements SignerPort {
       completedAt: null,
       rejectReason: null,
       metadata: { draftId: input.draftId, templateKey: input.templateKey },
-      embeddedUrl: `/mock-sign/${input.draftId}`,
+      // 계약(SignRes)이 절대 URL을 요구한다 — 상대 경로면 응답 parse에서 죽는다
+      embeddedUrl: `https://mock.namgida.local/sign/${input.draftId}`,
       expiresAt: new Date(now + EMBED_TTL_MS).toISOString(),
     };
     this.docs.set(doc.documentId, doc);

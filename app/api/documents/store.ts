@@ -12,6 +12,8 @@ export interface DraftRecord {
   verdict: GateVerdict;
   pdfUrl: string;
   status: DocStatus;
+  /** 서명 요청 후 채워진다 — 모두싸인 문서 역참조 (M-SIGN) */
+  modusignDocumentId?: string;
   createdAt: string;
 }
 
