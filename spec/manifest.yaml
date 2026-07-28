@@ -50,7 +50,7 @@ modules:
   spec: spec/fr/01.1-common-donation.md
   test: pnpm test extract
   model: sonnet            # Solar structured output 스키마 설계
-  status: todo
+  status: done
 
 - id: M-FACTS-CONFIRM
   mvp: M0
