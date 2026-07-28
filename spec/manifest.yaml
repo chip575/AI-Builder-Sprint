@@ -178,7 +178,7 @@ modules:
   spec: spec/plan/02.4-contracts.md
   test: pnpm test mock     # 키 없이 전 흐름
   model: haiku
-  status: todo
+  status: done
 
 # ── M1 · "체결이 끝이 아니다" (여기부터 병렬) ──────────────────
 - id: M-OBLIGATIONS
