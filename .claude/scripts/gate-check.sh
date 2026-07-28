@@ -18,8 +18,10 @@ HIT=$(grep -rnE '(systemPrompt|prompt|content|instruction)[^=]*=.*([0-9]+(\.[0-9
 [ -n "$HIT" ] && { red "프롬프트에 법률 수치 (P3 위반)"; echo "$HIT" | head -5; } || grn "프롬프트 수치 없음"
 
 echo "── 3. P3: 룰테이블 밖 하드코딩 상수 ──"
-HIT=$(grep -rnE '\b(16\.5|276000|408000|2000만|30%)\b' --include='*.ts' --include='*.tsx' . 2>/dev/null \
-      | grep -v 'lib/rules/' | grep -v node_modules | grep -v '\.test\.')
+# --exclude-dir 필수 — 출력 필터(grep -v)만 쓰면 node_modules·.next 전체를 스캔한 뒤 버린다
+HIT=$(grep -rnE '\b(16\.5|276000|408000|2000만|30%)\b' --include='*.ts' --include='*.tsx' \
+      --exclude-dir=node_modules --exclude-dir=.next . 2>/dev/null \
+      | grep -v 'lib/rules/' | grep -v '\.test\.')
 [ -n "$HIT" ] && { red "룰테이블 밖 법률 수치"; echo "$HIT" | head -5; } || grn "수치는 lib/rules에만"
 
 echo "── 4. P1: confirmed 기본값 ──"
@@ -27,7 +29,8 @@ HIT=$(grep -rn 'confirmed[_a-zA-Z]*:\s*true' --include='*.ts' lib/ app/ 2>/dev/n
 [ -n "$HIT" ] && { red "confirmed=true 기본값 (P1 위반 의심)"; echo "$HIT" | head -5; } || grn "confirmed 기본값 정상"
 
 echo "── 5. 보안: 식별번호 패턴 ──"
-HIT=$(grep -rnE '[0-9]{6}-[0-9]{7}' --include='*.ts' --include='*.tsx' --include='*.json' . 2>/dev/null | grep -v node_modules)
+HIT=$(grep -rnE '[0-9]{6}-[0-9]{7}' --include='*.ts' --include='*.tsx' --include='*.json' \
+      --exclude-dir=node_modules --exclude-dir=.next --exclude='pnpm-lock.yaml' . 2>/dev/null)
 [ -n "$HIT" ] && { red "주민등록번호 패턴 발견 (NFR-714 1조)"; echo "$HIT" | head -3; } || grn "식별번호 없음"
 
 echo "── 6. 실격 방지: 제출물 금칙어 ──"
