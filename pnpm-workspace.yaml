@@ -1,0 +1,7 @@
+# sharp(Next 이미지 최적화) 빌드 승인 — false면 pnpm install이 exit 1로 죽고
+# pnpm dev/test 전부 막힌다 (NFR-707 채점 경로).
+allowBuilds:
+  sharp: true
+minimumReleaseAgeExclude:
+  - '@types/node@26.1.2'
+  - postcss@8.5.24
