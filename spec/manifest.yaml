@@ -251,6 +251,80 @@ modules:
   model: haiku
   status: todo
 
+- id: M-GATE-COUNTER
+  mvp: M1
+  fr: [FR-509]
+  owner: be1
+  route: GET /api/admin/gate-stats
+  front: app/(ui)/org/GateCounter
+  in: null
+  out: GateStatsRes        # { blockedTotal, byDocType, byStatute[] }
+  owns: [app/api/admin/gate-stats/**, app/(ui)/org/GateCounter*]
+  spec: spec/fr/01.3-esign-clm.md
+  test: pnpm test gate-stats
+  model: haiku
+  status: todo
+  note: 모두싸인 "AI가 결과 품질에 기여" 5점의 유일한 담당. 게이트 차단 시 카운터 증가 + 사유·조문 로깅.
+
+- id: M-OBSERVABILITY
+  mvp: M1
+  fr: [NFR-709]
+  owner: be2
+  route: GET /api/admin/pipeline-stats
+  front: app/(ui)/org/PipelineStats
+  in: null
+  out: PipelineStatsRes    # 6단계별 { success, fail, p50Ms, p95Ms }
+  owns: [lib/observability/**, app/api/admin/pipeline-stats/**, app/(ui)/org/PipelineStats*]
+  spec: spec/fr/01.4-nfr.md
+  test: pnpm test observability
+  model: haiku
+  status: todo
+  note: 명세가 "데모에서 지표로 보여줄 수 있어야 한다"고 요구. 외부 SaaS가 아니라 앱 내부 화면.
+
+- id: M-SIGN-LIFECYCLE
+  mvp: M1
+  fr: [FR-506, FR-507]
+  owner: be2
+  route: POST /api/sign/[draftId]/remind · (거절은 웹훅 경유)
+  front: app/(ui)/org/PendingList
+  in: RemindReq
+  out: RemindRes
+  owns: [app/api/sign/*/remind/**, app/(ui)/org/PendingList*]
+  spec: spec/fr/01.3-esign-clm.md
+  test: pnpm test sign-lifecycle
+  model: haiku
+  status: todo
+  note: 거절 사유 저장 + 재요청은 새 문서(이력 보존) + 48h 미서명 리마인드. 생애주기 12점의 일부.
+
+- id: M-ADMIN-OPS
+  mvp: M1
+  fr: [FR-603, FR-604, FR-605]
+  owner: fe
+  route: POST /api/admin/bulk-remind · GET /api/admin/aggregate
+  front: app/(ui)/org/Dashboard (확장)
+  in: BulkRemindReq
+  out: AggregateRes
+  owns: [app/api/admin/bulk-remind/**, app/api/admin/aggregate/**]
+  spec: spec/fr/01.3-esign-clm.md
+  test: pnpm test admin-ops
+  model: haiku
+  status: todo
+
+- id: M-EVAL
+  mvp: M3
+  fr: [ADR-7]
+  owner: pm
+  route: null
+  front: null
+  in: null
+  out: null                # eval/results.json 커밋
+  owns: [eval/**]
+  spec: docs/decisions.md   # D-08
+  test: pnpm eval
+  model: null
+  status: todo
+  note: 검증 픽스처 10케이스(금액 누락·수증자 모순·기간 역전) 통과율 측정. 결과 JSON을 레포에 커밋해 증거물화. M0~M2가 끝나야 측정 대상이 존재한다.
+
 # ── M2 · "마음이 축이 된다" ──────────────────────────────────
 - id: M-QUESTION-BANK
   mvp: M2
@@ -351,3 +425,10 @@ modules:
   test: pnpm test recall
   model: haiku
   status: todo
+
+# ── M4 · 여력 (계약 미작성. 절단 시 여기부터 버린다) ──────────
+# FR-401~405 ESTATE 전체 — 인벤토리·디지털 유산·수증자 매핑·Custodian 부분 열람
+# FR-303 마음의 편지 · FR-112 스냅샷 봉인 · session 재개/종료 화면
+# FR-206 봉사(스키마+템플릿만 유지 — 01.1 확정)
+# 이 항목들은 03.0-mvp.md에 있으나 계약·모듈을 만들지 않았다.
+# 착수 시 contract-owner로 계약 제안부터 받는다.
