@@ -1,0 +1,14 @@
+# deps / build
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+
+# secrets — .env.example만 커밋한다 (02.3 §6)
+.env
+.env.*
+!.env.example
+
+# misc
+.DS_Store
+*.log

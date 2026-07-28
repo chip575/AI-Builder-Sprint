@@ -1,0 +1,353 @@
+# 오케스트레이터는 이 파일만 읽는다. 스펙 본문도 코드도 읽지 않는다.
+# 워커에게는 자기 행 + in/out 계약 파일 + fr 파일 1개만 준다.
+# status: todo | wip | done | blocked
+# owner: be1 | be2 | fe | pm
+
+meta:
+  contracts_dir: lib/contracts
+  frozen_after: M0          # M0 관통 후 계약 동결. 이후 변경은 contract-owner 경유
+  parallel_from: M1         # M0는 단일 세션 관통 (decisions.md D-14)
+
+modules:
+# ── M0 · "말이 서명이 된다" (P3 Express 관통) ──────────────────
+- id: M-AUTH
+  mvp: M0
+  fr: [auth]
+  owner: fe
+  route: POST /api/auth/{signup,login}
+  front: app/(ui)/auth/LoginPage
+  in: AuthReq
+  out: SessionRes
+  owns: [app/(ui)/auth/**]
+  spec: spec/plan/02.4-contracts.md
+  test: pnpm test auth
+  model: haiku
+  status: todo
+
+- id: M-SESSION-MSG
+  mvp: M0
+  fr: [FR-101, FR-110, FR-115B]
+  owner: be1
+  route: POST /api/session/message
+  front: app/(ui)/chat/SessionView
+  in: SessionMessageReq
+  out: SessionMessageRes   # SSE + utteranceId, axisCoverage, expressBranch?
+  owns: [app/api/session/**, lib/ai/session/**]
+  spec: spec/fr/01.6-spine.md
+  test: pnpm test session
+  model: sonnet            # Express 판정 로직에 판단 필요
+  status: todo
+
+- id: M-EXTRACT
+  mvp: M0
+  fr: [FR-102]
+  owner: be1
+  route: POST /api/extract
+  front: null
+  in: ExtractReq
+  out: IntentFactList      # 값 + confidence + sourceSpan
+  owns: [app/api/extract/**, lib/ai/extract/**]
+  spec: spec/fr/01.1-common-donation.md
+  test: pnpm test extract
+  model: sonnet            # Solar structured output 스키마 설계
+  status: todo
+
+- id: M-FACTS-CONFIRM
+  mvp: M0
+  fr: [FR-103]
+  owner: fe
+  route: PATCH /api/facts/[id]
+  front: app/(ui)/confirm/FactSheet
+  in: FactPatch
+  out: FactPatchRes        # { fact, recalc? }
+  owns: [app/api/facts/**, app/(ui)/confirm/**]
+  spec: spec/fr/01.1-common-donation.md
+  test: pnpm test facts
+  model: haiku
+  status: todo
+
+- id: M-GATE
+  mvp: M0
+  fr: [FR-104]
+  owner: be1
+  route: POST /api/gate
+  front: null
+  in: GateReq
+  out: GateVerdict         # ESIGN_OK | ESIGN_INVALID | NON_BINDING + statutes[]
+  owns: [lib/rules/validity-gate.ts]
+  spec: spec/00.1-rules.md
+  test: pnpm test gate
+  model: opus              # 핵심 자산. 초안만 AI, 병합은 사람 (보안 5조)
+  human_review: required
+  status: todo
+
+- id: M-RULES-DONATION
+  mvp: M0
+  fr: [FR-202]
+  owner: be1
+  route: null
+  front: null
+  in: null
+  out: TaxDeductionResult
+  owns: [lib/rules/hometown-donation.ts]
+  spec: spec/00.1-rules.md
+  test: pnpm test rules    # 100만→276000 / 특별재난→408000 / 10만→100000
+  model: opus
+  human_review: required
+  status: todo
+
+- id: M-REWARDS
+  mvp: M0
+  fr: [FR-203]
+  owner: fe
+  route: GET /api/rewards · POST /api/rewards/select
+  front: app/(ui)/branch/RewardPicker
+  in: RewardSelect
+  out: RewardSelectRes     # { selected[], remaining, overLimit }
+  owns: [app/api/rewards/**, app/(ui)/branch/RewardPicker*]
+  spec: spec/fr/01.1-common-donation.md
+  test: pnpm test rewards
+  model: haiku
+  status: todo
+
+- id: M-DOCUMENTS
+  mvp: M0
+  fr: [FR-501]
+  owner: be2
+  route: POST /api/documents
+  front: app/(ui)/doc/DraftView
+  in: DocumentCreateReq
+  out: DraftRes            # 403 if unconfirmed or gate fail
+  owns: [app/api/documents/**]
+  spec: spec/fr/01.3-esign-clm.md
+  test: pnpm test documents
+  model: sonnet
+  status: todo
+
+- id: M-SIGN
+  mvp: M0
+  fr: [FR-502]
+  owner: be2
+  route: POST /api/sign/[draftId] · GET /api/sign/[draftId]/status
+  front: app/(ui)/doc/SignPanel
+  in: SignReq
+  out: SignRes             # { signUrl | embedUrl, expiresAt } / StatusRes
+  owns: [app/api/sign/**, lib/signer/**]
+  spec: spec/plan/02.3-modusign.md
+  test: pnpm test sign
+  model: sonnet
+  status: todo
+
+- id: M-WEBHOOK
+  mvp: M0
+  fr: [FR-503]
+  owner: be2
+  route: POST /api/webhooks/modusign
+  front: null
+  in: ModusignWebhookPayload
+  out: always-200          # 즉시 200 → outbox → 상세조회 보강
+  owns: [app/api/webhooks/**]
+  spec: spec/plan/02.3-modusign.md
+  test: pnpm test webhook  # 동일 이벤트 5회 → 부수효과 1회
+  model: sonnet            # 멱등성 엣지케이스
+  status: todo
+
+- id: M-EVIDENCE
+  mvp: M0
+  fr: [FR-505]
+  owner: be2
+  route: GET /api/evidence/[docId]
+  front: app/(ui)/vault/EvidenceView
+  in: null
+  out: EvidenceRes         # pdfUrl(15분) + signedAt + parties + hash
+  owns: [app/api/evidence/**, app/(ui)/vault/EvidenceView*]
+  spec: spec/fr/01.3-esign-clm.md
+  test: pnpm test evidence
+  model: haiku
+  status: todo
+
+- id: M-MOCK
+  mvp: M0
+  fr: [NFR-707]
+  owner: be2
+  route: POST /api/dev/webhook-sim
+  front: null
+  in: WebhookSimReq
+  out: null
+  owns: [lib/signer/mock/**, app/api/dev/**]
+  spec: spec/plan/02.4-contracts.md
+  test: pnpm test mock     # 키 없이 전 흐름
+  model: haiku
+  status: todo
+
+# ── M1 · "체결이 끝이 아니다" (여기부터 병렬) ──────────────────
+- id: M-OBLIGATIONS
+  mvp: M1
+  fr: [FR-204, FR-508]
+  owner: be2
+  route: POST /api/cron/obligations
+  front: app/(ui)/vault/DueList
+  in: null
+  out: ObligationFireRes
+  owns: [app/api/cron/**, app/(ui)/vault/DueList*]
+  spec: spec/fr/01.3-esign-clm.md
+  test: pnpm test obligations
+  model: haiku
+  status: todo
+
+- id: M-RECONCILER
+  mvp: M1
+  fr: [FR-504]
+  owner: be2
+  route: POST /api/cron/reconcile
+  front: null
+  in: null
+  out: ReconcileRes        # { corrected: n, lastSyncAt }
+  owns: [app/api/cron/reconcile/**, lib/signer/reconciler.ts]
+  spec: spec/plan/02.3-modusign.md
+  test: pnpm test reconcile
+  model: sonnet
+  status: todo
+
+- id: M-PAPER-SCAN
+  mvp: M1
+  fr: [FR-401]
+  owner: be1
+  route: POST /api/paper-scan/{upload,extract}
+  front: app/(ui)/branch/PaperScanUpload
+  in: PaperScanReq
+  out: PaperScanRes        # DP+IE 파이프라인. Upstage 3종 가점 보호
+  owns: [app/api/paper-scan/**, lib/ai/document/**]
+  spec: spec/plan/02.5-upstage.md
+  test: pnpm test paper-scan
+  model: sonnet
+  status: todo
+
+- id: M-ADMIN
+  mvp: M1
+  fr: [FR-601, FR-602]
+  owner: fe
+  route: GET /api/admin/summary
+  front: app/(ui)/org/Dashboard
+  in: null
+  out: AdminSummaryRes     # RLS로 기관 격리
+  owns: [app/api/admin/**, app/(ui)/org/Dashboard*]
+  spec: spec/fr/01.3-esign-clm.md
+  test: pnpm test admin
+  model: haiku
+  status: todo
+
+- id: M-TIMETRAVEL
+  mvp: M1
+  fr: [NFR-707]
+  owner: be2
+  route: POST /api/dev/advance-time
+  front: app/(ui)/org/TimeTravel
+  in: AdvanceTimeReq       # { months: 6 | 12 }
+  out: FiredObligations
+  owns: [app/api/dev/advance-time/**, app/(ui)/org/TimeTravel*]
+  spec: spec/03.0-mvp.md
+  test: pnpm test timetravel
+  model: haiku
+  status: todo
+
+# ── M2 · "마음이 축이 된다" ──────────────────────────────────
+- id: M-QUESTION-BANK
+  mvp: M2
+  fr: [FR-301, FR-110]
+  owner: be1
+  route: null
+  front: null
+  in: null
+  out: QuestionBank        # 5축 20문항 상수 + 커버리지 엔진
+  owns: [lib/rules/question-bank.ts, lib/ai/axis/**]
+  spec: spec/fr/01.2-will-estate.md
+  test: pnpm test question-bank
+  model: sonnet
+  status: todo
+
+- id: M-HEARTWILL
+  mvp: M2
+  fr: [FR-111, FR-112]
+  owner: fe
+  route: POST /api/heartwill/apply · PATCH /api/heartwill/delivery
+  front: app/(ui)/will/HeartWillView, app/(ui)/will/DeliverySettings
+  in: HeartWillApplyReq
+  out: HeartWillVersionRes
+  owns: [app/api/heartwill/**, app/(ui)/will/HeartWill*, app/(ui)/will/Delivery*]
+  spec: spec/fr/01.6-spine.md
+  test: pnpm test heartwill
+  model: haiku
+  status: todo
+
+- id: M-HANDWRITING
+  mvp: M2
+  fr: [FR-302]
+  owner: fe
+  route: GET /api/will/draft/[id]/print
+  front: app/(ui)/will/HandwritingGuide
+  in: null
+  out: HandwritingGuideRes # draftText + checklist[4] + statutes. 서명버튼 없음
+  owns: [app/(ui)/will/HandwritingGuide*, app/api/will/**]
+  spec: spec/fr/01.2-will-estate.md
+  test: pnpm test handwriting
+  model: haiku
+  status: todo
+
+- id: M-BRANCH-DETECT
+  mvp: M2
+  fr: [FR-115A]
+  owner: be1
+  route: POST /api/branch/[id]/decide
+  front: app/(ui)/chat/ProposalCard, app/(ui)/branch/DeliberationScreen
+  in: BranchDecision
+  out: BranchDecisionRes   # 무게 등급은 lib/rules/branch-weight.ts (코드)
+  owns: [app/api/branch/**, lib/ai/branch/**, lib/rules/branch-weight.ts]
+  spec: spec/fr/01.6-spine.md
+  test: pnpm test branch
+  model: sonnet
+  human_review: required   # branch-weight는 rules 하위
+  status: todo
+
+# ── M3 · "시간에 서명한다" ───────────────────────────────────
+- id: M-LEDGER
+  mvp: M3
+  fr: [FR-551, FR-552, FR-553, FR-555]
+  owner: be2
+  route: POST /api/ledger/node · GET /api/ledger/[subjectId]
+  front: app/(ui)/vault/LedgerTimeline
+  in: LedgerNodeReq
+  out: LedgerRes           # append-only + 해시체인 + chainValid
+  owns: [app/api/ledger/**, lib/ledger/**, app/(ui)/vault/LedgerTimeline*]
+  spec: spec/fr/01.5-intent-ledger.md
+  test: pnpm test ledger
+  model: sonnet
+  status: todo
+
+- id: M-FAMILY-ACK
+  mvp: M3
+  fr: [FR-554]
+  owner: be2
+  route: POST /api/ledger/family-ack
+  front: app/(ui)/vault/FamilyAckPanel
+  in: FamilyAckReq
+  out: FamilyAckRes        # 동의가 아니라 인지. 거부해도 본인 효력 유지
+  owns: [app/api/ledger/family-ack/**]
+  spec: spec/fr/01.5-intent-ledger.md
+  test: pnpm test family-ack
+  model: sonnet
+  status: todo
+
+- id: M-EMBEDDINGS
+  mvp: M3
+  fr: [FR-110, FR-111]
+  owner: be1
+  route: null
+  front: app/(ui)/chat/ResumeCard
+  in: null
+  out: RecallRes           # embedding-passage 배치 / query top-k
+  owns: [lib/ai/embeddings/**, app/(ui)/chat/ResumeCard*]
+  spec: spec/plan/02.5-upstage.md
+  test: pnpm test recall
+  model: haiku
+  status: todo

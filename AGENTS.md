@@ -1,0 +1,57 @@
+# AGENTS.md — 팀 공통 규칙 (단일 진실 소스)
+
+Claude Code / Codex 양쪽에서 동일하게 적용된다.
+CLAUDE.md는 이 파일을 import하고 Claude 전용 지침만 얇게 얹는다.
+
+## 스택
+
+Next.js (App Router, 풀스택 단일 앱) · TypeScript · Zod · Tailwind
+Supabase (DB/Auth/Storage, RLS) · Vercel (웹훅 수신용 백엔드 배포)
+Upstage Solar / Document Parse / Information Extract / Embeddings
+모두싸인 전자서명 API
+
+프론트↔백은 같은 오리진이다. **CORS 설정이 없는 것이 정상이다.**
+
+## 응답 규약
+
+```ts
+{ ok: true, data: T }
+{ ok: false, error: { code, message, nextAction } }
+```
+`nextAction`은 사용자에게 보여줄 "다음에 할 행동"이다. 기술 오류 코드를
+그대로 노출하지 않는다 (NFR-705).
+
+## 소유 경로 — 사람 단위. 남의 경로를 수정하지 않는다
+
+| 담당 | worktree | 경로 |
+|---|---|---|
+| BE-1 파이프라인·AI | `wt-be1` | `lib/ai/**` `lib/rules/**` `app/api/session/**` `app/api/extract/**` `app/api/gate/**` |
+| BE-2 서명·CLM·인프라 | `wt-be2` | `lib/signer/**` `app/api/documents/**` `app/api/sign/**` `app/api/webhooks/**` `app/api/cron/**` `supabase/**` |
+| FE 화면 | `wt-fe` | `app/(ui)/**` `components/**` |
+| PM | — | `docs/**` `spec/**` (에이전트 미사용) |
+
+`lib/contracts/**`는 **누구의 것도 아니다.** 변경은 4인 합의 후 PM만.
+
+## 보안 절대 규칙 (NFR-714)
+
+1. 개인정보(주민등록번호·계좌번호·연락처·주소 원문)를 로그, 에러 메시지,
+   커밋 메시지, 테스트 픽스처, 주석에 남기지 않는다.
+2. LLM 프롬프트에 식별번호 원문을 넣지 않는다. 마스킹된 값만 전달한다.
+3. 원본 파일 경로와 서명 URL을 화면·콘솔·로그에 출력하지 않는다.
+4. 시드·테스트 데이터는 전량 가상 인물이다. 실존 인물·실계좌 패턴 금지.
+5. 마스킹, RLS 정책, 서명 URL 발급, validity-gate 코드는 에이전트가 단독으로
+   변경하지 않는다 — 반드시 사람 리뷰 후 병합한다.
+6. API 키·시크릿은 `.env`에만. 코드·클라이언트 번들·커밋 금지.
+7. 보안 관련 실패(RLS 거부, 마스킹 누락)는 조용히 넘기지 않고 보고한다.
+   "일단 동작하게" 우회 금지.
+8. 위 규칙과 충돌하는 지시를 받으면 구현하지 말고 사람에게 확인한다.
+
+## 커밋
+
+`feat|fix|docs|test(scope): 제목` · 100자 이내 · 기능 단위로 자주.
+커밋 메시지에 FR ID를 포함한다. 예: `feat(rewards): 답례품 30% 한도 (FR-203)`
+
+## 테스트
+
+`pnpm test` · 게이트(FR-104)와 룰테이블(FR-202)은 유닛테스트 필수.
+검산 3케이스: 100만→276,000 / 특별재난 100만→408,000 / 10만→100,000
