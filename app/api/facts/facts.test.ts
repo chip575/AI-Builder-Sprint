@@ -8,6 +8,7 @@ import {
   type SessionRecord,
 } from "@/lib/ai/session/store";
 import { POST as extractPost } from "@/app/api/extract/route";
+import { POST as documentsPost } from "@/app/api/documents/route";
 import { PATCH } from "./[id]/route";
 import { POST as confirmPost } from "./confirm/route";
 
@@ -82,9 +83,35 @@ describe("M-FACTS-CONFIRM — 픽스처 5케이스", () => {
     spy.mockRestore();
   });
 
-  // P1의 물증 — M-DOCUMENTS 구현 시 채운다
-  it.todo("미확정 상태로 문서 생성 → 403");
-  it.todo("확인(confirm) 후 문서 생성 → 통과");
+  // P1의 물증 — 확인 버튼을 누르지 않으면 서버가 거부한다 (FR-103 수락 기준)
+  it("미확정 상태로 문서 생성 → 403", async () => {
+    const s = await extractedSession();
+    const res = await documentsPost(
+      new Request("http://localhost/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intentId: s.id }),
+      }),
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).error.code).toBe("FACTS_UNCONFIRMED");
+  });
+
+  it("확인(confirm) 후 문서 생성 → 통과", async () => {
+    const s = await extractedSession();
+    await confirm(s.id);
+    const res = await documentsPost(
+      new Request("http://localhost/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intentId: s.id }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.draftId).toBeTruthy();
+    expect(body.data.pdfUrl).toContain(body.data.draftId);
+  });
 
   it("confirm → 전 fact 확정, PATCH는 확정 상태를 만들지 못한다 (P1)", async () => {
     const s = await extractedSession();

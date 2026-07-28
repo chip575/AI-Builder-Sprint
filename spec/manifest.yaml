@@ -122,7 +122,7 @@ modules:
   spec: spec/fr/01.3-esign-clm.md
   test: pnpm test documents
   model: sonnet
-  status: todo
+  status: done
 
 - id: M-SIGN
   mvp: M0
