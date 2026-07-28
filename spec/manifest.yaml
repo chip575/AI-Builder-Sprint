@@ -36,7 +36,7 @@ modules:
   spec: spec/fr/01.6-spine.md
   test: pnpm test session
   model: sonnet            # Express 판정 로직에 판단 필요
-  status: todo
+  status: done
 
 - id: M-EXTRACT
   mvp: M0
