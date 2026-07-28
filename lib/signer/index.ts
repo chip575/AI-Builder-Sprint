@@ -24,9 +24,14 @@ function unimplementedReal(): SignerPort {
   };
 }
 
-/** 프로세스 전역 단일 인스턴스 — 라우트 간 상태 공유 (Next dev의 모듈 캐시 기준) */
+// globalThis 캐싱 — 번들 청크 분리로 인스턴스가 갈라지는 것 방지 (영속화 시 제거)
+const g = globalThis as unknown as { __namgidaMockSigner?: MockSigner };
+
+/** 프로세스 전역 단일 인스턴스 — 라우트 간 상태 공유 */
 export const signer: SignerPort =
-  mode === "real" ? unimplementedReal() : new MockSigner(MOCK_AUTO_COMPLETE_MS);
+  mode === "real"
+    ? unimplementedReal()
+    : (g.__namgidaMockSigner ??= new MockSigner(MOCK_AUTO_COMPLETE_MS));
 
 /** webhook-sim 등 mock 전용 기능 접근자 — real 모드면 null */
 export const mockSigner: MockSigner | null =

@@ -135,6 +135,33 @@ describe("M-FACTS-CONFIRM — 경계", () => {
     expect(body.error.nextAction).toContain("region");
   });
 
+  it("필수 슬롯을 PATCH로 null 비우면 confirm이 거부한다 — 확정 시점 재검증 (FR-102)", async () => {
+    const s = await extractedSession();
+    const region = s.facts.find((f) => f.key === "region")!;
+    await patch(region.id, { value: null });
+    const res = await confirm(s.id);
+    expect(res.status).toBe(422);
+    expect((await res.json()).error.code).toBe("FACTS_INCOMPLETE");
+  });
+
+  it("확정 후 값을 수정하면 확정이 무효 → 문서 생성 403, 재확정 후 통과 (P1)", async () => {
+    const s = await extractedSession();
+    await confirm(s.id);
+    const amount = s.facts.find((f) => f.key === "amount")!;
+    await patch(amount.id, { value: 700_000 }); // 확정 후 수정
+    const doc = (intentId: string) =>
+      documentsPost(
+        new Request("http://localhost/api/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ intentId }),
+        }),
+      );
+    expect((await doc(s.id)).status).toBe(403);
+    await confirm(s.id); // 재확정
+    expect((await doc(s.id)).status).toBe(200);
+  });
+
   it("amount에 숫자가 아닌 값 → 400", async () => {
     const s = await extractedSession();
     const amount = s.facts.find((f) => f.key === "amount")!;

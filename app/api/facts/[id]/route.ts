@@ -87,7 +87,9 @@ export async function PATCH(
 
   fact.value = parsed.data.value;
   fact.confidence = 1; // 사용자가 직접 준 값 — 더 되물을 것 없음. 확정과는 별개다
-  // fact.confirmed는 건드리지 않는다 — 확정은 confirm 라우트만 (P1)
+  // 값이 바뀌면 확정은 무효다 — 확정 후 몰래 바꾸고 문서를 만드는 경로 차단 (P1).
+  // 다시 확정하려면 confirm 라우트를 다시 눌러야 한다.
+  fact.confirmed = false;
 
   return Response.json({
     ok: true,

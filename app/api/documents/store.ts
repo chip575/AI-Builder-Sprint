@@ -15,7 +15,9 @@ export interface DraftRecord {
   createdAt: string;
 }
 
-const drafts = new Map<string, DraftRecord>();
+// globalThis 캐싱 — 번들 청크 분리로 인스턴스가 갈라지는 것 방지 (영속화 시 제거)
+const g = globalThis as unknown as { __namgidaDrafts?: Map<string, DraftRecord> };
+const drafts = (g.__namgidaDrafts ??= new Map<string, DraftRecord>());
 
 export function createDraft(
   intentId: string,

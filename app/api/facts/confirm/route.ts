@@ -3,6 +3,7 @@
 // 필수 슬롯이 비어 있으면 확정 자체를 거부한다 (FR-102 — 추측으로 채우지 않는다).
 import { FactsConfirmReq, FactsConfirmRes } from "@/lib/contracts";
 import { getSession } from "@/lib/ai/session/store";
+import { requiredSlotsFor } from "@/lib/ai/extract/mock-extractor";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -36,14 +37,22 @@ export async function POST(req: Request) {
     );
   }
 
-  if (session.missingRequired.length > 0) {
+  // 필수 슬롯은 추출 시점 스냅숏이 아니라 **확정 시점에 재검증**한다 (FR-102).
+  // PATCH로 필수 값을 null로 비워도 여기서 걸린다 — UI가 아니라 서버의 방어선.
+  const required = requiredSlotsFor(session.proposals.at(-1)?.branchType ?? null);
+  const missing = required.filter((key) => {
+    const fact = session.facts.find((f) => f.key === key);
+    return !fact || fact.value === null || fact.value === "";
+  });
+  session.missingRequired = missing;
+  if (missing.length > 0) {
     return Response.json(
       {
         ok: false,
         error: {
           code: "FACTS_INCOMPLETE",
           message: "아직 채워지지 않은 항목이 있습니다.",
-          nextAction: `다음 항목을 먼저 알려주세요: ${session.missingRequired.join(", ")}`,
+          nextAction: `다음 항목을 먼저 알려주세요: ${missing.join(", ")}`,
         },
       },
       { status: 422 },

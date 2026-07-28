@@ -19,6 +19,11 @@ const REQUIRED_SLOTS: Record<string, string[]> = {
   HERITAGE_SUPPORT: ["orgName", "amount"],
 };
 
+/** confirm·documents가 확정 시점에 재검증할 때 쓴다 — 추출 시점 스냅숏에 의존하지 않기 위해 */
+export function requiredSlotsFor(branchType: string | null): string[] {
+  return branchType ? (REQUIRED_SLOTS[branchType] ?? []) : [];
+}
+
 function fact(
   key: string,
   value: string | number,

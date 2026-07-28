@@ -29,7 +29,10 @@ export interface SessionRecord {
   startedAt: string;
 }
 
-const sessions = new Map<string, SessionRecord>();
+// globalThis 캐싱 — Next가 라우트를 다른 청크로 번들해도 인스턴스가 갈라지지 않게.
+// (dev 실측은 통과했지만 보장된 동작이 아니다. 영속화(Supabase)가 붙으면 제거)
+const g = globalThis as unknown as { __namgidaSessions?: Map<string, SessionRecord> };
+const sessions = (g.__namgidaSessions ??= new Map<string, SessionRecord>());
 
 /** 조회 전용 — 없으면 undefined (extract·facts 라우트는 세션을 만들지 않는다) */
 export function getSession(sessionId: string): SessionRecord | undefined {
