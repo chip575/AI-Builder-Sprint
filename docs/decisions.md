@@ -232,3 +232,27 @@ switch 문이다. **일부 기능 때문에 억지로 끼워 맞추면 "실질 �
 **재검토 조건 (대회 이후)**: 가지 10종 초과 · LLM의 동적 경로 선택 필요 ·
 human-in-the-loop 중단점 다수화 · 체크포인트를 DB 행이 아닌 실행 상태로
 관리할 필요. 둘 이상이면 다시 본다.
+
+## D-18 · 영속화 접근 모드 — service role + 명시 필터, RLS는 심층방어
+
+**정함**: 서버 라우트는 Supabase service role로 접근하되 모든 쿼리에
+`user_id`(또는 intent 소유) 필터를 코드로 명시한다. RLS는 전 테이블에
+켜두되, 클라이언트 직접 접근 방어용 2차 방어선으로 둔다.
+
+**왜 (정직한 타협)**: RLS가 실제로 강제되려면 라우트가 사용자 세션 스코프
+클라이언트를 써야 하는데, M-AUTH가 M0 마지막이라 지금은 세션이 없다.
+그리고 웹훅·cron 라우트는 어차피 세션이 없어 service role이 필수다.
+M-ADMIN(M1)의 "RLS로 기관 격리" 시연 시 admin 라우트만 세션 스코프로
+전환한다. Q&A에서 물으면 이 순서 그대로 답한다 — 숨기지 않는다.
+
+**폴백 규칙 (NFR-707 정합)**: SUPABASE_URL이 없으면 인메모리 스토어로
+동작하고 기동 로그 1줄로 선언한다("DATA_MODE=memory"). 예선 에이전트는
+키가 없으므로 이것이 명시 요구사항이며, 보안 7조의 "조용한 폴백 금지"와
+충돌하지 않는다 — 로그로 선언되고, 실체 착각(실 서명이 된 척)이 없다.
+
+**append-only는 트리거로**: RLS는 service role을 막지 못한다.
+audit_logs·(M3) intent_ledger_nodes의 UPDATE/DELETE 차단은 DB 트리거가 한다.
+
+**테이블 범위**: M0·M1만. heart_will_*·intent_ledger_nodes·
+utterance_embeddings(pgvector)는 M2·M3 마이그레이션에서 — 추가는 싸고
+변경은 비싸다.
