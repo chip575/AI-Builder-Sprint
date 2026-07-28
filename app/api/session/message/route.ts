@@ -9,6 +9,7 @@ import {
 } from "@/lib/ai/session/store";
 import { mockReply, tokenize } from "@/lib/ai/session/mock-responder";
 import { detectExpress } from "@/lib/rules/express-detect";
+import { track } from "@/lib/observability/track";
 
 const encoder = new TextEncoder();
 
@@ -17,6 +18,7 @@ function sse(event: string, data: unknown): Uint8Array {
 }
 
 export async function POST(req: Request) {
+  const t0 = Date.now(); // NFR-709 관측 지점
   if ((process.env.UPSTAGE_MODE ?? "mock") !== "mock") {
     // Solar 연동은 키 확보 후 이 분기에 붙는다. 조용한 mock 폴백 금지 (보안 7조).
     return Response.json(
@@ -78,6 +80,7 @@ export async function POST(req: Request) {
       for (const t of tokens) controller.enqueue(sse("token", t));
       controller.enqueue(sse("meta", meta)); // 항상 마지막 이벤트
       controller.close();
+      track("CONVERSE", true, Date.now() - t0);
     },
   });
 

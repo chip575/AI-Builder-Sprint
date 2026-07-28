@@ -5,8 +5,10 @@
 import { ExtractReq } from "@/lib/contracts";
 import { extractor } from "@/lib/ai/extract";
 import { getSession } from "@/lib/ai/session/store";
+import { track } from "@/lib/observability/track";
 
 export async function POST(req: Request) {
+  const t0 = Date.now(); // NFR-709 관측 지점
   const body = await req.json().catch(() => null);
   const parsed = ExtractReq.safeParse(body);
   if (!parsed.success) {
@@ -41,13 +43,30 @@ export async function POST(req: Request) {
   // 가지 유형 = 최신 제안 기준 (M0은 Express 단일 제안)
   const branchType = session.proposals.at(-1)?.branchType ?? null;
 
-  const result = await extractor.extract({
-    intentId: session.id,
-    branchType,
-    utterances: session.utterances,
-  });
+  let result;
+  try {
+    result = await extractor.extract({
+      intentId: session.id,
+      branchType,
+      utterances: session.utterances,
+    });
+  } catch {
+    track("EXTRACT", false, Date.now() - t0);
+    return Response.json(
+      {
+        ok: false,
+        error: {
+          code: "EXTRACT_FAILED",
+          message: "정리하는 데 시간이 걸리네요.",
+          nextAction: "잠시 후 다시 시도하거나 직접 입력해 주세요.",
+        },
+      },
+      { status: 502 },
+    );
+  }
 
   session.facts = result.facts; // 확정(confirmed) 갱신은 M-FACTS-CONFIRM 소관
 
+  track("EXTRACT", true, Date.now() - t0);
   return Response.json({ ok: true, data: result });
 }
