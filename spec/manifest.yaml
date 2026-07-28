@@ -79,7 +79,7 @@ modules:
   test: pnpm test gate
   model: opus              # 핵심 자산. 초안만 AI, 병합은 사람 (보안 5조)
   human_review: required
-  status: todo
+  status: done
 
 - id: M-RULES-DONATION
   mvp: M0
@@ -94,7 +94,7 @@ modules:
   test: pnpm test rules    # 100만→276000 / 특별재난→408000 / 10만→100000
   model: opus
   human_review: required
-  status: todo
+  status: done
 
 - id: M-REWARDS
   mvp: M0
