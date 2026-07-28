@@ -1,18 +1,21 @@
 # 시작하기 — VS Code에서 바로 실행
 
-## 1. 배치
+**이 폴더가 레포 루트다.** VS Code로 이 폴더를 직접 열어야 `.claude/` 훅이 작동한다
+(상위 폴더에서 열면 소유 경로 차단이 로드되지 않는다).
 
-이 폴더 내용을 레포 루트에 그대로 복사한다.
+## 1. 구조
 
 ```
 CLAUDE.md              ← Claude Code가 매 세션 자동 로드
 AGENTS.md              ← 팀 공통 규칙 (Codex도 읽음)
 START-HERE.md          ← 이 파일
-package.json.snippet   ← 기존 package.json에 scripts 병합
 .claude/
   agents/{impl-worker,constitution-gate,contract-owner}.md
   scripts/{gate-check,check-ownership,update-manifest}.sh
   settings.json        ← 훅
+lib/
+  contracts/           ← 입출력의 유일한 진실 (Zod). PM_MODE 없이 수정 불가
+  rules/               ← 법률 수치·게이트. 사람 리뷰 필수
 spec/
   manifest.yaml        ← 오케스트레이터는 이것만 읽는다
   00-constitution.md · 00.1-rules.md · 00.2-glossary.md · 01.0-index.md · 03.0-mvp.md
@@ -22,31 +25,26 @@ spec/
 docs/
   decisions.md         ← ClickUp에 없는 결정 이력 16건. 먼저 읽을 것
   ai-usage.md          ← SDD·에이전트 하네스 = AI 활용 근거 정리
-  주제-통합정리본.md      ← 명세 15개를 읽는 순서로 합친 단일 문서 (공유·검토용)
+  spec-merged.md       ← 명세를 읽는 순서로 합친 단일 문서 (공유·검토용)
   ai-log.md            ← 매일 한 줄
 ```
 
-## 2. 실행 권한
+## 2. 설치·검증
 
 ```bash
-chmod +x .claude/scripts/*.sh
+pnpm install     # 또는 npm install
+pnpm gate:check  # 8종 전부 PASS여야 정상
+pnpm test        # 게이트·룰테이블 유닛테스트
+pnpm dev         # 예선 에이전트의 채점 경로 (NFR-707)
 ```
 
-## 3. package.json에 추가
+## 3. 보호 경로 작업 (PM만)
 
-```json
-"scripts": {
-  "gate:check": "bash .claude/scripts/gate-check.sh"
-}
-```
-
-## 4. 첫 검증
+`lib/contracts/**`·`lib/rules/**`는 훅이 차단한다. PM이 직접 고칠 때만:
 
 ```bash
-pnpm gate:check
+PM_MODE=1  # 작업 후 반드시 unset — 켠 채로 워커를 띄우면 안전장치 전체가 무력화된다
 ```
-
-레포가 비어 있으면 tsc는 건너뛰고 나머지 7개 검사가 돈다. 전부 PASS여야 정상.
 
 ## 5. 첫 작업 — 계약 코드화
 
