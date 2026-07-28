@@ -66,6 +66,7 @@ export async function POST(req: Request) {
   }
 
   session.facts = result.facts; // 확정(confirmed) 갱신은 M-FACTS-CONFIRM 소관
+  session.missingRequired = result.missingRequired;
 
   track("EXTRACT", true, Date.now() - t0);
   return Response.json({ ok: true, data: result });

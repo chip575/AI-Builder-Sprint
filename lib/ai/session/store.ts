@@ -24,6 +24,8 @@ export interface SessionRecord {
   proposals: BranchProposalRecord[];
   /** M-EXTRACT 결과 — 재추출 시 교체. 확정(confirmed)은 M-FACTS-CONFIRM이 갱신 */
   facts: IntentFact[];
+  /** 최근 추출 시점의 필수 슬롯 공백 — confirm·문서 생성 차단 근거 (FR-102) */
+  missingRequired: string[];
   startedAt: string;
 }
 
@@ -44,6 +46,7 @@ export function getOrCreateSession(sessionId?: string | null): SessionRecord {
     utterances: [],
     proposals: [],
     facts: [],
+    missingRequired: [],
     startedAt: new Date().toISOString(),
   };
   sessions.set(record.id, record);
@@ -54,6 +57,17 @@ export function addUtterance(session: SessionRecord, text: string): Utterance {
   const u: Utterance = { id: randomUUID(), text, at: new Date().toISOString() };
   session.utterances.push(u);
   return u;
+}
+
+/** factId로 세션 전체에서 fact와 소속 세션을 찾는다 (M-FACTS-CONFIRM용) */
+export function findFact(
+  factId: string,
+): { session: SessionRecord; fact: IntentFact } | undefined {
+  for (const session of sessions.values()) {
+    const fact = session.facts.find((f) => f.id === factId);
+    if (fact) return { session, fact };
+  }
+  return undefined;
 }
 
 export function addProposal(

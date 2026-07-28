@@ -56,15 +56,15 @@ modules:
   mvp: M0
   fr: [FR-103]
   owner: fe
-  route: PATCH /api/facts/[id]
+  route: PATCH /api/facts/[id] · POST /api/facts/confirm
   front: app/(ui)/confirm/FactSheet
-  in: FactPatch
-  out: FactPatchRes        # { fact, recalc? }
+  in: FactPatch · FactsConfirmReq          # 확정은 confirm 라우트로만 (P1, contract-owner 2026-07-29)
+  out: FactPatchRes · FactsConfirmRes      # { fact, recalc? } / { confirmedCount, confirmedAt }
   owns: [app/api/facts/**, app/(ui)/confirm/**]
   spec: spec/fr/01.1-common-donation.md
   test: pnpm test facts
   model: haiku
-  status: todo
+  status: done
 
 - id: M-GATE
   mvp: M0
