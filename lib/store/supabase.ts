@@ -21,6 +21,14 @@ import {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
 
+/** timestamptz → ISO(Z) 정규화.
+ *  PostgREST는 '2026-07-29T17:30:07.054+00:00'(오프셋)로 주는데 계약의
+ *  z.string().datetime()은 Z 표기만 허용한다. 형식 변환은 번역 계층의 일이다 —
+ *  인메모리와 Supabase가 **같은 형식**을 내보내야 계약이 하나로 유지된다. */
+function iso(v: string | null | undefined): any {
+  return v == null ? v : new Date(v).toISOString();
+}
+
 const toFact = (r: Row): IntentFact => ({
   id: r.id,
   key: r.key,
@@ -33,8 +41,8 @@ const toFact = (r: Row): IntentFact => ({
 const toUtterance = (r: Row): Utterance => ({
   id: r.id,
   text: r.text,
-  at: r.spoken_at,
-  deletedAt: r.deleted_at,
+  at: iso(r.spoken_at),
+  deletedAt: iso(r.deleted_at),
 });
 
 const toDraft = (r: Row): DraftRecord => ({
@@ -46,7 +54,7 @@ const toDraft = (r: Row): DraftRecord => ({
   status: r.status as DocStatus,
   modusignDocumentId: r.modusign_document_id,
   rejectReason: r.reject_reason,
-  createdAt: r.created_at,
+  createdAt: iso(r.created_at),
 });
 
 export class SupabaseStore implements StorePort {
@@ -102,7 +110,7 @@ export class SupabaseStore implements StorePort {
     return {
       id: intent.id,
       userId: intent.user_id,
-      startedAt: intent.started_at,
+      startedAt: iso(intent.started_at),
       utterances: (utts.data ?? []).map(toUtterance),
       proposals: (props.data ?? []).map(
         (r: Row): BranchProposalRecord => ({
@@ -110,7 +118,7 @@ export class SupabaseStore implements StorePort {
           branchType: r.branch_type as BranchType,
           origin: r.origin as BranchOrigin,
           sourceUtteranceId: r.source_utterance_id,
-          createdAt: r.created_at,
+          createdAt: iso(r.created_at),
         }),
       ),
       facts: (facts.data ?? []).map(toFact),
@@ -126,17 +134,17 @@ export class SupabaseStore implements StorePort {
   }
 
   async softDeleteUtterance(utteranceId: string): Promise<boolean> {
-    // 트리거가 단방향 전이를 강제한다 — 이미 삭제된 행이면 예외 → false로 번역
-    const { error } = await this.db
+    // .is("deleted_at", null) 필터가 이미 삭제된 행을 0행 매치로 걸러낸다.
+    // ⚠ 이때 "지금 삭제했다"와 "이미 삭제돼 있었다"를 구분하려면 반드시 .select()로
+    //   **영향받은 행**을 받아야 한다 — 사후 재조회는 둘을 구분하지 못한다
+    //   (계약 스위트가 잡은 실제 버그: 2회째 호출이 true를 반환했다).
+    const { data, error } = await this.db
       .from("utterances")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", utteranceId)
-      .is("deleted_at", null);
-    if (error) return false;
-    // eq+is 필터로 0행 매치면 update는 조용히 지나간다 — 실제 삭제됐는지 확인
-    const { data } = await this.db
-      .from("utterances").select("deleted_at").eq("id", utteranceId).maybeSingle();
-    if (!data || data.deleted_at === null) return false;
+      .is("deleted_at", null)
+      .select("id");
+    if (error || !data || data.length === 0) return false;
     await this.audit("utterance.softDelete", utteranceId);
     return true;
   }
@@ -162,7 +170,7 @@ export class SupabaseStore implements StorePort {
       branchType: data.branch_type,
       origin: data.origin,
       sourceUtteranceId: data.source_utterance_id,
-      createdAt: data.created_at,
+      createdAt: iso(data.created_at),
     };
   }
 
@@ -306,8 +314,8 @@ export class SupabaseStore implements StorePort {
       event: r.event,
       modusignDocumentId: r.modusign_document_id,
       payload: r.payload,
-      receivedAt: r.received_at,
-      processedAt: r.processed_at,
+      receivedAt: iso(r.received_at),
+      processedAt: iso(r.processed_at),
     }));
   }
 
@@ -336,9 +344,9 @@ export class SupabaseStore implements StorePort {
       draftId: data.draft_id,
       pdfStoragePath: data.pdf_storage_path,
       sha256: data.sha256,
-      signedAt: data.signed_at,
+      signedAt: iso(data.signed_at),
       parties: data.parties,
-      createdAt: data.created_at,
+      createdAt: iso(data.created_at),
     };
   }
 
@@ -352,9 +360,9 @@ export class SupabaseStore implements StorePort {
       draftId: data.draft_id,
       pdfStoragePath: data.pdf_storage_path,
       sha256: data.sha256,
-      signedAt: data.signed_at,
+      signedAt: iso(data.signed_at),
       parties: data.parties,
-      createdAt: data.created_at,
+      createdAt: iso(data.created_at),
     };
   }
 }

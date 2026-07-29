@@ -90,14 +90,42 @@ export function storeContractTests(name: string, makeStore: () => Promise<StoreP
         statutes: [],
       });
       expect(draft.status).toBe("DRAFT");
-      await s.markDraftRequested(draft.draftId, "mock-doc-1");
+      // 고정 문자열 금지 — modusign_document_id는 UNIQUE라, 영속 DB에서 재실행하면
+      // 충돌한다. 공유 스위트는 인메모리든 실 DB든 몇 번을 돌려도 통과해야 한다.
+      const docId = `mock-doc-${randomUUID()}`;
+      await s.markDraftRequested(draft.draftId, docId);
       let d = await s.getDraft(draft.draftId);
       expect(d?.status).toBe("REQUESTED");
-      expect(d?.modusignDocumentId).toBe("mock-doc-1");
+      expect(d?.modusignDocumentId).toBe(docId);
       await s.syncDraftStatus(draft.draftId, "COMPLETED");
       d = await s.getDraft(draft.draftId);
       expect(d?.status).toBe("COMPLETED");
       expect(d?.verdict.verdict).toBe("ESIGN_OK"); // 판정 원본 보존
+    });
+
+    it("시각은 ISO(Z) 형식으로 나온다 — 두 구현이 같은 형식이어야 계약이 하나로 유지된다", async () => {
+      // 계약의 z.string().datetime()은 Z 표기만 허용한다. PostgREST는 '+00:00'로 주므로
+      // 어댑터가 정규화해야 한다 (e2e에서 500으로 터진 실제 버그).
+      const ISO_Z = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+      const s = await makeStore();
+      const session = await s.getOrCreateSession();
+      expect(session.startedAt).toMatch(ISO_Z);
+      const u = await s.addUtterance(session.id, "시각 형식 확인");
+      expect(u.at).toMatch(ISO_Z);
+      const draft = await s.createDraft(session.id, "DONATION_PLEDGE", {
+        verdict: "ESIGN_OK",
+        statutes: [],
+      });
+      expect(draft.createdAt).toMatch(ISO_Z);
+      const ev = await s.createEvidence({
+        draftId: draft.draftId,
+        pdfStoragePath: `evidences/${draft.draftId}.pdf`,
+        sha256: "a".repeat(64),
+        signedAt: new Date().toISOString(),
+        parties: [],
+      });
+      expect(ev.signedAt).toMatch(ISO_Z);
+      expect(ev.createdAt).toMatch(ISO_Z);
     });
 
     it("events: 처리 마킹 후 미처리 목록에서 제외 (아웃박스)", async () => {
