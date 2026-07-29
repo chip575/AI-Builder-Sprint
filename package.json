@@ -8,7 +8,8 @@
     "start": "next start",
     "gate:check": "bash .claude/scripts/gate-check.sh",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "node scripts/e2e-mock.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.9",

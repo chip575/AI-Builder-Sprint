@@ -165,7 +165,7 @@ modules:
   spec: spec/fr/01.3-esign-clm.md
   test: pnpm test evidence
   model: haiku
-  status: todo
+  status: done
 
 - id: M-MOCK
   mvp: M0
