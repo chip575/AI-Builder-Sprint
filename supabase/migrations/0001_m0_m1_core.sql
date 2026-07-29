@@ -19,8 +19,11 @@ end $$;
 -- ── intents — 세션 1건 = Intent 1건 (00.2 §7) ────────────────
 create table public.intents (
   id          uuid primary key default gen_random_uuid(),
-  -- M-AUTH(M0 마지막) 전까지 null 허용. 연결 후 NOT NULL 마이그레이션 예정
-  user_id     uuid references auth.users (id),
+  -- NULL 금지 원칙: 인메모리/개발 경로는 NULL 대신 DEV_USER_ID
+  -- ('00000000-0000-4000-8000-0000000000de')를 넣는다 — 0002가 SET NOT NULL 한 줄로 끝나게.
+  -- auth.users FK는 M-AUTH 전이라 걸 수 없다(존재하지 않는 유저 uuid) → 0002에서 NOT NULL과 함께.
+  -- 사전 작성본: supabase/migrations/_pending/0002_user_id_not_null.sql
+  user_id     uuid,
   -- [기준4] lib/contracts/common.ts IntentKind와 자구 일치
   kind        text not null default 'BRANCH'
               check (kind in ('SPINE_SESSION', 'BRANCH')),
@@ -29,13 +32,38 @@ create table public.intents (
 
 -- ── utterances — 원문 발화. 덮어쓰지 않는다 (FR-111, D-10) ───
 create table public.utterances (
-  id         uuid primary key default gen_random_uuid(),
-  intent_id  uuid not null references public.intents (id),
+  id          uuid primary key default gen_random_uuid(),
+  intent_id   uuid not null references public.intents (id),
   -- [기준5] 식별번호 원문 저장 금지 — 저장 직전 서버 마스킹 (NFR-712, 02.4 §0)
-  text       text not null,
-  spoken_at  timestamptz not null default now()
+  text        text not null,
+  spoken_at   timestamptz not null default now(),
+  -- 소프트 삭제 — 본인의 명시적 요청만, 번복 불가 (D-10). 조회는 deleted_at IS NULL 필터,
+  -- 감사 뷰는 "삭제된 발화가 존재했다"는 사실만 노출(내용 마스킹)
+  deleted_at  timestamptz
 );
 create index utterances_intent_idx on public.utterances (intent_id, spoken_at);
+
+-- UPDATE는 원칙 금지 — 근거 발화(source_utterance) 참조가 무너진다 (FR-111).
+-- 유일한 허용 전이: deleted_at NULL → 값 (단방향, 다른 컬럼 불변). 물리 DELETE 금지.
+create or replace function public.utterances_guard()
+returns trigger language plpgsql as $$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'utterances는 물리 삭제 금지 — deleted_at 소프트 삭제만 (D-10)';
+  end if;
+  if new.id is distinct from old.id
+     or new.intent_id is distinct from old.intent_id
+     or new.text is distinct from old.text
+     or new.spoken_at is distinct from old.spoken_at
+     or old.deleted_at is not null
+     or new.deleted_at is null then
+    raise exception 'utterances 수정 불가 — 허용 전이는 deleted_at NULL→값 뿐 (FR-111, D-10)';
+  end if;
+  return new;
+end $$;
+create trigger utterances_guard
+  before update or delete on public.utterances
+  for each row execute function public.utterances_guard();
 
 -- ── branch_proposals — 가지 제안. origin은 분석·감사용 (FR-115) ─
 create table public.branch_proposals (
@@ -117,6 +145,11 @@ create table public.evidences (
   parties           jsonb not null,
   created_at        timestamptz not null default now()
 );
+-- 증빙은 불변이어야 해시 검증 주장이 성립한다 (FR-505). 본인 삭제권(D-10)은
+-- 본인의 이야기에 대한 것 — 상대방이 있는 체결 증빙은 삭제 대상이 아니다.
+create trigger evidences_append_only
+  before update or delete on public.evidences
+  for each row execute function public.forbid_mutation();
 
 -- ── obligations — 이행 관리 (FR-508 · M1) ────────────────────
 create table public.obligations (
@@ -145,16 +178,22 @@ create trigger audit_logs_append_only
   before update or delete on public.audit_logs
   for each row execute function public.forbid_mutation();
 
--- ── gate_blocks — 게이트 차단 카운터 (FR-509 · M1) ───────────
-create table public.gate_blocks (
-  id          bigint generated always as identity primary key,
-  doc_type    text not null,
-  verdict     text not null check (verdict in ('ESIGN_INVALID','NON_BINDING')),
-  statutes    jsonb not null,           -- 차단 사유·조문 (FR-509 수락 기준)
-  created_at  timestamptz not null default now()
+-- ── gate_verdicts — 게이트 판정 이력 (FR-509 · NFR-709 · M1) ─
+-- 기록은 3분기 전부 (게이트가 살아있다는 증거·분포 화면용).
+-- FR-509 "차단 카운터"의 숫자는 verdict='ESIGN_INVALID' AND was_sign_attempt만 집계 —
+-- NON_BINDING은 차단이 아니라 정상 라우팅이다. 부풀린 지표는 없느니만 못하다.
+create table public.gate_verdicts (
+  id                bigint generated always as identity primary key,
+  doc_type          text not null,
+  verdict           text not null check (verdict in
+    ('ESIGN_OK','ESIGN_INVALID','NON_BINDING')),
+  -- 서명 경로로 가려던 요청이었는가 — ESIGN_INVALID인데 서명 API가 호출된 경우만 true
+  was_sign_attempt  boolean not null default false,
+  statutes          jsonb not null,     -- 사유·조문 (FR-509 수락 기준)
+  created_at        timestamptz not null default now()
 );
-create trigger gate_blocks_append_only
-  before update or delete on public.gate_blocks
+create trigger gate_verdicts_append_only
+  before update or delete on public.gate_verdicts
   for each row execute function public.forbid_mutation();
 
 -- ── pipeline_metrics — 6단계 실행 지표 (NFR-709 · M1) ────────
@@ -180,7 +219,7 @@ alter table public.evidences        enable row level security;
 alter table public.obligations      enable row level security;
 alter table public.webhook_events   enable row level security;
 alter table public.audit_logs       enable row level security;
-alter table public.gate_blocks      enable row level security;
+alter table public.gate_verdicts    enable row level security;
 alter table public.pipeline_metrics enable row level security;
 
 -- 본인 소유 행만 (intents 기준, 자식은 EXISTS 연결)
@@ -213,5 +252,5 @@ create policy evidences_owner on public.evidences
     join public.intents i on i.id = d.intent_id
     where d.id = draft_id and i.user_id = auth.uid()));
 
--- webhook_events·audit_logs·gate_blocks·pipeline_metrics·obligations:
+-- webhook_events·audit_logs·gate_verdicts·pipeline_metrics·obligations:
 -- 정책 없음 = 클라이언트 전면 차단. 서버(service role)만 접근한다.

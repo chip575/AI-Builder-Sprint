@@ -23,6 +23,7 @@ modules:
   test: pnpm test auth
   model: haiku
   status: todo
+  note: 완료 직후 supabase/migrations/_pending/0002(user_id NOT NULL+FK) 적용 — 기억에 의존하지 않기
 
 - id: M-SESSION-MSG
   mvp: M0
@@ -179,6 +180,21 @@ modules:
   test: pnpm test mock     # 키 없이 전 흐름
   model: haiku
   status: done
+
+- id: M-PERSISTENCE
+  mvp: M0
+  fr: [NFR-704, NFR-707, FR-503]
+  owner: be2
+  route: null
+  front: null
+  in: null
+  out: null                # supabase/migrations 0001 + StorePort. 키 없으면 인메모리 폴백 (D-18)
+  owns: [supabase/**, lib/db/**]
+  spec: docs/decisions.md
+  test: pnpm test store
+  model: sonnet
+  human_review: required   # RLS·append-only 트리거 (보안 5조)
+  status: wip
 
 # ── M1 · "체결이 끝이 아니다" (여기부터 병렬) ──────────────────
 - id: M-OBLIGATIONS

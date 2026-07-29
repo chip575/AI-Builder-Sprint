@@ -1231,7 +1231,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 | 모듈 | 프론트 | 라우트 | 입력 Zod | 출력 Zod | MVP |
 | ---| ---| ---| ---| ---| --- |
 | 🟢 extract | (서버 내부) | POST extract | { intentId } | { facts: IntentFact\[\] } | M0 |
-| 🟢 facts 확인 | confirm/FactSheet | PATCH facts/\[id\] | FactPatch { value } | { fact, 🟡 recalc?: { field, oldValue, newValue, formula } } | M0 |
+| 🟢 facts 확인 | confirm/FactSheet | PATCH facts/\[id\] · POST facts/confirm | FactPatch { value } / FactsConfirmReq { intentId } | { fact, 🟡 recalc?: { field, oldValue, newValue, formula } } / { confirmedCount, confirmedAt } | M0 |
 | 🔴 답례품 선택 | branch/RewardPicker | GET rewards?orgId= · POST rewards/select | RewardSelect { rewardIds\[\], amount } | { selectedRewards\[\], remaining, 🟡 overLimit: boolean } | M0 |
 | 🟢 gate | (서버 내부) | POST gate | { docType, facts } | GateVerdict { verdict, statutes\[\] } | M0 |
 
@@ -1285,7 +1285,7 @@ auth/LoginPage → chat/SessionView
   ↓ SessionView가 가지 슬롯 대화 모드로 전환
   ↓ 슬롯 완성
 confirm/FactSheet (세액공제 계산 포함)
-  ↓ 확인 클릭
+  ↓ 확인 클릭 (POST facts/confirm)
   ↓ (서버: extract → gate → ESIGN_OK)
 branch/RewardPicker (답례품 30% 한도)
   ↓ 선택 완료
@@ -1469,6 +1469,7 @@ S1 로그인 (auth/LoginPage)
 | 확인·인라인 편집, 미확인 시 서버 거부 | FR-103 | facts.confirmed 게이트 조건 |
 | 유효성 게이트 (3분기 전체 로직) | FR-104, 00.1 | facts → verdict, 유언 케이스는 픽스처로 검증 |
 | 문서 생성 + 서명 요청 | FR-501, 02.3 | draft → modusign\_document\_id |
+| 영속화 — 스키마·RLS·append-only 트리거·StorePort | D-18, NFR-704, NFR-707 | supabase/migrations 0001. 키 없으면 인메모리 폴백(기동 로그 선언). 웹훅 UNIQUE의 전제 |
 | 웹훅 즉시200 + 멱등 | FR-503 | webhook\_events UNIQUE |
 | 증빙 보관 (PDF+해시) | FR-505 | evidences |
 | mock 전 흐름 | NFR-707, 02.4 §4 | 키 없이 동일 경로 — 예선 에이전트 채점 경로 |
@@ -1489,7 +1490,9 @@ S1 로그인 (auth/LoginPage)
 | 정기후원 + 갱신 Obligation 자동 생성 | FR-204 → FR-508 | 체결 완료 훅 → obligations |
 | 리컨실러 (웹훅 유실 복구) | FR-504 | cron → 상세조회 대조 |
 | 거절 처리·리마인드 | FR-506·507 | REJECTED 사유, 48h 재발송 |
-| 관리 대시보드 최소 (상태별·증빙 다운로드) | FR-601·602 | RLS 격리 |
+| 게이트 차단 카운터 | FR-509 | gate\_blocks — 차단 사유·조문 로깅, 관리자 화면 노출 |
+| 6단계 실행 지표 화면 | NFR-709 | pipeline\_metrics — track() 계측은 M0에 선삽입됨 |
+| 관리 대시보드 (상태별·증빙 다운로드·일괄 리마인드·갱신 도래·기간 집계) | FR-601~605 | RLS 격리 |
 | 종이 약정 옮기기 (DP+IE) | FR-401 응용, 02.4 §5 | 종이 기부약정 사진 → 갱신 체결. Upstage 가점 보호 장치 |
 | 시간 압축 컨트롤 | 02.4 admin/advance-time | "주기 무관 관리" 성질의 시연 |
 
@@ -1527,6 +1530,7 @@ S1 로그인 (auth/LoginPage)
 | 유족 타임라인 + 검증 배지 | FR-556 | 시간 압축과 결합한 발표 피크 |
 | Embeddings 회상 검색 | 02.5 §3 | 재개 카드 고도화 — 기간 무관 관리의 기술적 성립 |
 | 이어쓰기 초대·재검토 | FR-113, FR-305 | obligations kind 확장 |
+| 검증 통과율 측정 (ADR-7) | D-08 | eval/fixtures 10케이스 → 통과율 기록 → results.json 커밋 |
 
 **완료 판정**: 수증자 변경 → 재서명 → 가족 인지 → 노드 ACTIVE/SUPERSEDED가 타임라인에 표시.
 **배점 연결**: 생애주기 12 심화 · 서명 플로우 15(다자·다단계) · 창의성 20.

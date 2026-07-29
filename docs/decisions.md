@@ -256,3 +256,14 @@ audit_logs·(M3) intent_ledger_nodes의 UPDATE/DELETE 차단은 DB 트리거가 
 **테이블 범위**: M0·M1만. heart_will_*·intent_ledger_nodes·
 utterance_embeddings(pgvector)는 M2·M3 마이그레이션에서 — 추가는 싸고
 변경은 비싸다.
+
+**D-18 검토 반영 (2026-07-29)**: ① evidences 불변 트리거 즉시 — 해시 검증
+주장은 원본 행 불변일 때만 성립하고, 본인 삭제권은 체결 증빙에 적용되지
+않는다. ② utterances는 UPDATE 차단 + deleted_at 단방향 소프트 삭제(번복
+불가, 물리 DELETE 금지). ③ dev 경로는 user_id에 DEV_USER_ID 상수 — 0002는
+SET NOT NULL + FK 한 번에 (사전 작성: _pending/0002). ④ gate_blocks →
+gate_verdicts 개명, 3분기 전부 기록 + was_sign_attempt 컬럼. FR-509 카운터는
+ESIGN_INVALID AND was_sign_attempt만 집계 — NON_BINDING은 정상 라우팅이다.
+
+**미결**: 삭제된 발화를 근거로 가진 마음 유언 문단 처리(고아 표시 vs 연쇄
+삭제 제안) — M2 heart_will 설계 시 결정.
