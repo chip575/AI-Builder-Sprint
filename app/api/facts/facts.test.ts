@@ -5,6 +5,7 @@ import {
   addProposal,
   addUtterance,
   getOrCreateSession,
+  getSession,
   type SessionRecord,
 } from "@/lib/ai/session/store";
 import { POST as extractPost } from "@/app/api/extract/route";
@@ -14,10 +15,10 @@ import { POST as confirmPost } from "./confirm/route";
 
 /** 부산 + 100만원 기부 세션을 만들고 추출까지 끝낸 상태를 준비 */
 async function extractedSession(...texts: string[]): Promise<SessionRecord> {
-  const s = getOrCreateSession();
-  const first = addUtterance(s, texts[0] ?? "부산에 100만원 기부하고 싶어요");
-  addProposal(s, "DONATION_NOW", "EXPRESS", first.id);
-  for (const t of texts.slice(1)) addUtterance(s, t);
+  const s = await getOrCreateSession();
+  const first = await addUtterance(s.id, texts[0] ?? "부산에 100만원 기부하고 싶어요");
+  await addProposal(s.id, "DONATION_NOW", "EXPRESS", first.id);
+  for (const t of texts.slice(1)) await addUtterance(s.id, t);
   await extractPost(
     new Request("http://localhost/api/extract", {
       method: "POST",
@@ -25,7 +26,7 @@ async function extractedSession(...texts: string[]): Promise<SessionRecord> {
       body: JSON.stringify({ intentId: s.id }),
     }),
   );
-  return s;
+  return (await getSession(s.id))!; // 추출 반영된 최신 뷰
 }
 
 function patch(factId: string, body: unknown) {

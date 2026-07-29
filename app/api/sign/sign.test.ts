@@ -25,10 +25,11 @@ function status(draftId: string) {
 
 const okDraft = () =>
   createDraft(crypto.randomUUID(), "DONATION_PLEDGE", evaluateGate("DONATION_PLEDGE"));
+const freshDraft = (id: string) => getDraft(id);
 
 describe("M-SIGN — 서명 요청 (FR-501)", () => {
   it("LINK 요청 → signUrl + 만료시각, draft REQUESTED, 역참조 저장", async () => {
-    const draft = okDraft();
+    const draft = await okDraft();
     const res = await sign(draft.draftId, "LINK");
     expect(res.status).toBe(200);
     const { data } = await res.json();
@@ -36,27 +37,28 @@ describe("M-SIGN — 서명 요청 (FR-501)", () => {
     expect(data.embedUrl).toBeNull();
     expect(data.expiresAt).toBeTruthy();
 
-    expect(draft.status).toBe("REQUESTED");
-    const doc = await mockSigner!.getDocument(draft.modusignDocumentId!);
+    const after = (await freshDraft(draft.draftId))!;
+    expect(after.status).toBe("REQUESTED");
+    const doc = await mockSigner!.getDocument(after.modusignDocumentId!);
     expect(doc?.metadata.draftId).toBe(draft.draftId); // metadata 역참조 (02.3 §1)
   });
 
   it("EMBED 요청 → embedUrl", async () => {
-    const draft = okDraft();
+    const draft = await okDraft();
     const { data } = await (await sign(draft.draftId, "EMBED")).json();
     expect(data.embedUrl).toBeTruthy();
     expect(data.signUrl).toBeNull();
   });
 
   it("중복 요청 → 409 ALREADY_REQUESTED", async () => {
-    const draft = okDraft();
+    const draft = await okDraft();
     await sign(draft.draftId);
     const res = await sign(draft.draftId);
     expect(res.status).toBe(409);
   });
 
   it("ESIGN_OK가 아닌 draft → 403 (P2 — 어떤 경로로든 서버가 차단)", async () => {
-    const draft = createDraft(
+    const draft = await createDraft(
       crypto.randomUUID(),
       "HANDWRITTEN_WILL",
       evaluateGate("HANDWRITTEN_WILL"),
@@ -66,7 +68,7 @@ describe("M-SIGN — 서명 요청 (FR-501)", () => {
     const body = await res.json();
     expect(body.error.code).toBe("GATE_BLOCKED");
     expect(body.error.message).toContain("민법 §1066");
-    expect(getDraft(draft.draftId)?.status).toBe("DRAFT"); // 부분 상태 없음
+    expect((await freshDraft(draft.draftId))?.status).toBe("DRAFT"); // 부분 상태 없음
   });
 
   it("없는 draft → 404", async () => {
@@ -76,7 +78,7 @@ describe("M-SIGN — 서명 요청 (FR-501)", () => {
 
 describe("M-SIGN — 상태 폴링 (FR-502)", () => {
   it("요청 전 → DRAFT, 요청 후 → REQUESTED", async () => {
-    const draft = okDraft();
+    const draft = await okDraft();
     let body = await (await status(draft.draftId)).json();
     expect(body.data.status).toBe("DRAFT");
 
@@ -87,21 +89,23 @@ describe("M-SIGN — 상태 폴링 (FR-502)", () => {
   });
 
   it("완료 이벤트 후 폴링 → COMPLETED + completedAt + draft 동기화", async () => {
-    const draft = okDraft();
+    const draft = await okDraft();
     await sign(draft.draftId);
-    mockSigner!.simulateEvent(draft.modusignDocumentId!, "document_completed");
+    const requested = (await freshDraft(draft.draftId))!;
+    mockSigner!.simulateEvent(requested.modusignDocumentId!, "document_completed");
 
     const body = await (await status(draft.draftId)).json();
     expect(body.data.status).toBe("COMPLETED");
     expect(body.data.completedAt).toBeTruthy();
     expect(body.data.parties.every((p: { signedAt: string | null }) => p.signedAt)).toBe(true);
-    expect(getDraft(draft.draftId)?.status).toBe("COMPLETED"); // 폴링이 로컬 동기화
+    expect((await freshDraft(draft.draftId))?.status).toBe("COMPLETED"); // 폴링이 로컬 동기화
   });
 
   it("거절 이벤트 후 폴링 → REJECTED", async () => {
-    const draft = okDraft();
+    const draft = await okDraft();
     await sign(draft.draftId);
-    mockSigner!.simulateEvent(draft.modusignDocumentId!, "document_rejected");
+    const requested = (await freshDraft(draft.draftId))!;
+    mockSigner!.simulateEvent(requested.modusignDocumentId!, "document_rejected");
     const body = await (await status(draft.draftId)).json();
     expect(body.data.status).toBe("REJECTED");
   });

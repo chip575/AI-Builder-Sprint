@@ -4,7 +4,7 @@
 import { SignReq, SignRes } from "@/lib/contracts";
 import { signer } from "@/lib/signer";
 import { track } from "@/lib/observability/track";
-import { getDraft } from "../../documents/store";
+import { getDraft, markDraftRequested } from "../../documents/store";
 
 export async function POST(
   req: Request,
@@ -28,7 +28,7 @@ export async function POST(
     );
   }
 
-  const draft = getDraft(draftId);
+  const draft = await getDraft(draftId);
   if (!draft) {
     return Response.json(
       {
@@ -101,8 +101,7 @@ export async function POST(
     );
   }
 
-  draft.modusignDocumentId = result.documentId;
-  draft.status = "REQUESTED";
+  await markDraftRequested(draft.draftId, result.documentId);
   track("SIGN", true, Date.now() - t0);
 
   return Response.json({

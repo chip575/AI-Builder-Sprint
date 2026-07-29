@@ -3,6 +3,7 @@
 // 게이트는 UI가 아니라 여기(서버)서 차단한다 — 버튼 숨김은 눈속임이다 (FR-104).
 import { DocumentCreateReq, DraftRes } from "@/lib/contracts";
 import { getSession } from "@/lib/ai/session/store";
+import { requiredSlotsFor } from "@/lib/ai/extract/mock-extractor";
 import { evaluateGate } from "@/lib/rules/validity-gate";
 import { BRANCH_PRIMARY_DOC } from "@/lib/rules/branch-doc";
 import { track } from "@/lib/observability/track";
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const session = getSession(parsed.data.intentId);
+  const session = await getSession(parsed.data.intentId);
   if (!session) {
     return Response.json(
       {
@@ -38,24 +39,6 @@ export async function POST(req: Request) {
         },
       },
       { status: 404 },
-    );
-  }
-
-  // 403 ① — 확인 버튼을 누르지 않으면 서버가 거부한다 (FR-103 수락 기준, P1 물증)
-  const unconfirmed =
-    session.facts.length === 0 || session.facts.some((f) => !f.confirmed);
-  if (unconfirmed || session.missingRequired.length > 0) {
-    track("DRAFT", false, Date.now() - t0);
-    return Response.json(
-      {
-        ok: false,
-        error: {
-          code: "FACTS_UNCONFIRMED",
-          message: "아직 확인되지 않은 항목이 있습니다.",
-          nextAction: "확인 화면에서 내용을 확인해 주세요.",
-        },
-      },
-      { status: 403 },
     );
   }
 
@@ -71,6 +54,30 @@ export async function POST(req: Request) {
         },
       },
       { status: 400 },
+    );
+  }
+
+  // 403 ① — 확인 버튼을 누르지 않으면 서버가 거부한다 (FR-103 수락 기준, P1 물증).
+  // 필수 슬롯은 스냅숏이 아니라 현재 fact 값으로 재검증한다 (FR-102)
+  const required = requiredSlotsFor(branchType);
+  const missing = required.filter((key) => {
+    const fact = session.facts.find((f) => f.key === key);
+    return !fact || fact.value === null || fact.value === "";
+  });
+  const unconfirmed =
+    session.facts.length === 0 || session.facts.some((f) => !f.confirmed);
+  if (unconfirmed || missing.length > 0) {
+    track("DRAFT", false, Date.now() - t0);
+    return Response.json(
+      {
+        ok: false,
+        error: {
+          code: "FACTS_UNCONFIRMED",
+          message: "아직 확인되지 않은 항목이 있습니다.",
+          nextAction: "확인 화면에서 내용을 확인해 주세요.",
+        },
+      },
+      { status: 403 },
     );
   }
 
@@ -102,7 +109,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const draft = createDraft(session.id, docType, verdict);
+  const draft = await createDraft(session.id, docType, verdict);
   track("DRAFT", true, Date.now() - t0);
 
   return Response.json({

@@ -2,7 +2,7 @@
 // 세션의 모든 fact를 일괄 확정한다. 이 라우트를 거치지 않으면 문서 생성은 403이다.
 // 필수 슬롯이 비어 있으면 확정 자체를 거부한다 (FR-102 — 추측으로 채우지 않는다).
 import { FactsConfirmReq, FactsConfirmRes } from "@/lib/contracts";
-import { getSession } from "@/lib/ai/session/store";
+import { confirmFacts, getSession } from "@/lib/ai/session/store";
 import { requiredSlotsFor } from "@/lib/ai/extract/mock-extractor";
 
 export async function POST(req: Request) {
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const session = getSession(parsed.data.intentId);
+  const session = await getSession(parsed.data.intentId);
   if (!session) {
     return Response.json(
       {
@@ -44,7 +44,6 @@ export async function POST(req: Request) {
     const fact = session.facts.find((f) => f.key === key);
     return !fact || fact.value === null || fact.value === "";
   });
-  session.missingRequired = missing;
   if (missing.length > 0) {
     return Response.json(
       {
@@ -59,11 +58,8 @@ export async function POST(req: Request) {
     );
   }
 
-  let confirmedCount = 0;
-  for (const fact of session.facts) {
-    if (!fact.confirmed) confirmedCount += 1;
-    fact.confirmed = true; // 유일한 확정 지점 — P1의 해제 경로
-  }
+  // 유일한 확정 지점 — P1의 해제 경로. 확정 규칙은 StorePort가 강제한다
+  const confirmedCount = await confirmFacts(session.id);
 
   return Response.json({
     ok: true,

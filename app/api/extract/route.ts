@@ -4,7 +4,7 @@
 // Intent 1건 = 세션 1건 (00.2 §7) 이므로 intentId로 세션을 조회한다.
 import { ExtractReq } from "@/lib/contracts";
 import { extractor } from "@/lib/ai/extract";
-import { getSession } from "@/lib/ai/session/store";
+import { getSession, saveFacts } from "@/lib/ai/session/store";
 import { track } from "@/lib/observability/track";
 
 export async function POST(req: Request) {
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const session = getSession(parsed.data.intentId);
+  const session = await getSession(parsed.data.intentId);
   if (!session) {
     return Response.json(
       {
@@ -65,9 +65,12 @@ export async function POST(req: Request) {
     );
   }
 
-  session.facts = result.facts; // 확정(confirmed) 갱신은 M-FACTS-CONFIRM 소관
-  session.missingRequired = result.missingRequired;
+  // UPSERT — 확정된 fact는 덮지 않는다 (P1). 응답은 방어 적용 후의 유효 facts
+  const effective = await saveFacts(session.id, result.facts);
 
   track("EXTRACT", true, Date.now() - t0);
-  return Response.json({ ok: true, data: result });
+  return Response.json({
+    ok: true,
+    data: { facts: effective, missingRequired: result.missingRequired },
+  });
 }

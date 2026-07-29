@@ -50,9 +50,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const session = getOrCreateSession(parsed.data.sessionId);
+  const session = await getOrCreateSession(parsed.data.sessionId);
   const isFirstUtterance = session.utterances.length === 0;
-  const utterance = addUtterance(session, parsed.data.text);
+  const utterance = await addUtterance(session.id, parsed.data.text);
 
   // Express 판정은 첫 발화에만 적용된다 (FR-115B "첫 발화가 명시적 의사").
   // 코드 판정이 우선 — UNCERTAIN은 Solar 분류 대상이지만 mock에선 축으로 (결정론).
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
   const branchType = detection.kind === "EXPRESS" ? detection.branchType : null;
 
   const proposal = branchType
-    ? addProposal(session, branchType, "EXPRESS", utterance.id)
+    ? await addProposal(session.id, branchType, "EXPRESS", utterance.id)
     : null;
 
   const meta = SessionMessageRes.parse({

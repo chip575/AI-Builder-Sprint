@@ -2,7 +2,7 @@
 // 값 수정만 한다. 확정은 POST /api/facts/confirm으로만 — P1을 API 층에서 강제.
 // 재추출은 하지 않는다 (수락 기준: "재추출 없이 즉시 반영").
 import { FactPatch, FactPatchRes, type Recalc } from "@/lib/contracts";
-import { findFact } from "@/lib/ai/session/store";
+import { findFact, patchFactValue } from "@/lib/ai/session/store";
 import { computeTaxDeduction } from "@/lib/rules/hometown-donation";
 
 /** recalc가 도는 조건 — 이 둘뿐. 그 외 필드는 recalc: undefined */
@@ -29,7 +29,7 @@ export async function PATCH(
     );
   }
 
-  const found = findFact(id);
+  const found = await findFact(id);
   if (!found) {
     return Response.json(
       {
@@ -85,15 +85,12 @@ export async function PATCH(
     }
   }
 
-  fact.value = parsed.data.value;
-  fact.confidence = 1; // 사용자가 직접 준 값 — 더 되물을 것 없음. 확정과는 별개다
-  // 값이 바뀌면 확정은 무효다 — 확정 후 몰래 바꾸고 문서를 만드는 경로 차단 (P1).
-  // 다시 확정하려면 confirm 라우트를 다시 눌러야 한다.
-  fact.confirmed = false;
+  // 값이 바뀌면 확정 무효(재확정 필요) + confidence=1 — 규칙은 StorePort가 강제한다 (P1)
+  const updated = await patchFactValue(id, parsed.data.value);
 
   return Response.json({
     ok: true,
-    data: FactPatchRes.parse({ fact, recalc }),
+    data: FactPatchRes.parse({ fact: updated, recalc }),
   });
 }
 

@@ -25,7 +25,17 @@ HIT=$(grep -rnE '\b(16\.5|276000|408000|2000만|30%)\b' --include='*.ts' --inclu
 [ -n "$HIT" ] && { red "룰테이블 밖 법률 수치"; echo "$HIT" | head -5; } || grn "수치는 lib/rules에만"
 
 echo "── 4. P1: confirmed 기본값 ──"
-HIT=$(grep -rn 'confirmed[_a-zA-Z]*:\s*true' --include='*.ts' lib/ app/ 2>/dev/null | grep -v '\.test\.')
+# 예외는 라인 단위 — 정당한 확정 지점(FR-103)은 같은 줄 또는 직전 줄에 P1-CONFIRM-PATH 마커.
+# 파일 단위 제외는 금지: 마커 하나가 그 파일의 다른 위반까지 숨긴다.
+HIT=$(grep -rn 'confirmed[_a-zA-Z]*:[[:space:]]*true' --include='*.ts' lib/ app/ 2>/dev/null \
+      | grep -v '\.test\.' \
+      | while IFS=: read -r file line rest; do
+          prev=""; [ "$line" -gt 1 ] && prev=$(sed -n "$((line-1))p" "$file")
+          case "$prev$rest" in
+            *P1-CONFIRM-PATH*) ;;
+            *) echo "$file:$line:$rest" ;;
+          esac
+        done)
 [ -n "$HIT" ] && { red "confirmed=true 기본값 (P1 위반 의심)"; echo "$HIT" | head -5; } || grn "confirmed 기본값 정상"
 
 echo "── 5. 보안: 식별번호 패턴 ──"

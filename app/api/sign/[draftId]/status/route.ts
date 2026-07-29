@@ -3,14 +3,14 @@
 // 상태 머신을 공유하며, 웹훅 유실 시에도 폴링이 상태를 따라잡는다.
 import { SignStatusRes } from "@/lib/contracts";
 import { signer } from "@/lib/signer";
-import { getDraft } from "../../../documents/store";
+import { getDraft, syncDraftStatus } from "../../../documents/store";
 
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ draftId: string }> },
 ) {
   const { draftId } = await ctx.params;
-  const draft = getDraft(draftId);
+  const draft = await getDraft(draftId);
   if (!draft) {
     return Response.json(
       {
@@ -52,7 +52,8 @@ export async function GET(
     );
   }
 
-  draft.status = doc.status; // 폴링 동기화 — 허용 전이는 signer 상태 머신이 이미 보장
+  // 폴링 동기화 — 허용 전이는 signer 상태 머신이 이미 보장
+  await syncDraftStatus(draft.draftId, doc.status, doc.rejectReason);
 
   return Response.json({
     ok: true,
