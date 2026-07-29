@@ -109,7 +109,7 @@ modules:
   spec: spec/fr/01.1-common-donation.md
   test: pnpm test rewards
   model: haiku
-  status: todo
+  status: done
 
 - id: M-DOCUMENTS
   mvp: M0

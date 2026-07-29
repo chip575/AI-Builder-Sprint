@@ -36,7 +36,11 @@ pnpm install     # 또는 npm install
 pnpm gate:check  # 8종 전부 PASS여야 정상
 pnpm test        # 게이트·룰테이블 유닛테스트
 pnpm dev         # 예선 에이전트의 채점 경로 (NFR-707)
+pnpm e2e         # dev 띄운 상태에서 — 발화→서명→증빙 12단계 관통
 ```
+
+**트러블슈팅**: `pnpm build` ↔ `pnpm dev` 전환 후 멀쩡한 라우트가 404 등
+이상 동작하면 **`.next` 삭제부터** — 캐시가 서로를 덮는다.
 
 ## 3. 보호 경로 작업 (PM만)
 

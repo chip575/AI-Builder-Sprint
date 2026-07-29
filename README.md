@@ -26,6 +26,7 @@ mock 모드라, 별도 설정 없이 대화 → 구조화 → 확인 → 게이�
 pnpm test        # 유닛·라우트 테스트
 pnpm typecheck   # 계약(lib/contracts) 위반은 타입 에러로 잡힌다
 pnpm gate:check  # 프로젝트 불변식 검사 (법률 수치 위치·보안 패턴 등)
+pnpm e2e         # 발화→서명→증빙 12단계 관통 (dev 서버 띄운 뒤, 키 없이)
 ```
 
 ## 구조
