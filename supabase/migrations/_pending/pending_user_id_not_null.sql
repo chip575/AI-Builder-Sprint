@@ -1,5 +1,6 @@
 -- (대기) — M-AUTH 완료 직후 supabase/migrations/로 옮겨 적용한다.
--- ⚠ 승격 시 그 시점의 다음 빈 번호로 개명한다 (0002는 store_rpc가 선점 — 번호 고정 금지).
+-- ⚠ 승격 시 `supabase migration new user_id_not_null`로 새 타임스탬프 파일을 만들어
+--   내용을 옮긴다. 파일명은 CLI 형식(<타임스탬프>_<이름>)이어야 push가 인식한다.
 -- ⚠ human_review: required. 근거: docs/decisions.md D-18 검토 (2026-07-29).
 --
 -- 전제: 0001부터 서버 코드는 user_id에 NULL 대신 DEV_USER_ID

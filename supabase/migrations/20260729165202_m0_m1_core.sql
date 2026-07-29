@@ -1,4 +1,5 @@
--- 0001_m0_m1_core.sql — M0·M1 코어 스키마 (M2·M3 테이블은 해당 마이그레이션에서)
+-- 20260729165202_m0_m1_core.sql — M0·M1 코어 스키마 (M2·M3 테이블은 해당 마이그레이션에서)
+-- 파일명은 Supabase CLI 형식(<타임스탬프>_<이름>) — 원격 이력과 자구 일치해야 push가 no-op이 된다.
 -- ⚠ human_review: required — RLS·append-only 트리거 포함. 사람 검토 후 적용 (보안 5조).
 --
 -- 검토 기준 매핑 (docs/decisions.md D-18 논의):

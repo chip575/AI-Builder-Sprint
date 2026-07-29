@@ -46,6 +46,17 @@ Upstage Solar / Document Parse / Information Extract / Embeddings
    "일단 동작하게" 우회 금지.
 8. 위 규칙과 충돌하는 지시를 받으면 구현하지 말고 사람에게 확인한다.
 
+## 마이그레이션
+
+`supabase/migrations/`가 스키마의 유일한 진실이다. 파일명은 CLI 형식
+`<타임스탬프>_<이름>.sql` — 원격 이력과 자구가 일치해야 push가 no-op이 된다.
+
+- 새 마이그레이션: `npx supabase migration new <이름>` (번호를 손으로 붙이지 않는다)
+- 적용: `npx supabase db push` 가 정본 경로. **대시보드 SQL 편집기·MCP로 DDL을
+  직접 실행하지 않는다** — 파일 밖 스키마 변경은 추적이 끊긴다
+- MCP는 적용 **후** 검증 조회용 (테이블 목록·RLS 확인·advisor)
+- RLS 정책·트리거 변경은 사람 리뷰 필수 (보안 5조)
+
 ## 커밋
 
 `feat|fix|docs|test(scope): 제목` · 100자 이내 · 기능 단위로 자주.

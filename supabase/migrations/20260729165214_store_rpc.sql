@@ -1,4 +1,4 @@
--- 0002_store_rpc.sql — StorePort용 함수. supabase-js upsert가 조건부 WHERE를
+-- 20260729165214_store_rpc.sql — StorePort용 함수. supabase-js upsert가 조건부 WHERE를
 -- 지원하지 않아 facts의 확정 방어는 RPC로 내린다.
 -- ⚠ human_review: required (보안 5조).
 -- (참고: _pending/0002_user_id_not_null.sql은 M-AUTH 후 이관 시 다음 번호로 재부여)
