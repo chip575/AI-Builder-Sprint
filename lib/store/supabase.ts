@@ -247,6 +247,16 @@ export class SupabaseStore implements StorePort {
     return data ? toDraft(data) : undefined;
   }
 
+  async findDraftByDocumentId(modusignDocumentId: string) {
+    const { data, error } = await this.db
+      .from("document_drafts")
+      .select("*")
+      .eq("modusign_document_id", modusignDocumentId)
+      .maybeSingle();
+    if (error) this.fail("drafts.byDocumentId", error);
+    return data ? toDraft(data) : undefined;
+  }
+
   async markDraftRequested(draftId: string, modusignDocumentId: string) {
     const { error } = await this.db
       .from("document_drafts")

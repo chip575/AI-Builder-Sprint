@@ -50,6 +50,8 @@ export interface StorePort {
     verdict: GateVerdict,
   ): Promise<DraftRecord>;
   getDraft(draftId: string): Promise<DraftRecord | undefined>;
+  /** 웹훅 역참조 — 모두싸인 문서 ID로 draft를 찾는다 (02.3 §1) */
+  findDraftByDocumentId(modusignDocumentId: string): Promise<DraftRecord | undefined>;
   markDraftRequested(draftId: string, modusignDocumentId: string): Promise<void>;
   syncDraftStatus(
     draftId: string,

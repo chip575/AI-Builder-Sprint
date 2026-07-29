@@ -151,7 +151,7 @@ modules:
   spec: spec/plan/02.3-modusign.md
   test: pnpm test webhook  # 동일 이벤트 5회 → 부수효과 1회
   model: sonnet            # 멱등성 엣지케이스
-  status: todo
+  status: done
 
 - id: M-EVIDENCE
   mvp: M0

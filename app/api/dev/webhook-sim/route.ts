@@ -1,9 +1,10 @@
 // M-MOCK — POST /api/dev/webhook-sim (NFR-707)
-// mock signer에 외부 이벤트를 주입해 실제 상태 머신을 통과시킨다.
-// M-WEBHOOK 구현 후에는 반환된 페이로드를 /api/webhooks/modusign으로 그대로 전달한다.
+// mock signer(외부 세계)에 이벤트를 주입하고, 그 페이로드를 실제 웹훅 경로로 전달한다.
+// HTTP 왕복 없이 핸들러 직접 호출 — 멱등·아웃박스·증빙까지 실경로가 그대로 돈다.
 import { NextResponse } from "next/server";
 import { WebhookSimReq } from "@/lib/contracts";
 import { mockSigner } from "@/lib/signer";
+import { POST as webhookPost } from "../../webhooks/modusign/route";
 
 export async function POST(req: Request) {
   if (!mockSigner) {
@@ -50,6 +51,18 @@ export async function POST(req: Request) {
       { status: 404 },
     );
   }
+
+  // 실제 webhook 경로 실행 — 시크릿이 설정돼 있으면 정식 헤더로 전달
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const secret = process.env.MODUSIGN_WEBHOOK_SECRET;
+  if (secret) headers["x-webhook-secret"] = secret;
+  await webhookPost(
+    new Request("http://localhost/api/webhooks/modusign", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    }),
+  );
 
   return NextResponse.json({ ok: true, data: null });
 }

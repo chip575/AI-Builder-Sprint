@@ -174,6 +174,13 @@ export class InMemoryStore implements StorePort {
     return this.drafts.get(draftId);
   }
 
+  async findDraftByDocumentId(modusignDocumentId: string) {
+    for (const d of this.drafts.values()) {
+      if (d.modusignDocumentId === modusignDocumentId) return d;
+    }
+    return undefined;
+  }
+
   async markDraftRequested(draftId: string, modusignDocumentId: string) {
     const d = this.drafts.get(draftId);
     if (!d) throw new Error(`unknown draft: ${draftId}`);

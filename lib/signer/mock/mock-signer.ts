@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 import type { DocStatus } from "../../contracts/common";
 import type { ModusignWebhookPayload } from "../../contracts/webhook";
+import { canTransition, EVENT_TO_STATUS } from "../state-machine";
 import type {
   DocumentDetail,
   SignerPort,
@@ -13,23 +14,6 @@ import type {
 
 /** 임베디드 URL 만료 — 2시간 (FR-502) */
 const EMBED_TTL_MS = 2 * 60 * 60 * 1000;
-
-/** 허용 전이 표 — 여기 없는 전이는 무시된다 (역행 방지, 02.3 §3) */
-const ALLOWED: Record<DocStatus, DocStatus[]> = {
-  DRAFT: ["REQUESTED"],
-  REQUESTED: ["COMPLETED", "REJECTED", "CANCELED"],
-  COMPLETED: [],
-  REJECTED: [],
-  CANCELED: [],
-};
-
-/** 외부 이벤트명 → 목표 상태 */
-const EVENT_TO_STATUS: Record<string, DocStatus> = {
-  document_requested: "REQUESTED",
-  document_completed: "COMPLETED",
-  document_rejected: "REJECTED",
-  document_canceled: "CANCELED",
-};
 
 interface MockDoc extends DocumentDetail {
   embeddedUrl: string;
@@ -114,7 +98,7 @@ export class MockSigner implements SignerPort {
 
   /** 허용 전이 표를 따르는 상태 변경. 허용되지 않으면 false (스킵 + 무시) */
   private transition(doc: MockDoc, to: DocStatus): boolean {
-    if (!ALLOWED[doc.status].includes(to)) return false;
+    if (!canTransition(doc.status, to)) return false;
     doc.status = to;
     if (to === "COMPLETED") {
       const now = new Date().toISOString();
