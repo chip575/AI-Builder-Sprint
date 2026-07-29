@@ -92,7 +92,11 @@ create table public.intent_facts (
   confirmed_by_user    boolean not null default false,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now(),
-  unique (intent_id, key)              -- 같은 슬롯은 최신 1건 (mock-extractor와 동일 규칙)
+  -- 같은 슬롯은 최신 1건. ⚠ 어댑터 저장은 반드시 UPSERT —
+  -- INSERT ... ON CONFLICT (intent_id, key) DO UPDATE. 순수 INSERT면 정정 발화
+  -- ("아니, 30만원으로")에서 제약 위반이 터진다. 덮어쓴 이전 값의 이력은
+  -- audit_logs가 담당한다 (fact 갱신마다 기록 — 없으면 정정 이력 재구성 불가).
+  unique (intent_id, key)
 );
 
 -- ── document_drafts — 게이트 통과 문서 초안 (FR-501) ─────────
@@ -254,3 +258,14 @@ create policy evidences_owner on public.evidences
 
 -- webhook_events·audit_logs·gate_verdicts·pipeline_metrics·obligations:
 -- 정책 없음 = 클라이언트 전면 차단. 서버(service role)만 접근한다.
+
+-- ── 자기검증 — RLS enable 누락 테이블이 있으면 마이그레이션 자체가 실패한다 ──
+-- "정책 없음 = 전면 차단"은 RLS enable이 전제다. enable을 빼먹으면 정반대(전면 개방)가 된다.
+do $$ declare t record;
+begin
+  for t in select tablename from pg_tables
+           where schemaname = 'public' and not rowsecurity
+  loop
+    raise exception 'RLS 미적용 테이블: %', t.tablename;
+  end loop;
+end $$;

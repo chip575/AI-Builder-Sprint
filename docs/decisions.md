@@ -267,3 +267,9 @@ ESIGN_INVALID AND was_sign_attempt만 집계 — NON_BINDING은 정상 라우팅
 
 **미결**: 삭제된 발화를 근거로 가진 마음 유언 문단 처리(고아 표시 vs 연쇄
 삭제 제안) — M2 heart_will 설계 시 결정.
+
+**D-18 추가 명시 (0001 확정 시점)**: 현재 RLS 정책은 **본인 소유 SELECT뿐**이다
+— 기관(org) 스코프 정책은 존재하지 않는다. M-ADMIN(M1)의 "RLS 기관 격리"
+시연은 그때 org 스코프 SELECT 정책을 새로 작성해야 가능하다 (M1 담당자 주의).
+intent_facts 저장은 UPSERT 필수(UNIQUE 제약과 정정 발화의 양립 조건)이고,
+fact 갱신 이력은 audit_logs가 담당한다.
