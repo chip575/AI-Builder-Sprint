@@ -11,6 +11,11 @@ else
   FILE=$(printf '%s' "$INPUT" | grep -oE '"(file_path|path)"[[:space:]]*:[[:space:]]*"[^"]+"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
 fi
 
+# Windows 경로 정규화 — 하네스는 백슬래시 경로를 준다 (jq는 \, grep 폴백은 \).
+# 슬래시 패턴(*lib/contracts/* 등)과 매치되려면 통일 + 연속 슬래시 축약이 필수다.
+# (이거 없으면 훅이 호출돼도 아무것도 못 막는다 — 2026-07-29 실검증에서 발견)
+FILE=$(printf '%s' "$FILE" | tr '\134' '/' | sed 's#//*#/#g')
+
 # 경로를 못 읽으면 안전하게 차단한다 (fail-closed).
 if [ -z "$FILE" ]; then
   echo "BLOCKED: 훅이 대상 파일 경로를 읽지 못했습니다. jq 설치 여부를 확인하세요." >&2
