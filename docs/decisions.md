@@ -261,7 +261,7 @@ utterance_embeddings(pgvector)는 M2·M3 마이그레이션에서 — 추가는 
 주장은 원본 행 불변일 때만 성립하고, 본인 삭제권은 체결 증빙에 적용되지
 않는다. ② utterances는 UPDATE 차단 + deleted_at 단방향 소프트 삭제(번복
 불가, 물리 DELETE 금지). ③ dev 경로는 user_id에 DEV_USER_ID 상수 — 0002는
-SET NOT NULL + FK 한 번에 (사전 작성: _pending/0002). ④ gate_blocks →
+SET NOT NULL + FK 한 번에 (사전 작성: _pending/pending_user_id_not_null.sql — 승격 시 다음 빈 번호). ④ gate_blocks →
 gate_verdicts 개명, 3분기 전부 기록 + was_sign_attempt 컬럼. FR-509 카운터는
 ESIGN_INVALID AND was_sign_attempt만 집계 — NON_BINDING은 정상 라우팅이다.
 

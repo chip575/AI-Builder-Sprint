@@ -36,6 +36,10 @@ HIT=$(grep -rn 'confirmed[_a-zA-Z]*:[[:space:]]*true' --include='*.ts' lib/ app/
             *) echo "$file:$line:$rest" ;;
           esac
         done)
+# 마커는 만능 열쇠가 아니다 — 확정 연산이 실제로 사는 곳(confirm 라우트 + store 어댑터)에서만 유효
+M=$(grep -rln 'P1-CONFIRM-PATH' --include='*.ts' lib/ app/ 2>/dev/null \
+    | grep -vE 'app/api/facts/confirm/|lib/store/(supabase|memory)\.ts')
+[ -n "$M" ] && { red "P1-CONFIRM-PATH 마커 허용 경로 밖 사용"; echo "$M" | head -3; }
 [ -n "$HIT" ] && { red "confirmed=true 기본값 (P1 위반 의심)"; echo "$HIT" | head -5; } || grn "confirmed 기본값 정상"
 
 echo "── 5. 보안: 식별번호 패턴 ──"

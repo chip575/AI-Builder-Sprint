@@ -31,3 +31,10 @@ language sql as $$
     where public.intent_facts.confirmed_by_user = false
   returning *;
 $$;
+
+-- ⚠ 옆문 차단 — public 스키마 함수는 기본적으로 PostgREST에 노출된다.
+-- 테이블을 "정책 없음 = 차단"으로 막아도 이 RPC가 열려 있으면 클라이언트가
+-- 테이블을 우회해 미확정 facts를 직접 쓸 수 있다. service role만 호출한다 (D-18).
+-- security definer는 쓰지 않는다 — invoker + service role로 충분하고, definer는 권한 상승만 만든다.
+revoke execute on function public.save_fact(uuid, uuid, text, jsonb, numeric, jsonb)
+  from public, anon, authenticated;

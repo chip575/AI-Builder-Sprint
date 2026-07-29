@@ -23,7 +23,7 @@ modules:
   test: pnpm test auth
   model: haiku
   status: todo
-  note: 완료 직후 supabase/migrations/_pending/0002(user_id NOT NULL+FK) 적용 — 기억에 의존하지 않기
+  note: 완료 직후 supabase/migrations/_pending/pending_user_id_not_null.sql 승격(다음 빈 번호로 개명) — 기억에 의존하지 않기
 
 - id: M-SESSION-MSG
   mvp: M0

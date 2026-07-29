@@ -1,4 +1,5 @@
--- 0002 (대기) — M-AUTH 완료 직후 supabase/migrations/로 옮겨 적용한다.
+-- (대기) — M-AUTH 완료 직후 supabase/migrations/로 옮겨 적용한다.
+-- ⚠ 승격 시 그 시점의 다음 빈 번호로 개명한다 (0002는 store_rpc가 선점 — 번호 고정 금지).
 -- ⚠ human_review: required. 근거: docs/decisions.md D-18 검토 (2026-07-29).
 --
 -- 전제: 0001부터 서버 코드는 user_id에 NULL 대신 DEV_USER_ID

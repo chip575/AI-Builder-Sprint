@@ -22,7 +22,7 @@ create table public.intents (
   -- NULL 금지 원칙: 인메모리/개발 경로는 NULL 대신 DEV_USER_ID
   -- ('00000000-0000-4000-8000-0000000000de')를 넣는다 — 0002가 SET NOT NULL 한 줄로 끝나게.
   -- auth.users FK는 M-AUTH 전이라 걸 수 없다(존재하지 않는 유저 uuid) → 0002에서 NOT NULL과 함께.
-  -- 사전 작성본: supabase/migrations/_pending/0002_user_id_not_null.sql
+  -- 사전 작성본: supabase/migrations/_pending/pending_user_id_not_null.sql
   user_id     uuid,
   -- [기준4] lib/contracts/common.ts IntentKind와 자구 일치
   kind        text not null default 'BRANCH'
