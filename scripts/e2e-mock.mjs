@@ -85,7 +85,7 @@ console.log("8. 외부 문서 ok —", doc.documentId, doc.status);
 
 // 9. 서명 완료 시뮬 → 실제 웹훅 경로 (멱등 확인 위해 2회)
 for (let i = 0; i < 2; i++) {
-  res = await fetch(base + "/api/dev/webhook-sim", j({ docId: doc.documentId, event: "document_completed" }));
+  res = await fetch(base + "/api/dev/webhook-sim", j({ docId: doc.documentId, event: "document_all_signed" }));
   if (res.status !== 200) fail("webhook-sim " + res.status);
 }
 console.log("9. 완료 웹훅 x2 ok (멱등)");

@@ -58,7 +58,7 @@ describe("M-WEBHOOK — 멱등성 (FR-503 수락 기준)", () => {
   it("동일 이벤트 5회 수신 → 전부 200, 상태 전이·증빙 생성은 정확히 1회", async () => {
     const { draft, documentId } = await requestedDraft();
     // 외부 세계도 완료 상태로 (보강 조회가 읽는 대상)
-    const p = externalEvent(documentId, "document_completed", "evt-idem-1-" + documentId);
+    const p = externalEvent(documentId, "document_all_signed", "evt-idem-1-" + documentId);
     for (let i = 0; i < 5; i++) {
       expect((await post(p)).status).toBe(200);
     }
@@ -85,9 +85,9 @@ describe("M-WEBHOOK — 멱등성 (FR-503 수락 기준)", () => {
 
   it("역행 방지 — 완료 후 requested 이벤트는 스킵", async () => {
     const { draft, documentId } = await requestedDraft();
-    await post(externalEvent(documentId, "document_completed"));
+    await post(externalEvent(documentId, "document_all_signed"));
     await drainOutbox();
-    await post(externalEvent(documentId, "document_requested")); // 외부는 전이 거부, 이벤트만 도착
+    await post(externalEvent(documentId, "document_started")); // 외부는 전이 거부, 이벤트만 도착
     await drainOutbox();
     expect((await store.getDraft(draft.draftId))!.status).toBe("COMPLETED");
   });
@@ -95,7 +95,7 @@ describe("M-WEBHOOK — 멱등성 (FR-503 수락 기준)", () => {
 
 describe("M-WEBHOOK — 재시도 유발 방지", () => {
   it("모르는 documentId → 200, 처리 표시되어 재시도 없음", async () => {
-    expect((await post(payloadFor("mock-unknown-doc", "document_completed"))).status).toBe(200);
+    expect((await post(payloadFor("mock-unknown-doc", "document_all_signed"))).status).toBe(200);
     await drainOutbox();
     const stuck = (await store.listUnprocessedEvents()).filter(
       (e) => e.modusignDocumentId === "mock-unknown-doc",
@@ -113,7 +113,7 @@ describe("M-WEBHOOK — 시크릿 검증", () => {
   it("시크릿 설정 시: 불일치 401 / 일치 200", async () => {
     process.env.MODUSIGN_WEBHOOK_SECRET = "test-secret";
     const { documentId } = await requestedDraft();
-    const p = externalEvent(documentId, "document_completed");
+    const p = externalEvent(documentId, "document_all_signed");
     expect((await post(p, { "x-webhook-secret": "wrong" })).status).toBe(401);
     expect((await post(p, { "x-webhook-secret": "test-secret" })).status).toBe(200);
   });

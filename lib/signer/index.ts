@@ -2,6 +2,7 @@
 // realSigner는 M-SIGN에서 구현된다. 그 전까지 real 모드는 명시적으로 실패한다 —
 // 조용히 mock으로 폴백하면 "실 서명이 됐다"는 착각을 만든다 (보안 7조: 조용히 넘기지 않는다).
 import { MockSigner } from "./mock/mock-signer";
+import { ModusignSigner } from "./real/modusign";
 import type { SignerPort } from "./port";
 
 /** 02.4 §5 — mock 모드는 요청 후 3초 뒤 자동 완료 */
@@ -9,19 +10,33 @@ const MOCK_AUTO_COMPLETE_MS = 3_000;
 
 const mode = process.env.MODUSIGN_MODE ?? "mock";
 
-function unimplementedReal(): SignerPort {
-  const fail = () =>
-    Promise.reject(
-      new Error("MODUSIGN_MODE=real은 아직 구현 전입니다 (M-SIGN). mock으로 전환하세요."),
-    );
-  return {
-    requestWithTemplate: fail,
-    createEmbeddedDraft: fail,
-    getDocument: fail,
-    listDocuments: fail,
-    resendNotification: fail,
-    cancel: fail,
-  };
+/** MODUSIGN_TEMPLATE_<DocType> → 템플릿 ID. 미등록 키는 호출 시점에 알려주며 실패한다 */
+function templateIdsFromEnv(): Record<string, string | undefined> {
+  const ids: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (k.startsWith("MODUSIGN_TEMPLATE_") && v) {
+      ids[k.slice("MODUSIGN_TEMPLATE_".length)] = v;
+    }
+  }
+  return ids;
+}
+
+function realSigner(): SignerPort {
+  const apiKey = process.env.MODUSIGN_API_KEY;
+  if (!apiKey) {
+    // 키 없이 real을 켜면 조용히 mock으로 떨어지지 않고 명시적으로 실패한다 (보안 7조)
+    const fail = () =>
+      Promise.reject(new Error("MODUSIGN_MODE=real인데 MODUSIGN_API_KEY가 없습니다."));
+    return {
+      requestWithTemplate: fail,
+      createEmbeddedDraft: fail,
+      getDocument: fail,
+      listDocuments: fail,
+      resendNotification: fail,
+      cancel: fail,
+    };
+  }
+  return new ModusignSigner({ apiKey, templateIds: templateIdsFromEnv() });
 }
 
 // globalThis 캐싱 — 번들 청크 분리로 인스턴스가 갈라지는 것 방지 (영속화 시 제거)
@@ -30,7 +45,7 @@ const g = globalThis as unknown as { __namgidaMockSigner?: MockSigner };
 /** 프로세스 전역 단일 인스턴스 — 라우트 간 상태 공유 */
 export const signer: SignerPort =
   mode === "real"
-    ? unimplementedReal()
+    ? realSigner()
     : (g.__namgidaMockSigner ??= new MockSigner(MOCK_AUTO_COMPLETE_MS));
 
 /** webhook-sim 등 mock 전용 기능 접근자 — real 모드면 null */

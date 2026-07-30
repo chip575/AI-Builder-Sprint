@@ -24,7 +24,7 @@ describe("M-MOCK — 키 없는 전체 흐름", () => {
   it("완료 이벤트 → COMPLETED + completedAt + 서명자 signedAt", async () => {
     const s = new MockSigner();
     const r = await s.requestWithTemplate(input);
-    s.simulateEvent(r.documentId, "document_completed");
+    s.simulateEvent(r.documentId, "document_all_signed");
     const doc = await s.getDocument(r.documentId);
     expect(doc?.status).toBe("COMPLETED");
     expect(doc?.completedAt).not.toBeNull();
@@ -35,7 +35,7 @@ describe("M-MOCK — 키 없는 전체 흐름", () => {
     const s = new MockSigner();
     const r = await s.requestWithTemplate(input);
     for (let i = 0; i < 5; i++) {
-      s.simulateEvent(r.documentId, "document_completed", "evt-dup-1");
+      s.simulateEvent(r.documentId, "document_all_signed", "evt-dup-1");
     }
     expect(s.sideEffectCount).toBe(1);
     expect((await s.getDocument(r.documentId))?.status).toBe("COMPLETED");
@@ -44,8 +44,8 @@ describe("M-MOCK — 키 없는 전체 흐름", () => {
   it("역행 전이 무시 — COMPLETED 후 requested 이벤트는 스킵 (02.3 §3)", async () => {
     const s = new MockSigner();
     const r = await s.requestWithTemplate(input);
-    s.simulateEvent(r.documentId, "document_completed");
-    s.simulateEvent(r.documentId, "document_requested");
+    s.simulateEvent(r.documentId, "document_all_signed");
+    s.simulateEvent(r.documentId, "document_started");
     expect((await s.getDocument(r.documentId))?.status).toBe("COMPLETED");
   });
 
@@ -73,7 +73,7 @@ describe("M-MOCK — 키 없는 전체 흐름", () => {
     const s = new MockSigner();
     const a = await s.requestWithTemplate(input);
     await s.requestWithTemplate(input);
-    s.simulateEvent(a.documentId, "document_completed");
+    s.simulateEvent(a.documentId, "document_all_signed");
     expect(await s.listDocuments({ status: "COMPLETED" })).toHaveLength(1);
     expect(await s.listDocuments({ status: "REQUESTED" })).toHaveLength(1);
     expect(await s.listDocuments()).toHaveLength(2);

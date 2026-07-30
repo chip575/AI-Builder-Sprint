@@ -72,7 +72,7 @@ export default function DocPage() {
     await fetch("/api/dev/webhook-sim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ docId, event: "document_completed" }),
+      body: JSON.stringify({ docId, event: "document_all_signed" }),
     });
     setBusy(false);
     await poll();

@@ -25,7 +25,7 @@ export function storeContractTests(name: string, makeStore: () => Promise<StoreP
         results.push(
           await s.insertWebhookEvent({
             externalEventId: eventId,
-            event: "document_completed",
+            event: "document_all_signed",
             payload: { seq: i },
           }),
         );

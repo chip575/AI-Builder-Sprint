@@ -49,7 +49,7 @@ export class MockSigner implements SignerPort {
     if (this.autoCompleteMs !== undefined) {
       // 02.4 §5 — mock 모드는 일정 시간 뒤 자동 완료로 서명자를 흉내낸다
       const t = setTimeout(() => {
-        this.simulateEvent(doc.documentId, "document_completed");
+        this.simulateEvent(doc.documentId, "document_all_signed");
       }, this.autoCompleteMs);
       if (typeof t === "object" && "unref" in t) t.unref();
     }

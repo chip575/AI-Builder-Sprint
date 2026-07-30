@@ -25,7 +25,7 @@ async function completedDraft() {
     signerEmail: "fake@example.com",
   });
   await store.markDraftRequested(draft.draftId, r.documentId);
-  const payload = mockSigner!.simulateEvent(r.documentId, "document_completed")!;
+  const payload = mockSigner!.simulateEvent(r.documentId, "document_all_signed")!;
   await webhookPost(
     new Request("http://localhost/api/webhooks/modusign", {
       method: "POST",
