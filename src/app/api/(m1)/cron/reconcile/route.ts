@@ -60,8 +60,21 @@ export async function POST(req: Request) {
   });
 }
 
-/** 관리자 화면용 — 마지막 동기화·누적 교정 건수 (02.3 §4) */
-export async function GET() {
+/**
+ * GET은 두 가지로 쓰인다:
+ *  · 관리자 화면 — 마지막 동기화·누적 교정 건수 조회 (02.3 §4)
+ *  · **스케줄러 실행** — Vercel Cron은 GET으로 호출한다. POST만 실행으로 두면
+ *    배포해도 리컨실러가 영원히 돌지 않는다. Cron 인증 헤더가 있으면 실행한다.
+ *    (로컬 cron·수동 실행은 POST를 쓴다)
+ */
+export async function GET(req: Request) {
+  const cronSecret = process.env.CRON_SECRET;
+  const isCron =
+    Boolean(cronSecret) &&
+    req.headers.get("authorization") === `Bearer ${cronSecret}`;
+
+  if (isCron) return POST(new Request(req.url, { method: "POST" }));
+
   const state = await store.getReconcileState();
   return Response.json({ ok: true, data: state });
 }
