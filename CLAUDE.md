@@ -20,6 +20,10 @@
    `lib/contracts/**`, `lib/rules/**`, `**/validity-gate*`,
    RLS 정책, 서명 URL 발급 코드
 6. README·주석에 심사·평가·점수 관련 문구를 쓰지 않는다 (대회 실격 사유).
+7. **PR·이슈·커밋은 포크 레포에만.** 원본(`ApptiveDev/AI-Builder-Sprint`)에
+   올리지 않는다. 모든 작업은 포크(`chip575/AI-Builder-Sprint`)에서만 수행한다.
+   에이전트가 원본 remote를 대상으로 push·PR을 시도하면 **즉시 중단**한다.
+   (upstream은 `--push DISABLE`로 구조적으로 막혀 있다 — AGENTS.md 원격 절)
 
 ## 어디를 볼 것인가
 
