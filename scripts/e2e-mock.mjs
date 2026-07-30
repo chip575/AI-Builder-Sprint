@@ -110,4 +110,30 @@ const pdf = await res.text();
 if (!pdf.startsWith("%PDF")) fail("PDF 본문 이상");
 console.log("12. PDF ok —", res.headers.get("Content-Type"));
 
-console.log("\nE2E PASS — 발화→구조화→확정→게이트→초안→서명→웹훅→증빙 관통 (키 없이)");
+// 13. 게이트 차단 (FR-104) — 데모 장면의 자동 검증
+res = await fetch(base + "/api/admin/gate-stats");
+const blockedBefore = (await res.json()).data.blockedTotal;
+
+res = await fetch(base + "/api/session/message", j({ text: "유언장을 준비하고 싶어요" }));
+meta = JSON.parse([...(await res.text()).matchAll(/^data: (.*)$/gm)].at(-1)[1]);
+if (meta.expressBranch?.branchType !== "HANDWRITTEN_WILL") fail("유언 가지 미감지");
+const willSid = meta.sessionId;
+// fact가 하나도 없으면 게이트 이전(미확정)에서 막혀 게이트를 못 태운다
+await fetch(base + "/api/session/message", j({ sessionId: willSid, text: "부산에 살고 있어요" }));
+await fetch(base + "/api/extract", j({ intentId: willSid }));
+await fetch(base + "/api/facts/confirm", j({ intentId: willSid }));
+res = await fetch(base + "/api/documents", j({ intentId: willSid }));
+body = await res.json();
+if (res.status !== 403 || body.error.code !== "GATE_ESIGN_INVALID")
+  fail("유언 문서 생성이 차단되지 않음: " + res.status);
+if (!body.error.message.includes("민법")) fail("조문 인용 없음");
+console.log("13. GATE 차단 ok — 유언장 403 ·", body.error.message.match(/민법 §\d+/)?.[0]);
+
+// 14. 카운터 정직성 — 문서 생성 단계 거부는 '서명 시도 차단'이 아니다
+res = await fetch(base + "/api/admin/gate-stats");
+const gate = (await res.json()).data;
+if (gate.blockedTotal !== blockedBefore) fail("문서 생성 거부가 차단으로 집계됨(지표 부풀림)");
+if (!(gate.byVerdict.ESIGN_INVALID > 0)) fail("판정 분포에 기록되지 않음");
+console.log("14. COUNTER ok — 차단", gate.blockedTotal, "· 전체 판정", gate.totalEvaluations);
+
+console.log("\nE2E PASS — 발화→구조화→확정→게이트→초안→서명→웹훅→증빙 + 게이트 차단 카운터 (키 없이)");

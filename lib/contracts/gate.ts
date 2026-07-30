@@ -34,3 +34,21 @@ export const GateVerdict = z.object({
   alternativeRoute: z.string().nullish(),
 });
 export type GateVerdict = z.infer<typeof GateVerdict>;
+
+/** M-GATE-COUNTER — GET /api/admin/gate-stats (FR-509)
+ *  형태는 spec/manifest.yaml의 M-GATE-COUNTER 행이 이미 선언한 것을 코드로 옮긴 것이다.
+ *
+ *  ⚠ blockedTotal은 **차단**만 센다: verdict=ESIGN_INVALID ∧ wasSignAttempt.
+ *    NON_BINDING은 차단이 아니라 정상 라우팅이고, 문서 생성 단계의 거부도
+ *    "서명 시도 차단"은 아니다. 부풀린 지표는 없느니만 못하다.
+ *    전체 분포(byVerdict)는 게이트가 3분기를 실제로 태웠다는 증거로 따로 보여준다. */
+export const GateStatsRes = z.object({
+  blockedTotal: z.number().int().nonnegative(),
+  byDocType: z.record(z.string(), z.number().int().nonnegative()),
+  byStatute: z.array(
+    z.object({ id: z.string(), count: z.number().int().nonnegative() }),
+  ),
+  byVerdict: z.record(GateVerdictCode, z.number().int().nonnegative()),
+  totalEvaluations: z.number().int().nonnegative(),
+});
+export type GateStatsRes = z.infer<typeof GateStatsRes>;

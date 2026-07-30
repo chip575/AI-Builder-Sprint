@@ -12,6 +12,8 @@ import {
   type EvidenceRecord,
   type SessionRecord,
   type Utterance,
+  type GateStats,
+  type GateVerdictRecord,
   type WebhookEventInput,
   type WebhookEventRecord,
 } from "./types";
@@ -221,6 +223,35 @@ export class InMemoryStore implements StorePort {
     for (const e of this.events.values()) {
       if (e.id === id) e.processedAt = new Date().toISOString();
     }
+  }
+
+  private gateVerdicts: GateVerdictRecord[] = [];
+
+  async recordGateVerdict(input: GateVerdictRecord): Promise<void> {
+    this.gateVerdicts.push(input);
+  }
+
+  async getGateStats(): Promise<GateStats> {
+    const byDocType: Record<string, number> = {};
+    const statute = new Map<string, number>();
+    const byVerdict: Record<string, number> = {};
+    let blockedTotal = 0;
+
+    for (const v of this.gateVerdicts) {
+      byVerdict[v.verdict] = (byVerdict[v.verdict] ?? 0) + 1;
+      // 차단 = 무효 판정인데 서명 경로로 가려던 것만 (FR-509)
+      if (v.verdict !== "ESIGN_INVALID" || !v.wasSignAttempt) continue;
+      blockedTotal += 1;
+      byDocType[v.docType] = (byDocType[v.docType] ?? 0) + 1;
+      for (const st of v.statutes) statute.set(st.id, (statute.get(st.id) ?? 0) + 1);
+    }
+    return {
+      blockedTotal,
+      byDocType,
+      byStatute: [...statute].map(([id, count]) => ({ id, count })),
+      byVerdict,
+      totalEvaluations: this.gateVerdicts.length,
+    };
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

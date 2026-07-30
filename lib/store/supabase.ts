@@ -14,6 +14,8 @@ import {
   type EvidenceRecord,
   type SessionRecord,
   type Utterance,
+  type GateStats,
+  type GateVerdictRecord,
   type WebhookEventInput,
   type WebhookEventRecord,
 } from "./types";
@@ -336,6 +338,45 @@ export class SupabaseStore implements StorePort {
       .update({ processed_at: new Date().toISOString() })
       .eq("id", id);
     if (error) this.fail("webhook.markProcessed", error);
+  }
+
+  async recordGateVerdict(input: GateVerdictRecord): Promise<void> {
+    const { error } = await this.db.from("gate_verdicts").insert({
+      doc_type: input.docType,
+      verdict: input.verdict,
+      was_sign_attempt: input.wasSignAttempt,
+      statutes: input.statutes,
+    });
+    if (error) this.fail("gate_verdicts.insert", error);
+  }
+
+  async getGateStats(): Promise<GateStats> {
+    const { data, error } = await this.db
+      .from("gate_verdicts")
+      .select("doc_type, verdict, was_sign_attempt, statutes");
+    if (error) this.fail("gate_verdicts.select", error);
+
+    const byDocType: Record<string, number> = {};
+    const statute = new Map<string, number>();
+    const byVerdict: Record<string, number> = {};
+    let blockedTotal = 0;
+
+    for (const r of (data ?? []) as Row[]) {
+      byVerdict[r.verdict] = (byVerdict[r.verdict] ?? 0) + 1;
+      if (r.verdict !== "ESIGN_INVALID" || !r.was_sign_attempt) continue;
+      blockedTotal += 1;
+      byDocType[r.doc_type] = (byDocType[r.doc_type] ?? 0) + 1;
+      for (const st of (r.statutes ?? []) as { id: string }[]) {
+        statute.set(st.id, (statute.get(st.id) ?? 0) + 1);
+      }
+    }
+    return {
+      blockedTotal,
+      byDocType,
+      byStatute: [...statute].map(([id, count]) => ({ id, count })),
+      byVerdict,
+      totalEvaluations: (data ?? []).length,
+    };
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

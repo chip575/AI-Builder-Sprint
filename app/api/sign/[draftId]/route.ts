@@ -4,6 +4,7 @@
 import { SignReq, SignRes } from "@/lib/contracts";
 import { signer } from "@/lib/signer";
 import { track } from "@/lib/observability/track";
+import { logGateVerdict } from "@/lib/observability/gate-log";
 import { getDraft, markDraftRequested } from "../../documents/store";
 
 export async function POST(
@@ -46,6 +47,8 @@ export async function POST(
   // 방어선 2중화 — documents가 막았어도 여기서 다시 확인한다 (P2, UI 우회 불가)
   if (draft.verdict.verdict !== "ESIGN_OK") {
     track("SIGN", false, Date.now() - t0);
+    // 서명 경로에서 막힌 것 — FR-509 카운터가 세는 바로 그 사건
+    logGateVerdict(draft.docType, draft.verdict, true);
     return Response.json(
       {
         ok: false,

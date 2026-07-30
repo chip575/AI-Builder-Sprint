@@ -72,3 +72,20 @@ export interface EvidenceRecord {
   parties: unknown;
   createdAt: string;
 }
+
+/** 게이트 판정 1건의 기록 (FR-509) */
+export interface GateVerdictRecord {
+  docType: string;
+  verdict: "ESIGN_OK" | "ESIGN_INVALID" | "NON_BINDING";
+  /** 서명 경로에서 막혔는가 — 문서 생성 단계 거부는 false, sign 재검증 차단은 true */
+  wasSignAttempt: boolean;
+  statutes: { id: string }[];
+}
+
+export interface GateStats {
+  blockedTotal: number;
+  byDocType: Record<string, number>;
+  byStatute: { id: string; count: number }[];
+  byVerdict: Record<string, number>;
+  totalEvaluations: number;
+}

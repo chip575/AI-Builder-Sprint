@@ -5,6 +5,8 @@ import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type {
   BranchProposalRecord,
+  GateStats,
+  GateVerdictRecord,
   DraftRecord,
   EvidenceRecord,
   SessionRecord,
@@ -66,6 +68,12 @@ export interface StorePort {
   insertWebhookEvent(input: WebhookEventInput): Promise<"INSERTED" | "DUPLICATE">;
   listUnprocessedEvents(): Promise<WebhookEventRecord[]>;
   markEventProcessed(id: number): Promise<void>;
+
+  // ── gate verdicts (FR-509 · NFR-709) ──────────────────────
+  /** 판정 이력 기록. 3분기 전부 남긴다 — 분포 화면의 근거.
+   *  ⚠ 기록 실패가 본 흐름을 막으면 안 된다 — 호출부가 삼킨다 (관측이 기능을 죽이지 않는다) */
+  recordGateVerdict(input: GateVerdictRecord): Promise<void>;
+  getGateStats(): Promise<GateStats>;
 
   // ── evidences ─────────────────────────────────────────────
   createEvidence(

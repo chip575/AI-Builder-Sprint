@@ -79,6 +79,10 @@ Upstage Solar / Document Parse / Information Extract / Embeddings
 - 완료: 포크 내부 PR `m1 → main` → 병합 후 `m1-code` 태그
 - 진행 확인: `git log main..m1 --oneline`
 
+**층 브랜치와 사람 병렬은 다른 축이다.** 팀원 셋이 같은 층에 붙어도 소유 경로가
+겹치지 않으므로 **일단 `m1`에 직접 커밋**한다. 충돌이 나기 시작하면 그때
+`m1-be1` 식 사람 브랜치로 분리한다 — 미리 과설계하지 않는다.
+
 ## 커밋
 
 `feat|fix|docs|test(scope): 제목` · 100자 이내 · 기능 단위로 자주.

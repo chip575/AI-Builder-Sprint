@@ -7,6 +7,7 @@ import { requiredSlotsFor } from "@/lib/ai/extract/mock-extractor";
 import { evaluateGate } from "@/lib/rules/validity-gate";
 import { BRANCH_PRIMARY_DOC } from "@/lib/rules/branch-doc";
 import { track } from "@/lib/observability/track";
+import { logGateVerdict } from "@/lib/observability/gate-log";
 import { createDraft } from "./store";
 
 export async function POST(req: Request) {
@@ -86,6 +87,8 @@ export async function POST(req: Request) {
   const g0 = Date.now();
   const verdict = evaluateGate(docType);
   track("GATE", true, Date.now() - g0);
+  // 3분기 전부 기록 — 분포 화면의 근거. 문서 생성 단계이므로 서명 시도는 아니다 (FR-509)
+  logGateVerdict(docType, verdict, false);
 
   if (verdict.verdict !== "ESIGN_OK") {
     track("DRAFT", false, Date.now() - t0);

@@ -279,7 +279,7 @@ modules:
   spec: spec/fr/01.3-esign-clm.md
   test: pnpm test gate-stats
   model: haiku
-  status: todo
+  status: done
   note: 모두싸인 "AI가 결과 품질에 기여" 5점의 유일한 담당. 게이트 차단 시 카운터 증가 + 사유·조문 로깅.
 
 - id: M-OBSERVABILITY
