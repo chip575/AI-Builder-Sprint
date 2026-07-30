@@ -237,7 +237,7 @@ modules:
   spec: spec/plan/02.5-upstage.md
   test: pnpm test paper-scan
   model: sonnet
-  status: todo
+  status: done
 
 - id: M-ADMIN
   mvp: M1
