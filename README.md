@@ -39,6 +39,7 @@ pnpm e2e         # 발화→서명→증빙 12단계 관통 (dev 서버 띄운 �
 | `spec/` | 명세. 작업 목록은 `spec/manifest.yaml` |
 | `docs/decisions.md` | 설계 결정 이력 |
 | `AGENTS.md` | 개발 규칙 (팀·도구 공통) |
+| `docs/milestones.md` | **어디까지 구현했는지** — 층별 범위·태그·검증 |
 
 ---
 
