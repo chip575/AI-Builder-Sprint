@@ -70,6 +70,15 @@ Upstage Solar / Document Parse / Information Extract / Embeddings
 - upstream을 remote로 추가해야 한다면 `fetch` 전용으로 두고 push URL은 막는다:
   `git remote set-url --push upstream DISABLED`
 
+## 브랜치 — 층별 독립 개발
+
+`main`은 M0 완료 상태이고 **항상 초록이다**(test·e2e·gate:check 통과). 깨뜨리지 않는다.
+층 작업은 각자 브랜치에서 한다 — `m1` `m2` `m3`. 상세는 `docs/milestones.md`.
+
+- 착수: `git switch m1` (해당 층 브랜치)
+- 완료: 포크 내부 PR `m1 → main` → 병합 후 `m1-code` 태그
+- 진행 확인: `git log main..m1 --oneline`
+
 ## 커밋
 
 `feat|fix|docs|test(scope): 제목` · 100자 이내 · 기능 단위로 자주.
