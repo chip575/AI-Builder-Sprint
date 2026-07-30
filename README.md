@@ -39,3 +39,8 @@ pnpm e2e         # 발화→서명→증빙 12단계 관통 (dev 서버 띄운 �
 | `spec/` | 명세. 작업 목록은 `spec/manifest.yaml` |
 | `docs/decisions.md` | 설계 결정 이력 |
 | `AGENTS.md` | 개발 규칙 (팀·도구 공통) |
+
+---
+
+이 저장소는 AI Builder Sprint 2026 참가작입니다.
+대회 안내 원문은 [`docs/sprint-readme.md`](docs/sprint-readme.md)에 보존돼 있습니다.
