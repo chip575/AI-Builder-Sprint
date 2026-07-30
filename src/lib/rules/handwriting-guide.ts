@@ -19,7 +19,9 @@ export const HANDWRITING_CHECKLIST = [
     id: "DATE" as const,
     label: "연·월·일을 모두 쓰셨나요?",
     caseNote:
-      "“○년 ○월 길일”처럼 날짜가 특정되지 않으면 무효입니다. 연·월·일을 모두 적어야 합니다.",
+      // 연월일 불특정은 룰테이블상 §1066 조문 요건이다 — 원문 확인 안 된 사건번호를
+      // 화면에 박으면 그 자체가 P3 위반이므로 조문 기반으로만 적는다
+      "“○년 ○월 길일”처럼 날짜가 특정되지 않으면 무효입니다. 연·월·일을 모두 특정해야 합니다 (민법 §1066).",
   },
   {
     id: "ADDRESS" as const,
@@ -106,3 +108,14 @@ export function buildHandwritingGuide(input: DraftInput): HandwritingGuideRes {
     ],
   };
 }
+
+/** 빈칸 안내 — 초안 본문에는 넣지 않는다. 본문에 두면 이 문구까지 손으로 베끼게 된다 */
+export const BLANK_GUIDES = [
+  { label: "작성일", how: "옮겨 적는 오늘 날짜를 연·월·일 모두 직접 쓰세요" },
+  { label: "주소", how: "사시는 곳을 직접 쓰세요. 인쇄물이나 스티커는 무효입니다" },
+  { label: "성명", how: "이름을 쓰고 도장 또는 지장을 찍으세요" },
+];
+
+/** 법률 자문이 아님 — 화면·인쇄물 모두에 상시 노출 (NFR-706) */
+export const NOT_LEGAL_ADVICE =
+  "이 안내는 법률 자문이 아니라 참고용입니다. 재산 규모가 크거나 상속인 사이에 다툼이 예상되면 전문가와 상의해 주세요.";

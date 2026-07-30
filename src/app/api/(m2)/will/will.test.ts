@@ -10,7 +10,12 @@ import {
   getOrCreateSession,
   saveFacts,
 } from "@/lib/ai/session/store";
-import { buildDraftText, HANDWRITING_CHECKLIST } from "@/lib/rules/handwriting-guide";
+import {
+  BLANK_GUIDES,
+  buildDraftText,
+  HANDWRITING_CHECKLIST,
+  NOT_LEGAL_ADVICE,
+} from "@/lib/rules/handwriting-guide";
 import type { IntentFact } from "@/lib/contracts";
 import { GET } from "./draft/[id]/print/route";
 
@@ -65,6 +70,23 @@ describe("M-HANDWRITING — 초안 (민법 §1066)", () => {
     expect(page).toContain("민법 제1066조");
   });
 
+  it("빈칸 안내는 초안 본문 밖에 있다 — 본문에 있으면 그 문구까지 베끼게 된다", () => {
+    const text = buildDraftText({ facts: [{ key: "region", value: "부산" }] });
+    for (const g of BLANK_GUIDES) expect(text).not.toContain(g.how);
+    expect(BLANK_GUIDES).toHaveLength(3);
+  });
+
+  it("법률 자문이 아니라는 고지가 인쇄물에도 남는다 (NFR-706)", () => {
+    const page = readFileSync("src/app/(ui)/(m2)/will/handwriting/page.tsx", "utf-8");
+    // 고지를 렌더하는 그 줄 자체에 print:hidden이 붙으면 인쇄물에서 사라진다
+    const line = page
+      .split(/\r?\n/)
+      .find((l) => l.includes("NOT_LEGAL_ADVICE") && l.includes("Notice"));
+    expect(line).toBeDefined();
+    expect(line).not.toContain("print:hidden");
+    expect(NOT_LEGAL_ADVICE).toContain("법률 자문이 아니");
+  });
+
   it("날짜·주소·성명은 빈칸으로 남는다 — 그 자리를 본인이 자서해야 한다", () => {
     const text = buildDraftText({
       facts: [
@@ -110,6 +132,18 @@ describe("M-HANDWRITING — 체크리스트 (FR-302)", () => {
     expect(notes).toContain("주소를 자서하지 않으면");
     expect(notes).toContain("날인이 없는");
     expect(notes).toContain("길일");
+  });
+
+  it("사건번호는 룰테이블에 근거가 있는 둘만 — 연월일은 조문 기반이다 (P3)", () => {
+    const date = HANDWRITING_CHECKLIST.find((c) => c.id === "DATE")!;
+    // 원문 확인 안 된 사건번호를 화면에 박으면 그 자체가 P3 위반이다
+    expect(date.caseNote).not.toMatch(/\d{4}다\d+|\d{4}\.\s?\d{1,2}\.\s?\d{1,2}\./);
+    expect(date.caseNote).toContain("민법 §1066");
+
+    const withCaseNumber = HANDWRITING_CHECKLIST.filter((c) =>
+      /\d{4}다\d+|선고/.test(c.caseNote),
+    ).map((c) => c.id);
+    expect(withCaseNumber.sort()).toEqual(["ADDRESS", "NAME_SEAL"]);
   });
 });
 

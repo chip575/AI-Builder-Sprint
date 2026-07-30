@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import type { HandwritingGuideRes } from "@/lib/contracts";
 import { ErrorNote, Notice, PrimaryButton, Shell } from "@/app/(ui)/_components/Shell";
+import { BLANK_GUIDES, NOT_LEGAL_ADVICE } from "@/lib/rules/handwriting-guide";
 
 const NOTICE =
   "이 문서는 손으로 옮겨 적어야 효력이 있습니다. 인쇄물에 서명하거나 전자서명을 해도 유언으로서 효력이 생기지 않습니다 (민법 제1066조).";
@@ -63,6 +64,14 @@ function HandwritingGuide() {
         <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-stone-400 bg-white p-6 text-xl leading-loose text-stone-900 print:border-black print:text-lg">
           {guide.draftText}
         </pre>
+        <ul className="mt-3 space-y-1 rounded-lg bg-stone-100 p-4 text-sm text-stone-700 print:bg-white">
+          {BLANK_GUIDES.map((b) => (
+            <li key={b.label}>
+              <strong>{b.label}</strong> 자리 — {b.how}
+            </li>
+          ))}
+        </ul>
+
         <button
           onClick={() => window.print()}
           className="mt-3 min-h-11 w-full rounded-xl border border-stone-400 px-6 py-3 text-stone-700 print:hidden"
@@ -160,10 +169,8 @@ function HandwritingGuide() {
         </PrimaryButton>
       </div>
 
-      <Notice>
-        이 안내는 법률 자문이 아닙니다. 재산 규모가 크거나 상속인 사이에 다툼이
-        예상되면 전문가와 상의해 주세요.
-      </Notice>
+      {/* NFR-706 — 화면·인쇄물 모두에 상시 노출한다 (print:hidden을 붙이지 않는다) */}
+      <Notice>{NOT_LEGAL_ADVICE}</Notice>
     </div>
   );
 }
