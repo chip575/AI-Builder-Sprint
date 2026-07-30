@@ -287,6 +287,16 @@ export class InMemoryStore implements StorePort {
     };
   }
 
+  private mockDocs = new Map<string, Record<string, unknown>>();
+
+  async putMockDoc(documentId: string, state: Record<string, unknown>): Promise<void> {
+    this.mockDocs.set(documentId, state);
+  }
+
+  async getMockDoc(documentId: string) {
+    return this.mockDocs.get(documentId);
+  }
+
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {
     const record: EvidenceRecord = {
       ...input,

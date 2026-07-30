@@ -431,6 +431,25 @@ export class SupabaseStore implements StorePort {
     };
   }
 
+  // mock 전용 상태다. 전용 테이블·RLS 결정을 새로 만들지 않고 append-only 감사 로그에
+  // 얹는다 — 최신 행이 현재 상태다 (recordReconcile과 같은 판단).
+  async putMockDoc(documentId: string, state: Record<string, unknown>): Promise<void> {
+    await this.audit("mock.doc", documentId, state);
+  }
+
+  async getMockDoc(documentId: string) {
+    const { data, error } = await this.db
+      .from("audit_logs")
+      .select("detail")
+      .eq("action", "mock.doc")
+      .eq("subject", documentId)
+      .order("id", { ascending: false })
+      .limit(1);
+    if (error) this.fail("audit.mockDoc", error);
+    const row = (data ?? [])[0] as Row | undefined;
+    return (row?.detail as Record<string, unknown>) ?? undefined;
+  }
+
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {
     const row = {
       id: randomUUID(),

@@ -92,7 +92,7 @@ describe("M-SIGN — 상태 폴링 (FR-502)", () => {
     const draft = await okDraft();
     await sign(draft.draftId);
     const requested = (await freshDraft(draft.draftId))!;
-    mockSigner!.simulateEvent(requested.modusignDocumentId!, "document_all_signed");
+    await mockSigner!.simulateEvent(requested.modusignDocumentId!, "document_all_signed");
 
     const body = await (await status(draft.draftId)).json();
     expect(body.data.status).toBe("COMPLETED");
@@ -105,7 +105,7 @@ describe("M-SIGN — 상태 폴링 (FR-502)", () => {
     const draft = await okDraft();
     await sign(draft.draftId);
     const requested = (await freshDraft(draft.draftId))!;
-    mockSigner!.simulateEvent(requested.modusignDocumentId!, "document_rejected");
+    await mockSigner!.simulateEvent(requested.modusignDocumentId!, "document_rejected");
     const body = await (await status(draft.draftId)).json();
     expect(body.data.status).toBe("REJECTED");
   });

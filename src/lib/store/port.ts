@@ -88,6 +88,14 @@ export interface StorePort {
   recordReconcile(corrected: number): Promise<void>;
   getReconcileState(): Promise<{ lastSyncAt: string | null; correctedTotal: number }>;
 
+  // ── mock signer 외부 상태 (MODUSIGN_MODE=mock 전용) ───────
+  /** 서버리스는 요청마다 인스턴스가 갈린다. mock이 대역하는 "외부 세계"를 인메모리로만
+   *  두면 서명 요청은 A에서, 완료 시뮬은 B에서 처리되어 문서를 잃는다.
+   *  ⚠ **draft와 분리된 자리**여야 한다 — 같은 자리에 쓰면 우리 기록이 함께 움직여
+   *  "웹훅 유실"(외부만 완료, 우리는 REQUESTED)을 재현할 수 없다. */
+  putMockDoc(documentId: string, state: Record<string, unknown>): Promise<void>;
+  getMockDoc(documentId: string): Promise<Record<string, unknown> | undefined>;
+
   // ── evidences ─────────────────────────────────────────────
   createEvidence(
     input: Omit<EvidenceRecord, "id" | "createdAt">,

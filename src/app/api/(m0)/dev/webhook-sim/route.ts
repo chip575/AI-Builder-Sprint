@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const payload = mockSigner.simulateEvent(parsed.data.docId, parsed.data.event);
+  const payload = await mockSigner.simulateEvent(parsed.data.docId, parsed.data.event);
   if (!payload) {
     return NextResponse.json(
       {

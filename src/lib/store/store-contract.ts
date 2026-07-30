@@ -154,5 +154,16 @@ export function storeContractTests(name: string, makeStore: () => Promise<StoreP
         (await s.listUnprocessedEvents()).find((e) => e.externalEventId === eventId),
       ).toBeUndefined();
     });
+
+    it("mock 슬롯: 마지막으로 쓴 상태가 읽힌다 (인스턴스 교체 대비)", async () => {
+      const s = await makeStore();
+      const docId = `mock-${randomUUID()}`;
+      expect(await s.getMockDoc(docId)).toBeUndefined();
+      await s.putMockDoc(docId, { doc: { status: "REQUESTED" }, events: [] });
+      await s.putMockDoc(docId, { doc: { status: "COMPLETED" }, events: ["e1"] });
+      const got = await s.getMockDoc(docId);
+      expect((got?.doc as { status: string }).status).toBe("COMPLETED");
+      expect(got?.events).toEqual(["e1"]);
+    });
   });
 }

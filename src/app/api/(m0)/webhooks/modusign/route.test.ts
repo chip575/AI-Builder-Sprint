@@ -38,8 +38,8 @@ async function requestedDraft() {
 
 // 외부 세계(모두싸인)를 먼저 전이시키고 그 페이로드를 쓴다 — 보강 조회(02.3 §3 5단계)가
 // 읽는 진실은 외부 문서 상태이므로, 전이 없이 페이로드만 쏘는 것은 비현실적 시나리오다.
-const externalEvent = (documentId: string, event: string, eventId: string = randomUUID()) =>
-  mockSigner!.simulateEvent(documentId, event, eventId)!;
+const externalEvent = async (documentId: string, event: string, eventId: string = randomUUID()) =>
+  (await mockSigner!.simulateEvent(documentId, event, eventId))!;
 
 const payloadFor = (documentId: string, event: string, eventId: string = randomUUID()) => ({
   eventId,
@@ -58,7 +58,7 @@ describe("M-WEBHOOK — 멱등성 (FR-503 수락 기준)", () => {
   it("동일 이벤트 5회 수신 → 전부 200, 상태 전이·증빙 생성은 정확히 1회", async () => {
     const { draft, documentId } = await requestedDraft();
     // 외부 세계도 완료 상태로 (보강 조회가 읽는 대상)
-    const p = externalEvent(documentId, "document_all_signed", "evt-idem-1-" + documentId);
+    const p = await externalEvent(documentId, "document_all_signed", "evt-idem-1-" + documentId);
     for (let i = 0; i < 5; i++) {
       expect((await post(p)).status).toBe(200);
     }
@@ -78,16 +78,16 @@ describe("M-WEBHOOK — 멱등성 (FR-503 수락 기준)", () => {
 
   it("거절 이벤트 → REJECTED 동기화", async () => {
     const { draft, documentId } = await requestedDraft();
-    await post(externalEvent(documentId, "document_rejected"));
+    await post(await externalEvent(documentId, "document_rejected"));
     await drainOutbox();
     expect((await store.getDraft(draft.draftId))!.status).toBe("REJECTED");
   });
 
   it("역행 방지 — 완료 후 requested 이벤트는 스킵", async () => {
     const { draft, documentId } = await requestedDraft();
-    await post(externalEvent(documentId, "document_all_signed"));
+    await post(await externalEvent(documentId, "document_all_signed"));
     await drainOutbox();
-    await post(externalEvent(documentId, "document_started")); // 외부는 전이 거부, 이벤트만 도착
+    await post(await externalEvent(documentId, "document_started")); // 외부는 전이 거부, 이벤트만 도착
     await drainOutbox();
     expect((await store.getDraft(draft.draftId))!.status).toBe("COMPLETED");
   });
@@ -113,7 +113,7 @@ describe("M-WEBHOOK — 시크릿 검증", () => {
   it("시크릿 설정 시: 불일치 401 / 일치 200", async () => {
     process.env.MODUSIGN_WEBHOOK_SECRET = "test-secret";
     const { documentId } = await requestedDraft();
-    const p = externalEvent(documentId, "document_all_signed");
+    const p = await externalEvent(documentId, "document_all_signed");
     expect((await post(p, { "x-webhook-secret": "wrong" })).status).toBe(401);
     expect((await post(p, { "x-webhook-secret": "test-secret" })).status).toBe(200);
   });

@@ -32,7 +32,7 @@ describe("M-RECONCILER — 웹훅 유실 복구 (FR-504)", () => {
   it("웹훅이 오지 않아도 외부 완료 상태를 따라잡는다", async () => {
     const { draftId, documentId } = await requestedDraft();
     // 외부만 완료시킨다 — 우리 웹훅 경로는 태우지 않는다 (유실 재현)
-    mockSigner!.simulateEvent(documentId, "document_all_signed");
+    await mockSigner!.simulateEvent(documentId, "document_all_signed");
     expect((await store.getDraft(draftId))!.status).toBe("REQUESTED"); // 아직 모름
 
     const body = await (await run()).json();
@@ -43,7 +43,7 @@ describe("M-RECONCILER — 웹훅 유실 복구 (FR-504)", () => {
 
   it("이미 일치하면 교정하지 않는다 (멱등 — 두 번 돌려도 0)", async () => {
     const { documentId } = await requestedDraft();
-    mockSigner!.simulateEvent(documentId, "document_all_signed");
+    await mockSigner!.simulateEvent(documentId, "document_all_signed");
     await run();
     const second = await (await run()).json();
     expect(second.data.corrected).toBe(0);
@@ -57,7 +57,7 @@ describe("M-RECONCILER — 웹훅 유실 복구 (FR-504)", () => {
 
   it("임계 이내(최근) 문서는 대상이 아니다 — 5분 규칙", async () => {
     const { draftId, documentId } = await requestedDraft();
-    mockSigner!.simulateEvent(documentId, "document_all_signed");
+    await mockSigner!.simulateEvent(documentId, "document_all_signed");
     await run(5 * 60 * 1000); // 방금 만든 draft는 5분 임계에 안 걸린다
     expect((await store.getDraft(draftId))!.status).toBe("REQUESTED");
   });
@@ -65,7 +65,7 @@ describe("M-RECONCILER — 웹훅 유실 복구 (FR-504)", () => {
   it("Cron 인증 헤더가 붙은 GET은 **실행**한다 — Vercel Cron은 GET으로 부른다", async () => {
     process.env.CRON_SECRET = "test-cron-secret";
     const { draftId, documentId } = await requestedDraft();
-    mockSigner!.simulateEvent(documentId, "document_all_signed");
+    await mockSigner!.simulateEvent(documentId, "document_all_signed");
 
     const res = await GET(
       new Request("http://localhost/api/cron/reconcile?staleMs=0", {

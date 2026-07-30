@@ -24,7 +24,7 @@ describe("M-MOCK — 키 없는 전체 흐름", () => {
   it("완료 이벤트 → COMPLETED + completedAt + 서명자 signedAt", async () => {
     const s = new MockSigner();
     const r = await s.requestWithTemplate(input);
-    s.simulateEvent(r.documentId, "document_all_signed");
+    await s.simulateEvent(r.documentId, "document_all_signed");
     const doc = await s.getDocument(r.documentId);
     expect(doc?.status).toBe("COMPLETED");
     expect(doc?.completedAt).not.toBeNull();
@@ -35,7 +35,7 @@ describe("M-MOCK — 키 없는 전체 흐름", () => {
     const s = new MockSigner();
     const r = await s.requestWithTemplate(input);
     for (let i = 0; i < 5; i++) {
-      s.simulateEvent(r.documentId, "document_all_signed", "evt-dup-1");
+      await s.simulateEvent(r.documentId, "document_all_signed", "evt-dup-1");
     }
     expect(s.sideEffectCount).toBe(1);
     expect((await s.getDocument(r.documentId))?.status).toBe("COMPLETED");
@@ -44,15 +44,15 @@ describe("M-MOCK — 키 없는 전체 흐름", () => {
   it("역행 전이 무시 — COMPLETED 후 requested 이벤트는 스킵 (02.3 §3)", async () => {
     const s = new MockSigner();
     const r = await s.requestWithTemplate(input);
-    s.simulateEvent(r.documentId, "document_all_signed");
-    s.simulateEvent(r.documentId, "document_started");
+    await s.simulateEvent(r.documentId, "document_all_signed");
+    await s.simulateEvent(r.documentId, "document_started");
     expect((await s.getDocument(r.documentId))?.status).toBe("COMPLETED");
   });
 
   it("거절 이벤트 → REJECTED, 취소 API → CANCELED + 사유 (FR-506)", async () => {
     const s = new MockSigner();
     const a = await s.requestWithTemplate(input);
-    s.simulateEvent(a.documentId, "document_rejected");
+    await s.simulateEvent(a.documentId, "document_rejected");
     expect((await s.getDocument(a.documentId))?.status).toBe("REJECTED");
 
     const b = await s.requestWithTemplate(input);
@@ -73,9 +73,23 @@ describe("M-MOCK — 키 없는 전체 흐름", () => {
     const s = new MockSigner();
     const a = await s.requestWithTemplate(input);
     await s.requestWithTemplate(input);
-    s.simulateEvent(a.documentId, "document_all_signed");
+    await s.simulateEvent(a.documentId, "document_all_signed");
     expect(await s.listDocuments({ status: "COMPLETED" })).toHaveLength(1);
     expect(await s.listDocuments({ status: "REQUESTED" })).toHaveLength(1);
     expect(await s.listDocuments()).toHaveLength(2);
+  });
+
+  it("인스턴스가 갈려도 문서를 잃지 않는다 — 서버리스 대비", async () => {
+    // 배포에서만 드러나는 실패다. 서명 요청과 완료 시뮬이 다른 인스턴스에 떨어지면
+    // 인메모리 맵만 가진 mock은 "문서를 찾을 수 없습니다"를 낸다.
+    const a = new MockSigner();
+    const r = await a.requestWithTemplate(input);
+
+    const b = new MockSigner(); // 다른 인스턴스가 이어받는다
+    expect((await b.getDocument(r.documentId))?.status).toBe("REQUESTED");
+    await b.simulateEvent(r.documentId, "document_all_signed", "evt-cross-1");
+
+    const c = new MockSigner();
+    expect((await c.getDocument(r.documentId))?.status).toBe("COMPLETED");
   });
 });

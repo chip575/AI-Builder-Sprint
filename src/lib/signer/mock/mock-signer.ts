@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import type { DocStatus } from "../../contracts/common";
 import type { ModusignWebhookPayload } from "../../contracts/webhook";
 import { canTransition, EVENT_TO_STATUS } from "../state-machine";
+import { store } from "../../store";
 import type {
   DocumentDetail,
   SignerPort,
@@ -21,6 +22,9 @@ interface MockDoc extends DocumentDetail {
 }
 
 export class MockSigner implements SignerPort {
+  // 맵은 **빠른 경로일 뿐**이다. 서버리스는 요청마다 인스턴스가 갈릴 수 있어
+  // 이것만 믿으면 "서명 요청은 A에서, 완료 시뮬은 B에서"에 문서를 잃는다.
+  // 진짜 자리는 store의 mock 슬롯이다 (load/persist 참조).
   private docs = new Map<string, MockDoc>();
   /** 처리한 이벤트 ID — webhook_events ON CONFLICT DO NOTHING의 인메모리판 (멱등성) */
   private processedEvents = new Set<string>();
@@ -46,10 +50,11 @@ export class MockSigner implements SignerPort {
       expiresAt: new Date(now + EMBED_TTL_MS).toISOString(),
     };
     this.docs.set(doc.documentId, doc);
+    void this.persist(doc);
     if (this.autoCompleteMs !== undefined) {
       // 02.4 §5 — mock 모드는 일정 시간 뒤 자동 완료로 서명자를 흉내낸다
       const t = setTimeout(() => {
-        this.simulateEvent(doc.documentId, "document_all_signed");
+        void this.simulateEvent(doc.documentId, "document_all_signed");
       }, this.autoCompleteMs);
       if (typeof t === "object" && "unref" in t) t.unref();
     }
@@ -76,8 +81,44 @@ export class MockSigner implements SignerPort {
     };
   }
 
+  /** 외부 세계의 상태를 우리 기록과 **다른 자리**에 남긴다.
+   *  실패해도 흐름을 막지 않는다 — mock은 개발 보조이지 진실이 아니다. */
+  private async persist(doc: MockDoc): Promise<void> {
+    try {
+      await store.putMockDoc(doc.documentId, {
+        doc: doc as unknown as Record<string, unknown>,
+        events: [...this.processedEvents],
+      });
+    } catch (err) {
+      console.warn("[mock-signer] 외부 상태 저장 실패:", (err as Error).message);
+    }
+  }
+
+  /** 맵 우선, 없으면 store의 mock 슬롯에서 복원한다 (인스턴스 교체 대비). */
+  private async load(documentId: string): Promise<MockDoc | null> {
+    const cached = this.docs.get(documentId);
+    if (cached) return cached;
+
+    let saved: Record<string, unknown> | undefined;
+    try {
+      saved = await store.getMockDoc(documentId);
+    } catch (err) {
+      console.warn("[mock-signer] 외부 상태 복원 실패:", (err as Error).message);
+    }
+    const doc = saved?.doc as MockDoc | undefined;
+    if (!doc) return null;
+
+    // 멱등성 판정도 함께 복원한다 — 이것 없이는 인스턴스가 갈릴 때마다
+    // 같은 이벤트가 "처음 본 이벤트"가 되어 부수효과가 반복된다.
+    for (const id of (saved?.events as string[] | undefined) ?? []) {
+      this.processedEvents.add(id);
+    }
+    this.docs.set(documentId, doc);
+    return doc;
+  }
+
   async getDocument(documentId: string): Promise<DocumentDetail | null> {
-    return this.docs.get(documentId) ?? null;
+    return this.load(documentId);
   }
 
   async listDocuments(filter?: { status?: DocStatus }): Promise<DocumentDetail[]> {
@@ -86,14 +127,17 @@ export class MockSigner implements SignerPort {
   }
 
   async resendNotification(documentId: string): Promise<void> {
-    if (!this.docs.has(documentId)) throw new Error(`unknown document: ${documentId}`);
+    if (!(await this.load(documentId))) throw new Error(`unknown document: ${documentId}`);
     // mock — 실 발송 없음. 발송 이력은 FR-507 구현부(라우트)가 기록한다.
   }
 
   async cancel(documentId: string, reason: string): Promise<void> {
-    const doc = this.docs.get(documentId);
+    const doc = await this.load(documentId);
     if (!doc) throw new Error(`unknown document: ${documentId}`);
-    if (this.transition(doc, "CANCELED")) doc.rejectReason = reason;
+    if (this.transition(doc, "CANCELED")) {
+      doc.rejectReason = reason;
+      await this.persist(doc);
+    }
   }
 
   /** 허용 전이 표를 따르는 상태 변경. 허용되지 않으면 false (스킵 + 무시) */
@@ -112,12 +156,12 @@ export class MockSigner implements SignerPort {
    * 외부 이벤트 주입 (webhook-sim이 호출) — 멱등 처리 후 웹훅 페이로드를 반환한다.
    * 같은 eventId가 몇 번 오든 상태 전이·부수효과는 정확히 1회 (FR-503).
    */
-  simulateEvent(
+  async simulateEvent(
     documentId: string,
     event: string,
     eventId: string = randomUUID(),
-  ): ModusignWebhookPayload | null {
-    const doc = this.docs.get(documentId);
+  ): Promise<ModusignWebhookPayload | null> {
+    const doc = await this.load(documentId);
     if (!doc) return null;
 
     const payload: ModusignWebhookPayload = {
@@ -136,6 +180,9 @@ export class MockSigner implements SignerPort {
     if (target && this.transition(doc, target)) {
       this.sideEffectCount += 1; // 실제 구현에서는 메일 발송·Obligation 생성 지점
     }
+    // 전이가 없어도 남긴다 — 중복 이벤트 판정(events)이 갱신됐다.
+    // ⚠ draft는 건드리지 않는다. 외부만 움직여야 웹훅 유실을 재현할 수 있다 (FR-504).
+    await this.persist(doc);
     return payload;
   }
 }
