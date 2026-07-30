@@ -55,6 +55,8 @@ Upstage Solar / Document Parse / Information Extract / Embeddings
 - 적용: `npx supabase db push` 가 정본 경로. **대시보드 SQL 편집기·MCP로 DDL을
   직접 실행하지 않는다** — 파일 밖 스키마 변경은 추적이 끊긴다
 - MCP는 적용 **후** 검증 조회용 (테이블 목록·RLS 확인·advisor)
+- **새 테이블을 만드는 마이그레이션은 끝에 `select public.assert_rls_enabled();`를 호출한다** —
+  0001의 검증 블록은 그 마이그레이션이 도는 순간의 스냅샷일 뿐이라 새 테이블을 잡지 못한다
 - RLS 정책·트리거 변경은 사람 리뷰 필수 (보안 5조)
 
 ## 원격 저장소 — 포크에만 올린다
