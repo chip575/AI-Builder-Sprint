@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
+import type { LedgerNode } from "../contracts/ledger";
+import { buildNode, withDerivedStatus } from "../ledger/chain";
 import type { StorePort } from "./port";
 import { summarizeMetrics } from "./percentile";
 import {
@@ -11,6 +13,7 @@ import {
   type BranchProposalRecord,
   type DraftRecord,
   type EvidenceRecord,
+  type LedgerAppendInput,
   type SessionRecord,
   type Utterance,
   type GateStats,
@@ -295,6 +298,24 @@ export class InMemoryStore implements StorePort {
 
   async getMockDoc(documentId: string) {
     return this.mockDocs.get(documentId);
+  }
+
+  /** key = subjectId. 배열은 push만 한다 — 인메모리에서도 append-only는 규칙이다 */
+  private ledger = new Map<string, LedgerNode[]>();
+
+  async appendLedgerNode(input: LedgerAppendInput): Promise<LedgerNode> {
+    const chain = this.ledger.get(input.subjectId) ?? [];
+    const node = buildNode(chain.at(-1), input, {
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+    });
+    chain.push(node);
+    this.ledger.set(input.subjectId, chain);
+    return node;
+  }
+
+  async listLedgerNodes(subjectId: string): Promise<LedgerNode[]> {
+    return withDerivedStatus(this.ledger.get(subjectId) ?? []);
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

@@ -3,10 +3,12 @@
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
+import type { LedgerNode } from "../contracts/ledger";
 import type {
   BranchProposalRecord,
   GateStats,
   GateVerdictRecord,
+  LedgerAppendInput,
   MetricRecord,
   StageStat,
   DraftRecord,
@@ -95,6 +97,13 @@ export interface StorePort {
    *  "웹훅 유실"(외부만 완료, 우리는 REQUESTED)을 재현할 수 없다. */
   putMockDoc(documentId: string, state: Record<string, unknown>): Promise<void>;
   getMockDoc(documentId: string): Promise<Record<string, unknown> | undefined>;
+
+  // ── intent ledger (FR-550~555) ────────────────────────────
+  /** append-only. UPDATE·DELETE는 존재하지 않는다 — 정정도 새 노드다.
+   *  seq와 해시는 어댑터가 꼬리를 읽어 계산한다 (lib/ledger/chain.buildNode) */
+  appendLedgerNode(input: LedgerAppendInput): Promise<LedgerNode>;
+  /** seq 오름차순. status는 저장값이 아니라 유도값으로 내보낸다 (FR-555 최신성) */
+  listLedgerNodes(subjectId: string): Promise<LedgerNode[]>;
 
   // ── evidences ─────────────────────────────────────────────
   createEvidence(
