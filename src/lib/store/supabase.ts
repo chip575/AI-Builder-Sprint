@@ -13,6 +13,11 @@ import {
   type BranchProposalRecord,
   type DraftRecord,
   type EvidenceRecord,
+  type HeartWillApplyResult,
+  type HeartWillOrigin,
+  type HeartWillParagraph,
+  type HeartWillParagraphDraft,
+  type HeartWillVersion,
   type SessionRecord,
   type Utterance,
   type GateStats,
@@ -448,6 +453,177 @@ export class SupabaseStore implements StorePort {
     if (error) this.fail("audit.mockDoc", error);
     const row = (data ?? [])[0] as Row | undefined;
     return (row?.detail as Record<string, unknown>) ?? undefined;
+  }
+
+  // ── 마음 유언 (FR-111) ────────────────────────────────────
+  // ⚠ 20260730160227_heartwill.sql이 적용된 프로젝트에서만 동작한다. 테이블이 없으면
+  //   this.fail이 던진다 — **조용한 폴백은 없다**(보안 7조). 인메모리 구현은 별개 클래스라
+  //   이 실패에 영향받지 않는다.
+
+  private toParagraph = (r: Row): HeartWillParagraph => ({
+    id: r.id,
+    ord: r.ord,
+    body: r.body,
+    origin: r.origin as HeartWillOrigin,
+    sourceUtteranceId: r.source_utterance_id,
+    acceptedAt: iso(r.accepted_at),
+    createdAt: iso(r.created_at),
+  });
+
+  /** intent당 1건 (UNIQUE). create=false면 없을 때 undefined */
+  private async heartWillDocId(intentId: string, create: boolean): Promise<string | undefined> {
+    const { data, error } = await this.db
+      .from("heart_will_documents").select("id").eq("intent_id", intentId).maybeSingle();
+    if (error) this.fail("heart_will_documents.select", error);
+    if (data) return data.id;
+    if (!create) return undefined;
+    const id = randomUUID();
+    const ins = await this.db.from("heart_will_documents").insert({ id, intent_id: intentId });
+    if (ins.error) this.fail("heart_will_documents.insert", ins.error);
+    return id;
+  }
+
+  /** 현재 버전 = 아무도 prev로 가리키지 않는 버전. 체인이 선형이므로 유일하다
+   *  (heart_will_versions_linear UNIQUE 인덱스가 분기를 막는다) */
+  private async heartWillHeadRow(documentId: string): Promise<Row | undefined> {
+    const { data, error } = await this.db
+      .from("heart_will_versions")
+      .select("id, prev_version_id, created_at")
+      .eq("document_id", documentId)
+      .order("created_at");
+    if (error) this.fail("heart_will_versions.select", error);
+    const rows = (data ?? []) as Row[];
+    if (rows.length === 0) return undefined;
+    const linked = new Set(rows.map((r) => r.prev_version_id).filter(Boolean));
+    return rows.find((r) => !linked.has(r.id)) ?? rows[rows.length - 1];
+  }
+
+  private async heartWillVersion(documentId: string, row: Row): Promise<HeartWillVersion> {
+    const { data, error } = await this.db
+      .from("heart_will_paragraphs").select("*").eq("version_id", row.id).order("ord");
+    if (error) this.fail("heart_will_paragraphs.select", error);
+    return {
+      versionId: row.id,
+      documentId,
+      prevVersionId: row.prev_version_id,
+      paragraphs: (data ?? []).map(this.toParagraph),
+      createdAt: iso(row.created_at),
+    };
+  }
+
+  private async insertHeartWillVersion(
+    documentId: string,
+    prevVersionId: string | null,
+    paragraphs: Omit<HeartWillParagraph, "id" | "createdAt">[],
+  ): Promise<string> {
+    const versionId = randomUUID();
+    const v = await this.db.from("heart_will_versions").insert({
+      id: versionId,
+      document_id: documentId,
+      prev_version_id: prevVersionId,
+    });
+    if (v.error) this.fail("heart_will_versions.insert", v.error);
+    if (paragraphs.length > 0) {
+      const p = await this.db.from("heart_will_paragraphs").insert(
+        paragraphs.map((x) => ({
+          id: randomUUID(),
+          version_id: versionId,
+          ord: x.ord,
+          body: x.body,
+          origin: x.origin,
+          source_utterance_id: x.sourceUtteranceId,
+          accepted_at: x.acceptedAt,
+        })),
+      );
+      if (p.error) this.fail("heart_will_paragraphs.insert", p.error);
+    }
+    return versionId;
+  }
+
+  async draftHeartWillParagraphs(
+    sessionId: string,
+    drafts: HeartWillParagraphDraft[],
+  ): Promise<HeartWillVersion> {
+    // FK가 잡아주기 **전에** 우리가 먼저 막는다. FK 위반 메시지는 사용자에게 보여줄 수 없고,
+    // 삭제된 발화는 FK를 통과하지만 근거로는 죽은 발화다 (소프트 삭제, D-10).
+    const { data: utts, error } = await this.db
+      .from("utterances").select("id").eq("intent_id", sessionId).is("deleted_at", null);
+    if (error) this.fail("utterances.select", error);
+    const alive = new Set((utts ?? []).map((u: Row) => u.id));
+    for (const d of drafts) {
+      if (!d.sourceUtteranceId || !alive.has(d.sourceUtteranceId)) {
+        throw new Error("[store] 근거 발화 없는 문단은 만들 수 없다 (FR-111)");
+      }
+      if (d.body.trim() === "") throw new Error("[store] 빈 문단은 만들 수 없다");
+    }
+
+    const documentId = (await this.heartWillDocId(sessionId, true))!;
+    let head = await this.heartWillHeadRow(documentId);
+    if (!head) {
+      const rootId = await this.insertHeartWillVersion(documentId, null, []);
+      head = { id: rootId, prev_version_id: null, created_at: new Date().toISOString() };
+    }
+
+    const base = await this.heartWillVersion(documentId, head);
+    const rows = drafts.map((d, i) => ({
+      id: randomUUID(),
+      version_id: head!.id,
+      ord: base.paragraphs.length + i,
+      body: d.body,
+      origin: d.origin,
+      source_utterance_id: d.sourceUtteranceId,
+      accepted_at: null, // 기본은 미승인 (P1)
+    }));
+    if (rows.length > 0) {
+      const ins = await this.db.from("heart_will_paragraphs").insert(rows);
+      if (ins.error) this.fail("heart_will_paragraphs.insert", ins.error);
+    }
+    return this.heartWillVersion(documentId, head);
+  }
+
+  async getHeartWillHead(sessionId: string): Promise<HeartWillVersion | undefined> {
+    const documentId = await this.heartWillDocId(sessionId, false);
+    if (!documentId) return undefined;
+    const head = await this.heartWillHeadRow(documentId);
+    if (!head) return undefined;
+    return this.heartWillVersion(documentId, head);
+  }
+
+  async applyHeartWill(
+    sessionId: string,
+    acceptedParagraphIds: string[],
+  ): Promise<HeartWillApplyResult | null> {
+    const documentId = await this.heartWillDocId(sessionId, false);
+    if (!documentId) return null;
+    const headRow = await this.heartWillHeadRow(documentId);
+    if (!headRow) return null;
+    const head = await this.heartWillVersion(documentId, headRow);
+    const wanted = new Set(acceptedParagraphIds);
+
+    const previous = head.paragraphs.filter((p) => p.acceptedAt !== null);
+    const accepted = head.paragraphs.filter((p) => p.acceptedAt === null && wanted.has(p.id));
+    if (accepted.length === 0) return null; // 승인 없으면 버전을 만들지 않는다 (P1)
+    const stillPending = head.paragraphs.filter(
+      (p) => p.acceptedAt === null && !wanted.has(p.id),
+    );
+
+    // 인메모리와 같은 규칙 — 대체(같은 발화)·이월(본문)·유예(미승인 초안).
+    // 규칙의 진실은 store-contract 스위트다.
+    const at = new Date().toISOString();
+    const claimed = new Set(accepted.map((p) => p.sourceUtteranceId));
+    const carried = previous.filter((p) => !claimed.has(p.sourceUtteranceId));
+    const body = [...carried, ...accepted].map((p, i) => ({ ...p, ord: i, acceptedAt: at }));
+    const pending = stillPending.map((p, i) => ({ ...p, ord: body.length + i }));
+
+    const versionId = await this.insertHeartWillVersion(documentId, head.versionId, [
+      ...body,
+      ...pending,
+    ]);
+    const newRow = { id: versionId, prev_version_id: head.versionId, created_at: at };
+    return {
+      version: await this.heartWillVersion(documentId, newRow),
+      previousParagraphs: previous,
+    };
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

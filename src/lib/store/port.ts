@@ -11,6 +11,9 @@ import type {
   StageStat,
   DraftRecord,
   EvidenceRecord,
+  HeartWillApplyResult,
+  HeartWillParagraphDraft,
+  HeartWillVersion,
   SessionRecord,
   Utterance,
   WebhookEventInput,
@@ -95,6 +98,24 @@ export interface StorePort {
    *  "웹훅 유실"(외부만 완료, 우리는 REQUESTED)을 재현할 수 없다. */
   putMockDoc(documentId: string, state: Record<string, unknown>): Promise<void>;
   getMockDoc(documentId: string): Promise<Record<string, unknown> | undefined>;
+
+  // ── 마음 유언 (FR-111) ────────────────────────────────────
+  /** 문단 초안을 현재 버전에 **미승인 상태로** 쌓는다. 문서 본문은 아직 그대로다.
+   *  근거 발화가 없거나 이 세션의 살아있는 발화가 아니면 **거부한다** — 스키마의
+   *  `source_utterance_id NOT NULL` + FK를 코드에서도 세운다 (AI가 지어낸 문장의 자리를 없앤다) */
+  draftHeartWillParagraphs(
+    sessionId: string,
+    drafts: HeartWillParagraphDraft[],
+  ): Promise<HeartWillVersion>;
+  /** 현재 버전. 문서가 아직 없으면 undefined (초안조차 쌓인 적 없는 상태) */
+  getHeartWillHead(sessionId: string): Promise<HeartWillVersion | undefined>;
+  /** 승인된 문단만 담아 새 버전을 잇는다 (append-only 체인).
+   *  ⚠ 승인이 하나도 없으면 **버전을 만들지 않고 null**이다 — 빈 승인은 "갱신 없음"이지
+   *  "전부 승인"이 아니다 (P1). 같은 발화를 근거로 새로 승인된 문단은 옛 문단을 대체한다 */
+  applyHeartWill(
+    sessionId: string,
+    acceptedParagraphIds: string[],
+  ): Promise<HeartWillApplyResult | null>;
 
   // ── evidences ─────────────────────────────────────────────
   createEvidence(

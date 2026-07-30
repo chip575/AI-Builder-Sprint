@@ -73,6 +73,46 @@ export interface EvidenceRecord {
   createdAt: string;
 }
 
+// ── 마음 유언 (FR-111) ──────────────────────────────────────
+// 문단이 단위다. 버전을 통짜 텍스트로 두지 않는다 — 승인·근거 연결·AI/사용자 구분이
+// 전부 문단 단위이기 때문이다 (20260730160227_heartwill.sql의 설계 결정 [1]).
+
+/** 문단의 출처. 화면이 AI 문장과 사용자 문장을 다르게 보이게 하는 근거다 (P1의 화면 증거).
+ *  USER_EDITED는 AI 초안을 사용자가 고친 것 — 고친 순간 사용자의 문장이 된다 */
+export type HeartWillOrigin = "AI_DRAFT" | "USER_EDITED" | "USER_WRITTEN";
+
+/** 적재 요청. sourceUtteranceId는 선택항목이 아니다 — 근거 없는 문단은 만들 수 없다 */
+export interface HeartWillParagraphDraft {
+  body: string;
+  origin: HeartWillOrigin;
+  sourceUtteranceId: string;
+}
+
+export interface HeartWillParagraph extends HeartWillParagraphDraft {
+  id: string;
+  ord: number;
+  /** null이면 미승인 — 문서 본문이 아니다. **기본값이 미승인**이라 조용히 반영되는 경로가 없다 (P1) */
+  acceptedAt: string | null;
+  createdAt: string;
+}
+
+/** 버전 = 문서의 한 스냅샷. paragraphs에는 본문(acceptedAt≠null)과
+ *  아직 승인을 기다리는 초안(acceptedAt=null)이 함께 있다 — acceptedAt이 둘을 가른다 */
+export interface HeartWillVersion {
+  versionId: string;
+  documentId: string;
+  prevVersionId: string | null;
+  paragraphs: HeartWillParagraph[];
+  createdAt: string;
+}
+
+/** 새 버전 + 직전 버전의 **본문**(승인 문단만).
+ *  diff 계산은 두 어댑터에 같은 로직을 심지 않으려고 호출부(라우트)로 뺐다 */
+export interface HeartWillApplyResult {
+  version: HeartWillVersion;
+  previousParagraphs: HeartWillParagraph[];
+}
+
 /** 게이트 판정 1건의 기록 (FR-509) */
 export interface GateVerdictRecord {
   docType: string;

@@ -11,6 +11,10 @@ import {
   type BranchProposalRecord,
   type DraftRecord,
   type EvidenceRecord,
+  type HeartWillApplyResult,
+  type HeartWillParagraph,
+  type HeartWillParagraphDraft,
+  type HeartWillVersion,
   type SessionRecord,
   type Utterance,
   type GateStats,
@@ -27,6 +31,19 @@ interface MemUtterance extends Utterance {
 
 interface MemSession extends Omit<SessionRecord, "utterances"> {
   utterances: MemUtterance[];
+}
+
+interface MemHeartWillVersion {
+  id: string;
+  prevVersionId: string | null;
+  createdAt: string;
+  paragraphs: HeartWillParagraph[];
+}
+
+/** intent당 문서 1건. versions는 선형 체인이고 마지막 원소가 현재 버전이다 */
+interface MemHeartWill {
+  documentId: string;
+  versions: MemHeartWillVersion[];
 }
 
 export class InMemoryStore implements StorePort {
@@ -295,6 +312,117 @@ export class InMemoryStore implements StorePort {
 
   async getMockDoc(documentId: string) {
     return this.mockDocs.get(documentId);
+  }
+
+  private heartWills = new Map<string, MemHeartWill>(); // key = intentId
+
+  /** 방어 복사로 내보낸다 — 호출부가 들고 있는 배열이 저장소를 바꾸면 안 된다 */
+  private heartWillView(hw: MemHeartWill): HeartWillVersion {
+    const head = hw.versions.at(-1)!;
+    return {
+      versionId: head.id,
+      documentId: hw.documentId,
+      prevVersionId: head.prevVersionId,
+      paragraphs: head.paragraphs.map((p) => ({ ...p })),
+      createdAt: head.createdAt,
+    };
+  }
+
+  async draftHeartWillParagraphs(
+    sessionId: string,
+    drafts: HeartWillParagraphDraft[],
+  ): Promise<HeartWillVersion> {
+    const s = this.sessions.get(sessionId);
+    if (!s) throw new Error(`unknown session: ${sessionId}`);
+
+    // 전량 검사 후 전량 적재 — 하나가 근거 없으면 아무것도 쌓이지 않는다.
+    // 부분 적재를 허용하면 "근거 없는 문단은 만들 수 없다"가 순서 의존 규칙이 된다.
+    const alive = new Set(
+      s.utterances.filter((u) => u.deletedAt === null).map((u) => u.id),
+    );
+    for (const d of drafts) {
+      if (!d.sourceUtteranceId || !alive.has(d.sourceUtteranceId)) {
+        throw new Error("[store] 근거 발화 없는 문단은 만들 수 없다 (FR-111)");
+      }
+      if (d.body.trim() === "") throw new Error("[store] 빈 문단은 만들 수 없다");
+    }
+
+    const now = new Date().toISOString();
+    let hw = this.heartWills.get(sessionId);
+    if (!hw) {
+      hw = {
+        documentId: randomUUID(),
+        versions: [{ id: randomUUID(), prevVersionId: null, createdAt: now, paragraphs: [] }],
+      };
+      this.heartWills.set(sessionId, hw);
+    }
+    const head = hw.versions.at(-1)!;
+    for (const d of drafts) {
+      head.paragraphs.push({
+        id: randomUUID(),
+        ord: head.paragraphs.length,
+        body: d.body,
+        origin: d.origin,
+        sourceUtteranceId: d.sourceUtteranceId,
+        acceptedAt: null, // 기본은 미승인 (P1)
+        createdAt: now,
+      });
+    }
+    return this.heartWillView(hw);
+  }
+
+  async getHeartWillHead(sessionId: string): Promise<HeartWillVersion | undefined> {
+    const hw = this.heartWills.get(sessionId);
+    return hw ? this.heartWillView(hw) : undefined;
+  }
+
+  async applyHeartWill(
+    sessionId: string,
+    acceptedParagraphIds: string[],
+  ): Promise<HeartWillApplyResult | null> {
+    const hw = this.heartWills.get(sessionId);
+    if (!hw) return null;
+    const head = hw.versions.at(-1)!;
+    const wanted = new Set(acceptedParagraphIds);
+
+    const previous = head.paragraphs.filter((p) => p.acceptedAt !== null);
+    const accepted = head.paragraphs.filter((p) => p.acceptedAt === null && wanted.has(p.id));
+    // 승인이 없으면 버전을 만들지 않는다. 빈 배열은 "전부 승인"이 아니라 "갱신 없음"이다 (P1)
+    if (accepted.length === 0) return null;
+    const stillPending = head.paragraphs.filter(
+      (p) => p.acceptedAt === null && !wanted.has(p.id),
+    );
+
+    const at = new Date().toISOString();
+    // 같은 발화를 근거로 새 문단이 승인되면 옛 문단은 그것으로 대체된다(=수정).
+    // 대체되지 않은 본문은 그대로 이어진다 — 승인은 더하기지 지우기가 아니다.
+    const claimed = new Set(accepted.map((p) => p.sourceUtteranceId));
+    const carried = previous.filter((p) => !claimed.has(p.sourceUtteranceId));
+    const body = [...carried, ...accepted].map((p, i) => ({
+      ...p,
+      id: randomUUID(), // 버전마다 새 행 — 문단 id는 버전 안에서만 유효하다
+      ord: i,
+      acceptedAt: at,
+      createdAt: at,
+    }));
+    // 승인하지 않은 초안은 버리지 않고 다음 버전으로 옮긴다 — 사용자가 아직 정하지 않았을 뿐이다
+    const pending = stillPending.map((p, i) => ({
+      ...p,
+      id: randomUUID(),
+      ord: body.length + i,
+      createdAt: at,
+    }));
+
+    hw.versions.push({
+      id: randomUUID(),
+      prevVersionId: head.id,
+      createdAt: at,
+      paragraphs: [...body, ...pending],
+    });
+    return {
+      version: this.heartWillView(hw),
+      previousParagraphs: previous.map((p) => ({ ...p })),
+    };
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

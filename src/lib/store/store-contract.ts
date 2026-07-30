@@ -15,7 +15,14 @@ const fact = (key: string, value: IntentFact["value"], confidence = 0.95): Inten
   confirmed: false,
 });
 
-export function storeContractTests(name: string, makeStore: () => Promise<StorePort>) {
+export function storeContractTests(
+  name: string,
+  makeStore: () => Promise<StorePort>,
+  /** heartWill: 마음 유언 테이블(20260730160227)이 적용된 저장소인가.
+   *  추측하지 않는다 — 호출부가 실제로 물어보고 넘긴다 (supabase.contract.test.ts) */
+  opts: { heartWill?: boolean } = {},
+) {
+  const { heartWill = true } = opts;
   describe(`StorePort 계약 — ${name}`, () => {
     it("웹훅: 동일 external_event_id 5회 insert → 1건 (ON CONFLICT DO NOTHING)", async () => {
       const s = await makeStore();
@@ -153,6 +160,88 @@ export function storeContractTests(name: string, makeStore: () => Promise<StoreP
       expect(
         (await s.listUnprocessedEvents()).find((e) => e.externalEventId === eventId),
       ).toBeUndefined();
+    });
+
+    // ── 마음 유언 (FR-111) ──────────────────────────────────
+    // 이 다섯 케이스가 "승인한 것만 남는다"의 정의다. 화면이나 라우트가 아니라
+    // 저장소가 그것을 지킨다 — UI를 우회해도 미승인 문단은 본문에 들어가지 못한다.
+    describe.skipIf(!heartWill)("마음 유언", () => {
+      /** 발화 2개를 가진 세션 + 각 발화를 근거로 한 AI 초안 2문단 */
+      async function seeded(s: StorePort) {
+        const session = await s.getOrCreateSession();
+        const u1 = await s.addUtterance(session.id, "아이들에게 미안했던 날이 있었다");
+        const u2 = await s.addUtterance(session.id, "고맙다는 말을 못 했다");
+        const head = await s.draftHeartWillParagraphs(session.id, [
+          { body: "미안했던 마음을 남깁니다.", origin: "AI_DRAFT", sourceUtteranceId: u1.id },
+          { body: "고맙다는 말을 남깁니다.", origin: "AI_DRAFT", sourceUtteranceId: u2.id },
+        ]);
+        return { session, u1, u2, head };
+      }
+
+      it("근거 발화 없는 문단은 만들 수 없다 (source_utterance_id NOT NULL의 코드판)", async () => {
+        const s = await makeStore();
+        const session = await s.getOrCreateSession();
+        await expect(
+          s.draftHeartWillParagraphs(session.id, [
+            { body: "AI가 지어낸 문장", origin: "AI_DRAFT", sourceUtteranceId: randomUUID() },
+          ]),
+        ).rejects.toThrow();
+        // 거부는 전량이다 — 문서 자체가 생기지 않는다
+        expect(await s.getHeartWillHead(session.id)).toBeUndefined();
+      });
+
+      it("초안은 미승인으로 쌓인다 — 기본값이 미승인이라 조용히 반영될 길이 없다 (P1)", async () => {
+        const s = await makeStore();
+        const { head } = await seeded(s);
+        expect(head.paragraphs).toHaveLength(2);
+        expect(head.paragraphs.every((p) => p.acceptedAt === null)).toBe(true);
+        expect(head.prevVersionId).toBeNull(); // 아직 첫 버전 — 승인이 없었으니 체인도 없다
+      });
+
+      it("승인한 문단만 본문에 들어간다 — 미승인분은 유예되고 버려지지 않는다", async () => {
+        const s = await makeStore();
+        const { session, head } = await seeded(s);
+        const target = head.paragraphs[0]!;
+
+        const result = await s.applyHeartWill(session.id, [target.id]);
+        expect(result).not.toBeNull();
+        expect(result!.previousParagraphs).toHaveLength(0); // 직전 본문은 비어 있었다
+
+        const body = result!.version.paragraphs.filter((p) => p.acceptedAt !== null);
+        const pending = result!.version.paragraphs.filter((p) => p.acceptedAt === null);
+        expect(body.map((p) => p.body)).toEqual([target.body]);
+        expect(pending).toHaveLength(1); // 승인하지 않은 초안은 다음 판단을 기다린다
+        expect(pending[0]!.sourceUtteranceId).toBe(head.paragraphs[1]!.sourceUtteranceId);
+        expect(result!.version.prevVersionId).toBe(head.versionId); // 체인이 이어졌다
+      });
+
+      it("빈 승인 배열 → 버전이 생기지 않는다 (빈 승인은 '전부 승인'이 아니다)", async () => {
+        const s = await makeStore();
+        const { session, head } = await seeded(s);
+        expect(await s.applyHeartWill(session.id, [])).toBeNull();
+        const after = await s.getHeartWillHead(session.id);
+        expect(after!.versionId).toBe(head.versionId); // 현재 버전 그대로
+        expect(after!.paragraphs.every((p) => p.acceptedAt === null)).toBe(true);
+      });
+
+      it("같은 발화를 근거로 새로 승인된 문단이 옛 문단을 대체한다 (수정)", async () => {
+        const s = await makeStore();
+        const { session, u1, head } = await seeded(s);
+        await s.applyHeartWill(session.id, [head.paragraphs[0]!.id]);
+
+        await s.draftHeartWillParagraphs(session.id, [
+          { body: "미안했던 마음을, 제 말로 남깁니다.", origin: "USER_EDITED", sourceUtteranceId: u1.id },
+        ]);
+        const staged = (await s.getHeartWillHead(session.id))!;
+        const edited = staged.paragraphs.find((p) => p.origin === "USER_EDITED")!;
+
+        const result = await s.applyHeartWill(session.id, [edited.id]);
+        const body = result!.version.paragraphs.filter((p) => p.acceptedAt !== null);
+        // 같은 근거의 문단이 둘로 늘지 않는다 — 하나가 다른 하나를 대체한다
+        expect(body.filter((p) => p.sourceUtteranceId === u1.id)).toHaveLength(1);
+        expect(body.find((p) => p.sourceUtteranceId === u1.id)!.body).toBe(edited.body);
+        expect(result!.previousParagraphs).toHaveLength(1); // 대체당한 옛 본문
+      });
     });
 
     it("mock 슬롯: 마지막으로 쓴 상태가 읽힌다 (인스턴스 교체 대비)", async () => {
