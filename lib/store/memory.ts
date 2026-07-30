@@ -5,6 +5,7 @@ import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { StorePort } from "./port";
+import { summarizeMetrics } from "./percentile";
 import {
   DEV_USER_ID,
   type BranchProposalRecord,
@@ -14,6 +15,8 @@ import {
   type Utterance,
   type GateStats,
   type GateVerdictRecord,
+  type MetricRecord,
+  type StageStat,
   type WebhookEventInput,
   type WebhookEventRecord,
 } from "./types";
@@ -252,6 +255,16 @@ export class InMemoryStore implements StorePort {
       byVerdict,
       totalEvaluations: this.gateVerdicts.length,
     };
+  }
+
+  private metrics: MetricRecord[] = [];
+
+  async recordMetric(input: MetricRecord): Promise<void> {
+    this.metrics.push(input);
+  }
+
+  async getPipelineStats(): Promise<StageStat[]> {
+    return summarizeMetrics(this.metrics);
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

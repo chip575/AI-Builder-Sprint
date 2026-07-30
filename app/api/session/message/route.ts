@@ -79,10 +79,19 @@ export async function POST(req: Request) {
   const tokens = tokenize(mockReply(branchType));
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      for (const t of tokens) controller.enqueue(sse("token", t));
+      let firstTokenSent = false;
+      for (const t of tokens) {
+        controller.enqueue(sse("token", t));
+        if (!firstTokenSent) {
+          firstTokenSent = true;
+          // NFR-702의 기준은 **첫 토큰 2초**다 — 전체 스트림 시간이 아니라
+          // 이 값을 재야 지표가 곧 준수의 증거가 된다
+          track("CONVERSE", true, Date.now() - t0);
+        }
+      }
       controller.enqueue(sse("meta", meta)); // 항상 마지막 이벤트
       controller.close();
-      track("CONVERSE", true, Date.now() - t0);
+      if (!firstTokenSent) track("CONVERSE", false, Date.now() - t0);
     },
   });
 

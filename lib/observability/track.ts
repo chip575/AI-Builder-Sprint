@@ -1,18 +1,17 @@
-// NFR-709 — 6단계 실행 지표(성공/실패/소요시간)의 수집 지점.
-// 지금은 no-op. M-OBSERVABILITY(M1)가 적재·집계로 교체한다 — 인터페이스만 고정.
-// 호출부가 M0 관통 중에 이미 심어지므로, M1에서 라우트를 다시 열 일이 없다.
+// NFR-709 — 6단계 실행 지표(성공/실패/소요시간) 수집 지점.
+//
+// ⚠ 관측이 기능을 죽이면 안 된다 — 적재 실패는 로그만 남기고 본 흐름은 진행한다.
+// ⚠ 키 없는 환경에서도 돌아야 한다 (NFR-707) — StorePort 경유라 인메모리에서도 집계된다.
+import { store } from "../store";
+import type { PipelineStage } from "./stages";
 
-export type PipelineStage =
-  | "CONVERSE" // 1. 대화 (M-SESSION-MSG)
-  | "EXTRACT"  // 2. 구조화 (M-EXTRACT)
-  | "GATE"     // 3. 검증 (M-GATE 호출부)
-  | "DRAFT"    // 4. 문서화 (M-DOCUMENTS)
-  | "SIGN"     // 5. 체결 (M-SIGN·M-WEBHOOK)
-  | "CUSTODY"; // 6. 보관·이행 (M-EVIDENCE·M-OBLIGATIONS)
+// 단계 목록은 stages.ts에 있다 — 여기 두면 store가 그것을 참조하며 순환이 생긴다
+export { PIPELINE_STAGES, type PipelineStage } from "./stages";
 
 export function track(stage: PipelineStage, ok: boolean, ms: number): void {
-  // no-op — M1에서 구현
-  void stage;
-  void ok;
-  void ms;
+  void store
+    .recordMetric({ stage, ok, ms: Math.max(Math.round(ms), 0) })
+    .catch((err) =>
+      console.warn("[track] 지표 적재 실패 — 본 흐름은 진행:", (err as Error).message),
+    );
 }

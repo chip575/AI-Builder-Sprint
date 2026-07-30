@@ -7,6 +7,7 @@ import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { StorePort } from "./port";
+import { summarizeMetrics } from "./percentile";
 import {
   DEV_USER_ID,
   type BranchProposalRecord,
@@ -16,6 +17,8 @@ import {
   type Utterance,
   type GateStats,
   type GateVerdictRecord,
+  type MetricRecord,
+  type StageStat,
   type WebhookEventInput,
   type WebhookEventRecord,
 } from "./types";
@@ -377,6 +380,24 @@ export class SupabaseStore implements StorePort {
       byVerdict,
       totalEvaluations: (data ?? []).length,
     };
+  }
+
+  async recordMetric(input: MetricRecord): Promise<void> {
+    const { error } = await this.db
+      .from("pipeline_metrics")
+      .insert({ stage: input.stage, ok: input.ok, ms: input.ms });
+    if (error) this.fail("pipeline_metrics.insert", error);
+  }
+
+  async getPipelineStats(): Promise<StageStat[]> {
+    // 분위수는 앱에서 계산한다 — 두 구현이 같은 코드를 써야 수치가 어긋나지 않는다
+    const { data, error } = await this.db
+      .from("pipeline_metrics")
+      .select("stage, ok, ms")
+      .order("id", { ascending: false })
+      .limit(5000); // 최근 구간만 — 무한 성장 방어
+    if (error) this.fail("pipeline_metrics.select", error);
+    return summarizeMetrics((data ?? []) as MetricRecord[]);
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

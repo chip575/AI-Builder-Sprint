@@ -89,3 +89,18 @@ export interface GateStats {
   byVerdict: Record<string, number>;
   totalEvaluations: number;
 }
+
+/** 파이프라인 실행 지표 1건 (NFR-709) */
+export interface MetricRecord {
+  stage: string;
+  ok: boolean;
+  ms: number;
+}
+
+export interface StageStat {
+  stage: string;
+  success: number;
+  fail: number;
+  p50Ms: number | null;
+  p95Ms: number | null;
+}

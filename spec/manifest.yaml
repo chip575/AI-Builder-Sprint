@@ -294,7 +294,7 @@ modules:
   spec: spec/fr/01.4-nfr.md
   test: pnpm test observability
   model: haiku
-  status: todo
+  status: done
   note: 명세가 "데모에서 지표로 보여줄 수 있어야 한다"고 요구. 외부 SaaS가 아니라 앱 내부 화면.
 
 - id: M-SIGN-LIFECYCLE

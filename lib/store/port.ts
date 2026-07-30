@@ -7,6 +7,8 @@ import type {
   BranchProposalRecord,
   GateStats,
   GateVerdictRecord,
+  MetricRecord,
+  StageStat,
   DraftRecord,
   EvidenceRecord,
   SessionRecord,
@@ -74,6 +76,11 @@ export interface StorePort {
    *  ⚠ 기록 실패가 본 흐름을 막으면 안 된다 — 호출부가 삼킨다 (관측이 기능을 죽이지 않는다) */
   recordGateVerdict(input: GateVerdictRecord): Promise<void>;
   getGateStats(): Promise<GateStats>;
+
+  // ── pipeline metrics (NFR-709) ────────────────────────────
+  /** 적재 실패가 본 흐름을 막으면 안 된다 — 호출부가 삼킨다 */
+  recordMetric(input: MetricRecord): Promise<void>;
+  getPipelineStats(): Promise<StageStat[]>;
 
   // ── evidences ─────────────────────────────────────────────
   createEvidence(

@@ -34,3 +34,21 @@ export const FiredObligations = z.object({
   firedObligations: z.array(Obligation),
 });
 export type FiredObligations = z.infer<typeof FiredObligations>;
+
+/** M-OBSERVABILITY — GET /api/admin/pipeline-stats (NFR-709)
+ *  6단계 실행 지표. CONVERSE의 ms는 **첫 토큰까지의 시간**이다 —
+ *  NFR-702가 명시한 기준이 첫 토큰 2초이므로, 그 수치가 곧 준수의 증거가 된다. */
+export const PipelineStageStat = z.object({
+  stage: z.enum(["CONVERSE", "EXTRACT", "GATE", "DRAFT", "SIGN", "CUSTODY"]),
+  success: z.number().int().nonnegative(),
+  fail: z.number().int().nonnegative(),
+  p50Ms: z.number().int().nonnegative().nullable(),
+  p95Ms: z.number().int().nonnegative().nullable(),
+});
+export type PipelineStageStat = z.infer<typeof PipelineStageStat>;
+
+export const PipelineStatsRes = z.object({
+  stages: z.array(PipelineStageStat),
+  totalRecords: z.number().int().nonnegative(),
+});
+export type PipelineStatsRes = z.infer<typeof PipelineStatsRes>;

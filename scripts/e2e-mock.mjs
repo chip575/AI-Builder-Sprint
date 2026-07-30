@@ -136,4 +136,17 @@ if (gate.blockedTotal !== blockedBefore) fail("문서 생성 거부가 차단으
 if (!(gate.byVerdict.ESIGN_INVALID > 0)) fail("판정 분포에 기록되지 않음");
 console.log("14. COUNTER ok — 차단", gate.blockedTotal, "· 전체 판정", gate.totalEvaluations);
 
+// 15. 파이프라인 지표 (NFR-709) — 수치는 환경 따라 변하므로 **존재**만 검증한다
+res = await fetch(base + "/api/admin/pipeline-stats");
+const pipe = (await res.json()).data;
+const silent = pipe.stages.filter((s) => s.success + s.fail === 0).map((s) => s.stage);
+if (silent.length > 0) fail("기록이 없는 단계: " + silent.join(", "));
+const conv = pipe.stages.find((s) => s.stage === "CONVERSE");
+if (conv.p95Ms === null) fail("CONVERSE 첫 토큰 시간이 기록되지 않음");
+console.log(
+  "15. METRICS ok — 6단계 전부 기록 ·",
+  pipe.totalRecords + "건 · 첫 토큰 p95",
+  conv.p95Ms + "ms",
+);
+
 console.log("\nE2E PASS — 발화→구조화→확정→게이트→초안→서명→웹훅→증빙 + 게이트 차단 카운터 (키 없이)");
