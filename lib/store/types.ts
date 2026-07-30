@@ -33,6 +33,8 @@ export interface SessionRecord {
   utterances: Utterance[]; // deletedAt IS NULL만 (삭제분은 조회 계층에서 걸러짐)
   proposals: BranchProposalRecord[];
   facts: IntentFact[];
+  /** 전 fact 확정 시각. null이면 미확정 — 확정 여부의 진실은 서버가 소유한다 */
+  confirmedAt: string | null;
   startedAt: string;
 }
 

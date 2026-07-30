@@ -122,6 +122,17 @@ export class SupabaseStore implements StorePort {
         }),
       ),
       facts: (facts.data ?? []).map(toFact),
+      // 파생값 — 전부 확정일 때만 최종 갱신 시각. 화면이 자체 계산하지 않게 서버가 준다
+      confirmedAt:
+        (facts.data ?? []).length > 0 &&
+        (facts.data ?? []).every((r: Row) => r.confirmed_by_user)
+          ? iso(
+              (facts.data ?? [])
+                .map((r: Row) => r.updated_at)
+                .sort()
+                .at(-1),
+            )
+          : null,
     };
   }
 

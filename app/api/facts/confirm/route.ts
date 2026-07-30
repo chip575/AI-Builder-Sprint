@@ -60,13 +60,14 @@ export async function POST(req: Request) {
 
   // 유일한 확정 지점 — P1의 해제 경로. 확정 규칙은 StorePort가 강제한다
   const confirmedCount = await confirmFacts(session.id);
+  const after = await getSession(session.id);
 
   return Response.json({
     ok: true,
     data: FactsConfirmRes.parse({
       intentId: session.id,
       confirmedCount,
-      confirmedAt: new Date().toISOString(),
+      confirmedAt: after?.confirmedAt ?? new Date().toISOString(),
     }),
   });
 }

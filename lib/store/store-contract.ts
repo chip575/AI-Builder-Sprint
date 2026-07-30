@@ -103,6 +103,20 @@ export function storeContractTests(name: string, makeStore: () => Promise<StoreP
       expect(d?.verdict.verdict).toBe("ESIGN_OK"); // 판정 원본 보존
     });
 
+    it("confirmedAt: 확정 시 값·수정 시 무효 — 확정 여부의 진실은 서버가 소유한다", async () => {
+      const s = await makeStore();
+      const session = await s.getOrCreateSession();
+      const saved = await s.saveFacts(session.id, [fact("amount", 100_000)]);
+      expect((await s.getSession(session.id))!.confirmedAt).toBeNull();
+
+      await s.confirmFacts(session.id);
+      const confirmed = (await s.getSession(session.id))!.confirmedAt;
+      expect(confirmed).toBeTruthy();
+
+      await s.patchFactValue(saved[0]!.id, 300_000);
+      expect((await s.getSession(session.id))!.confirmedAt).toBeNull(); // 수정 → 확정 무효
+    });
+
     it("시각은 ISO(Z) 형식으로 나온다 — 두 구현이 같은 형식이어야 계약이 하나로 유지된다", async () => {
       // 계약의 z.string().datetime()은 Z 표기만 허용한다. PostgREST는 '+00:00'로 주므로
       // 어댑터가 정규화해야 한다 (e2e에서 500으로 터진 실제 버그).

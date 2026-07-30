@@ -88,9 +88,15 @@ export async function PATCH(
   // 값이 바뀌면 확정 무효(재확정 필요) + confidence=1 — 규칙은 StorePort가 강제한다 (P1)
   const updated = await patchFactValue(id, parsed.data.value);
 
+  // 값이 바뀌면 확정 무효 — 화면이 재조회 없이 인지하도록 함께 내려준다
+  const after = await findFact(id);
   return Response.json({
     ok: true,
-    data: FactPatchRes.parse({ fact: updated, recalc }),
+    data: FactPatchRes.parse({
+      fact: updated,
+      recalc,
+      confirmedAt: after?.session.confirmedAt ?? null,
+    }),
   });
 }
 

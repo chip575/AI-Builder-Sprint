@@ -48,6 +48,7 @@ export class InMemoryStore implements StorePort {
       utterances: [],
       proposals: [],
       facts: [],
+      confirmedAt: null,
       startedAt: new Date().toISOString(),
     };
     this.sessions.set(record.id, record);
@@ -112,6 +113,7 @@ export class InMemoryStore implements StorePort {
       const existing = byKey.get(incoming.key);
       if (existing?.confirmed) continue; // DO UPDATE ... WHERE confirmed=false의 인메모리판 (P1)
       byKey.set(incoming.key, existing ? { ...incoming, id: existing.id } : incoming);
+      s.confirmedAt = null; // 새 값이 들어오면 확정 무효
       this.auditTrail.push({ action: "fact.upsert", subject: incoming.key, at: new Date().toISOString() });
     }
     s.facts = [...byKey.values()];
@@ -134,6 +136,7 @@ export class InMemoryStore implements StorePort {
     fact.value = value;
     fact.confidence = 1;      // 사용자가 직접 준 값
     fact.confirmed = false;   // 값이 바뀌면 확정 무효 — 재확정 필요 (P1)
+    s.confirmedAt = null;
     this.auditTrail.push({ action: "fact.patch", subject: factId, at: new Date().toISOString() });
     return fact;
   }
@@ -146,6 +149,7 @@ export class InMemoryStore implements StorePort {
       if (!f.confirmed) n += 1;
       f.confirmed = true;
     }
+    s.confirmedAt = new Date().toISOString();
     return n;
   }
 

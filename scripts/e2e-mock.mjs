@@ -32,6 +32,15 @@ const amount = body.data.facts.find((f) => f.key === "amount");
 if (amount?.value !== 1000000) fail("amount 추출 실패");
 console.log("3. EXTRACT ok —", body.data.facts.map((f) => `${f.key}=${f.value}`).join(", "));
 
+// 3.5 확인 화면(S3) 조회 — extract 재호출이 아니다
+res = await fetch(base + `/api/facts?intentId=${sid}`);
+body = await res.json();
+if (!body.ok) fail("facts GET " + res.status);
+if (body.data.confirmedAt !== null) fail("확정 전인데 confirmedAt이 있다");
+if (!body.data.deduction || body.data.deduction.deductionAmount !== 276000)
+  fail("세액공제 검산 불일치: " + JSON.stringify(body.data.deduction));
+console.log("3.5 FACTSHEET ok — 예상공제", body.data.deduction.deductionAmount, "· 미확정");
+
 // 4. 미확정 문서 생성 → 403 (P1)
 res = await fetch(base + "/api/documents", j({ intentId: sid }));
 if (res.status !== 403) fail("미확정 403 아님: " + res.status);
@@ -42,6 +51,17 @@ res = await fetch(base + "/api/facts/confirm", j({ intentId: sid }));
 body = await res.json();
 if (res.status !== 200) fail("confirm " + res.status);
 console.log("5. confirm ok —", body.data.confirmedCount, "facts");
+
+// 5.5 답례품(S4) — 목록 + 한도 + 초과 거부
+res = await fetch(base + "/api/rewards");
+const rewards = (await res.json()).data;
+res = await fetch(base + "/api/rewards/select", j({ rewardIds: [], amount: 1000000 }));
+body = await res.json();
+if (!body.ok || body.data.remaining !== 300000) fail("답례품 한도 불일치: " + JSON.stringify(body.data));
+const over = rewards.slice(0, 3).map((r) => r.id);
+res = await fetch(base + "/api/rewards/select", j({ rewardIds: over, amount: 100000 }));
+if (res.status !== 422) fail("한도 초과가 거부되지 않음: " + res.status);
+console.log("5.5 REWARDS ok — 한도 300,000원 · 초과 조합 422 거부");
 
 // 6. 문서 생성
 res = await fetch(base + "/api/documents", j({ intentId: sid }));
