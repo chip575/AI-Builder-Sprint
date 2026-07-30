@@ -77,7 +77,7 @@ export class SupabaseStore implements StorePort {
     throw new Error(`[store:supabase] ${op} 실패: ${error?.message ?? "unknown"}`);
   }
 
-  async getOrCreateSession(sessionId?: string | null): Promise<SessionRecord> {
+  async getOrCreateSession(sessionId?: string | null, userId = DEV_USER_ID): Promise<SessionRecord> {
     if (sessionId) {
       const found = await this.getSession(sessionId);
       if (found) return found;
@@ -85,7 +85,7 @@ export class SupabaseStore implements StorePort {
     const id = sessionId ?? randomUUID();
     const { error } = await this.db
       .from("intents")
-      .insert({ id, user_id: DEV_USER_ID }); // NULL 금지 — dev 상수 (0002 전제)
+      .insert({ id, user_id: userId }); // NULL 금지 — 기본은 dev 상수 (0002 전제)
     if (error) this.fail("intents.insert", error);
     return (await this.getSession(id))!;
   }

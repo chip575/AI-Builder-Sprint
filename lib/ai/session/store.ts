@@ -10,8 +10,8 @@ export type {
   Utterance,
 } from "../../store/types";
 
-export const getOrCreateSession = (sessionId?: string | null) =>
-  store.getOrCreateSession(sessionId);
+export const getOrCreateSession = (sessionId?: string | null, userId?: string) =>
+  store.getOrCreateSession(sessionId, userId);
 
 export const getSession = (sessionId: string) => store.getSession(sessionId);
 

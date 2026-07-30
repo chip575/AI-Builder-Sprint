@@ -37,14 +37,14 @@ export class InMemoryStore implements StorePort {
     return { ...s, utterances: s.utterances.filter((u) => u.deletedAt === null) };
   }
 
-  async getOrCreateSession(sessionId?: string | null): Promise<SessionRecord> {
+  async getOrCreateSession(sessionId?: string | null, userId = DEV_USER_ID): Promise<SessionRecord> {
     if (sessionId) {
       const found = this.sessions.get(sessionId);
       if (found) return this.view(found);
     }
     const record: MemSession = {
       id: sessionId ?? randomUUID(),
-      userId: DEV_USER_ID,
+      userId,
       utterances: [],
       proposals: [],
       facts: [],

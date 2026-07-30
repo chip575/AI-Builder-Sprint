@@ -22,7 +22,7 @@ modules:
   spec: spec/plan/02.4-contracts.md
   test: pnpm test auth
   model: haiku
-  status: todo
+  status: done
   note: 완료 직후 supabase/migrations/_pending/pending_user_id_not_null.sql 승격(다음 빈 번호로 개명) — 기억에 의존하지 않기
 
 - id: M-SESSION-MSG

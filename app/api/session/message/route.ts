@@ -10,6 +10,7 @@ import {
 import { mockReply, tokenize } from "@/lib/ai/session/mock-responder";
 import { detectExpress } from "@/lib/rules/express-detect";
 import { track } from "@/lib/observability/track";
+import { getCurrentUserId } from "@/lib/auth/session";
 
 const encoder = new TextEncoder();
 
@@ -50,7 +51,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const session = await getOrCreateSession(parsed.data.sessionId);
+  // 소유자는 쿠키가 결정한다 — 클라이언트가 userId를 보내지 않는다 (02.4 §0)
+  const session = await getOrCreateSession(parsed.data.sessionId, await getCurrentUserId(req));
   const isFirstUtterance = session.utterances.length === 0;
   const utterance = await addUtterance(session.id, parsed.data.text);
 

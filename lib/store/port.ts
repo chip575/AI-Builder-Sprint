@@ -15,7 +15,7 @@ import type {
 
 export interface StorePort {
   // ── 세션(intent) ──────────────────────────────────────────
-  getOrCreateSession(sessionId?: string | null): Promise<SessionRecord>;
+  getOrCreateSession(sessionId?: string | null, userId?: string): Promise<SessionRecord>;
   getSession(sessionId: string): Promise<SessionRecord | undefined>;
   addUtterance(sessionId: string, text: string): Promise<Utterance>;
   /** 원문 수정 API는 존재하지 않는다 (FR-111). 삭제는 단방향 소프트 삭제만 —

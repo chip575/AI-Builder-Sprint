@@ -5,7 +5,7 @@ import { EvidenceRes } from "@/lib/contracts";
 import { getSession } from "@/lib/ai/session/store";
 import { getDraft } from "@/app/api/documents/store";
 import { store } from "@/lib/store";
-import { DEV_USER_ID } from "@/lib/store/types";
+import { getCurrentUserId } from "@/lib/auth/session";
 import { issueEvidenceUrl } from "../sign-url";
 
 export async function GET(
@@ -15,8 +15,8 @@ export async function GET(
   const { docId } = await ctx.params;
 
   // D-18 규율 — service role이므로 소유 필터는 라우트 코드가 명시한다.
-  // M-AUTH 연결 시 세션 userId로 교체되는 지점 (지금은 dev 상수)
-  const currentUserId = DEV_USER_ID;
+  // 인증 비활성(키 없음)이면 DEV_USER_ID로 통과한다 (NFR-707)
+  const currentUserId = await getCurrentUserId(req);
 
   const notFound = () =>
     Response.json(
