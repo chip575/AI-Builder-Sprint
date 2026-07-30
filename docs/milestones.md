@@ -5,15 +5,15 @@
 ## 파일에서 층 보기 — 라우트 그룹
 
 ```
-app/api/(m0)/   app/api/(m1)/     ← API를 층별로
-app/(ui)/(m0)/  app/(ui)/(m1)/    ← 화면을 층별로
+src/app/api/(m0)/   src/app/api/(m1)/     ← API를 층별로
+src/app/(ui)/(m0)/  src/app/(ui)/(m1)/    ← 화면을 층별로
 ```
 
 `(m0)`·`(m1)`은 Next.js **라우트 그룹**이라 **URL에 나타나지 않는다** —
-`app/api/(m0)/session/message` → `/api/session/message`.
+`src/app/api/(m0)/session/message` → `/api/session/message`.
 파일 트리에서 층이 보이되 주소는 그대로다. 각 그룹 폴더의 README에 그 층의 목록이 있다.
 
-`lib/`은 층으로 나누지 않는다 — 계약·룰테이블·스토어·어댑터는 **모든 층이 공유하는
+`src/lib/`은 층으로 나누지 않는다 — 계약·룰테이블·스토어·어댑터는 **모든 층이 공유하는
 토대**이고, 나누면 같은 파일을 여러 층이 참조하며 경계가 거짓이 된다.
 
 ## 진행에서 층 보기 — 브랜치
@@ -53,21 +53,21 @@ main   ← M0 완료. 항상 동작하는 상태를 유지한다 (데모·심사
 
 | 모듈 | 구현 위치 |
 |---|---|
-| M-GATE (FR-104) | `lib/rules/validity-gate.ts` — 게이트 3분기, 순수 함수 |
-| M-RULES-DONATION (FR-202·203) | `lib/rules/hometown-donation.ts` — 검산 3케이스 |
-| M-MOCK (NFR-707) | `lib/signer/mock/` — 키 없이 전 흐름 |
-| M-PERSISTENCE (D-18) | `supabase/migrations/`, `lib/store/` — 인메모리·Supabase 이중 구현 |
-| M-SESSION-MSG (FR-101·110·115B) | `app/api/(m0)/session/message/`, `lib/rules/express-detect.ts` |
-| M-EXTRACT (FR-102) | `app/api/(m0)/extract/`, `lib/ai/extract/` |
-| M-FACTS-CONFIRM (FR-103) | `app/api/(m0)/facts/` — 확인 버튼이 P1 강제 지점 |
-| M-DOCUMENTS (FR-501) | `app/api/(m0)/documents/` — 미확정·게이트 비통과는 403 |
-| M-SIGN (FR-501·502) | `app/api/(m0)/sign/`, `lib/signer/` |
-| M-WEBHOOK (FR-503) | `app/api/(m0)/webhooks/modusign/` — 멱등·아웃박스 |
-| M-EVIDENCE (FR-505) | `app/api/(m0)/evidence/` — 해시·15분 만료 URL |
-| M-REWARDS (FR-203) | `app/api/(m0)/rewards/` — 한도 초과는 서버가 거부 |
-| M-AUTH | `lib/auth/`, `app/api/(m0)/auth/`, `middleware.ts` |
-| 화면 S1~S7 | `app/(ui)/(m0)/` — auth·chat·confirm·rewards·doc·vault |
-| real 어댑터 | `lib/signer/real/`, `lib/ai/extract/real/`, `lib/ai/session/real/` — 키 없이 픽스처 테스트 |
+| M-GATE (FR-104) | `src/lib/rules/validity-gate.ts` — 게이트 3분기, 순수 함수 |
+| M-RULES-DONATION (FR-202·203) | `src/lib/rules/hometown-donation.ts` — 검산 3케이스 |
+| M-MOCK (NFR-707) | `src/lib/signer/mock/` — 키 없이 전 흐름 |
+| M-PERSISTENCE (D-18) | `supabase/migrations/`, `src/lib/store/` — 인메모리·Supabase 이중 구현 |
+| M-SESSION-MSG (FR-101·110·115B) | `src/app/api/(m0)/session/message/`, `src/lib/rules/express-detect.ts` |
+| M-EXTRACT (FR-102) | `src/app/api/(m0)/extract/`, `src/lib/ai/extract/` |
+| M-FACTS-CONFIRM (FR-103) | `src/app/api/(m0)/facts/` — 확인 버튼이 P1 강제 지점 |
+| M-DOCUMENTS (FR-501) | `src/app/api/(m0)/documents/` — 미확정·게이트 비통과는 403 |
+| M-SIGN (FR-501·502) | `src/app/api/(m0)/sign/`, `src/lib/signer/` |
+| M-WEBHOOK (FR-503) | `src/app/api/(m0)/webhooks/modusign/` — 멱등·아웃박스 |
+| M-EVIDENCE (FR-505) | `src/app/api/(m0)/evidence/` — 해시·15분 만료 URL |
+| M-REWARDS (FR-203) | `src/app/api/(m0)/rewards/` — 한도 초과는 서버가 거부 |
+| M-AUTH | `src/lib/auth/`, `src/app/api/(m0)/auth/`, `middleware.ts` |
+| 화면 S1~S7 | `src/app/(ui)/(m0)/` — auth·chat·confirm·rewards·doc·vault |
+| real 어댑터 | `src/lib/signer/real/`, `src/lib/ai/extract/real/`, `src/lib/ai/session/real/` — 키 없이 픽스처 테스트 |
 
 **완료 판정 (03.0)**: 실 서명 왕복 1건 — **미달**. 코드는 끝났고 PM 계정 작업 대기.
 **검증**: `pnpm test`(139) · `pnpm e2e`(14단계, 키 유무 양쪽) · `pnpm gate:check`(8종)
@@ -82,10 +82,10 @@ main   ← M0 완료. 항상 동작하는 상태를 유지한다 (데모·심사
 
 | 모듈 | 구현 위치 |
 |---|---|
-| M-GATE-COUNTER (FR-509) | `app/api/(m1)/admin/gate-stats/` · `lib/observability/gate-log.ts` · `app/(ui)/(m1)/org/gate-counter/` |
-| M-OBSERVABILITY (NFR-709) | `app/api/(m1)/admin/pipeline-stats/` · `lib/observability/{track,stages}.ts` · `lib/store/percentile.ts` · `app/(ui)/(m1)/org/pipeline/` |
-| M-RECONCILER (FR-504) | `app/api/(m1)/cron/reconcile/` · `app/(ui)/(m1)/org/` |
-| M-PAPER-SCAN (FR-401·NFR-711) | `app/api/(m1)/paper-scan/` · `lib/ai/document/` · `app/(ui)/(m1)/branch/paper-scan/` |
+| M-GATE-COUNTER (FR-509) | `src/app/api/(m1)/admin/gate-stats/` · `src/lib/observability/gate-log.ts` · `src/app/(ui)/(m1)/org/gate-counter/` |
+| M-OBSERVABILITY (NFR-709) | `src/app/api/(m1)/admin/pipeline-stats/` · `src/lib/observability/{track,stages}.ts` · `src/lib/store/percentile.ts` · `src/app/(ui)/(m1)/org/pipeline/` |
+| M-RECONCILER (FR-504) | `src/app/api/(m1)/cron/reconcile/` · `src/app/(ui)/(m1)/org/` |
+| M-PAPER-SCAN (FR-401·NFR-711) | `src/app/api/(m1)/paper-scan/` · `src/lib/ai/document/` · `src/app/(ui)/(m1)/branch/paper-scan/` |
 
 ### 잔여
 
@@ -100,7 +100,7 @@ DB는 이미 준비돼 있다 — `gate_verdicts`·`pipeline_metrics`·`obligati
 ## M2 · "마음이 축이 된다" — 브랜치 `m2`
 
 질문은행·세션 재개·마음 유언 버전·가지 감지(DETECTED)·자필 필사 가이드·
-마음의 편지·유산기부(숙려 화면). 계약(`lib/contracts/`)은 이미 정의돼 있고
+마음의 편지·유산기부(숙려 화면). 계약(`src/lib/contracts/`)은 이미 정의돼 있고
 DB 테이블(`heart_will_*`)은 해당 마이그레이션에서 추가한다.
 
 ## M3 · "시간에 서명한다" — 브랜치 `m3`

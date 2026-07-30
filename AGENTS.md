@@ -25,12 +25,12 @@ Upstage Solar / Document Parse / Information Extract / Embeddings
 
 | 담당 | worktree | 경로 |
 |---|---|---|
-| BE-1 파이프라인·AI | `wt-be1` | `lib/ai/**` `lib/rules/**` `app/api/session/**` `app/api/extract/**` `app/api/gate/**` |
-| BE-2 서명·CLM·인프라 | `wt-be2` | `lib/signer/**` `app/api/documents/**` `app/api/sign/**` `app/api/webhooks/**` `app/api/cron/**` `supabase/**` |
-| FE 화면 | `wt-fe` | `app/(ui)/**` `components/**` |
+| BE-1 파이프라인·AI | `wt-be1` | `src/lib/ai/**` `src/lib/rules/**` `src/app/api/**/session/**` `src/app/api/**/extract/**` |
+| BE-2 서명·CLM·인프라 | `wt-be2` | `src/lib/signer/**` `src/app/api/**/documents/**` `src/app/api/**/sign/**` `src/app/api/**/webhooks/**` `src/app/api/**/cron/**` `supabase/**` |
+| FE 화면 | `wt-fe` | `src/app/(ui)/**` |
 | PM | — | `docs/**` `spec/**` (에이전트 미사용) |
 
-`lib/contracts/**`는 **누구의 것도 아니다.** 변경은 4인 합의 후 PM만.
+`src/lib/contracts/**`는 **누구의 것도 아니다.** 변경은 4인 합의 후 PM만.
 
 ## 보안 절대 규칙 (NFR-714)
 

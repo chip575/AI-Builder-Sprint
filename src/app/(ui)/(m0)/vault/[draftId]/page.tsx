@@ -13,18 +13,46 @@ export default function VaultPage() {
   const [evidence, setEvidence] = useState<EvidenceRes | null>(null);
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
   const [spineDismissed, setSpineDismissed] = useState(false);
+  const [preparing, setPreparing] = useState(false);
 
+  // 서명 완료 직후에는 증빙이 아직 만들어지는 중일 수 있다 —
+  // 웹훅 처리(아웃박스)가 비동기이기 때문. 몇 초간 조용히 기다린다.
   useEffect(() => {
+    let alive = true;
     void (async () => {
-      const body = await fetch(`/api/evidence/${draftId}`).then((r) => r.json());
-      if (body.ok) setEvidence(body.data);
-      else setError(body.error);
+      for (let attempt = 0; attempt < 6 && alive; attempt++) {
+        const body = await fetch(`/api/evidence/${draftId}`).then((r) => r.json());
+        if (body.ok) {
+          setEvidence(body.data);
+          return;
+        }
+        if (body.error.code !== "NOT_FOUND") {
+          setError(body.error);
+          return;
+        }
+        setPreparing(true);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      if (alive) {
+        setPreparing(false);
+        setError({
+          message: "증빙을 준비하는 데 시간이 걸리고 있어요.",
+          nextAction: "잠시 후 이 화면을 새로고침해 주세요.",
+        });
+      }
     })();
+    return () => {
+      alive = false;
+    };
   }, [draftId]);
 
   return (
     <Shell title="증빙" fr={["FR-505", "FR-115B"]}>
       <div className="space-y-5">
+        {preparing && !evidence && !error && (
+          <p className="text-stone-500">서명이 완료됐어요. 증빙을 준비하는 중입니다…</p>
+        )}
+
         <ErrorNote error={error} />
 
         {evidence && (

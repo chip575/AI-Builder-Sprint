@@ -101,9 +101,14 @@ if (body.data.status !== "COMPLETED") fail("status != COMPLETED: " + body.data.s
 console.log("10. STATUS ok — COMPLETED,", body.data.completedAt);
 
 // 11. 증빙 조회 → 해시 + 15분 만료 URL
-res = await fetch(base + `/api/evidence/${draftId}`);
-body = await res.json();
-if (res.status !== 200) fail("evidence " + res.status + " " + JSON.stringify(body));
+// 아웃박스가 비동기라 완료 직후엔 아직 없을 수 있다 — 화면과 같은 방식으로 기다린다
+for (let i = 0; i < 8; i++) {
+  res = await fetch(base + `/api/evidence/${draftId}`);
+  body = await res.json();
+  if (body.ok) break;
+  await new Promise((r) => setTimeout(r, 700));
+}
+if (!body.ok) fail("evidence 준비 안 됨 " + JSON.stringify(body));
 if (!/^[0-9a-f]{64}$/.test(body.data.hash)) fail("해시 형식 이상");
 console.log("11. EVIDENCE ok — hash:", body.data.hash.slice(0, 16) + "…");
 

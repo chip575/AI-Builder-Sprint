@@ -11,13 +11,13 @@
 
 ## 절대 규칙 (위반 시 즉시 중단)
 
-1. 유일한 진실은 `lib/contracts/*.ts`. 여기 없는 필드는 주고받지 않는다.
-2. 법률 수치(공제율·한도·기한)는 `lib/rules/`에만 존재한다.
+1. 유일한 진실은 `src/lib/contracts/*.ts`. 여기 없는 필드는 주고받지 않는다.
+2. 법률 수치(공제율·한도·기한)는 `src/lib/rules/`에만 존재한다.
    LLM 프롬프트에 숫자를 넣지 않는다. `[CALC:항목]` 토큰만 사용한다.
 3. AI 산출물은 `confirmed=false`로 시작한다. 사용자 승인 없이 확정 금지.
 4. 유언(HANDWRITTEN_WILL) 문서 타입에 서명 버튼을 만들지 않는다 (민법 §1066).
 5. 아래 경로를 수정해야 하면 **작업을 멈추고 사람에게 보고**한다:
-   `lib/contracts/**`, `lib/rules/**`, `**/validity-gate*`,
+   `src/lib/contracts/**`, `src/lib/rules/**`, `**/validity-gate*`,
    RLS 정책, 서명 URL 발급 코드
 6. README·주석에 심사·평가·점수 관련 문구를 쓰지 않는다 (대회 실격 사유).
 7. **PR·이슈·커밋은 포크 레포에만.** 원본(`ApptiveDev/AI-Builder-Sprint`)에

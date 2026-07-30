@@ -33,9 +33,9 @@ pnpm e2e         # 발화→서명→증빙 12단계 관통 (dev 서버 띄운 �
 
 | 위치 | 역할 |
 |---|---|
-| `lib/contracts/` | 입출력의 유일한 진실 — Zod 스키마. 프론트·백이 같은 것을 import |
-| `lib/rules/` | 법률 수치·게이트 판정. LLM이 아니라 코드가 계산한다 |
-| `app/api/` | 파이프라인 라우트 (대화→추출→확인→게이트→문서→서명→보관) |
+| `src/lib/contracts/` | 입출력의 유일한 진실 — Zod 스키마. 프론트·백이 같은 것을 import |
+| `src/lib/rules/` | 법률 수치·게이트 판정. LLM이 아니라 코드가 계산한다 |
+| `src/app/api/` | 파이프라인 라우트 (대화→추출→확인→게이트→문서→서명→보관) |
 | `spec/` | 명세. 작업 목록은 `spec/manifest.yaml` |
 | `docs/decisions.md` | 설계 결정 이력 |
 | `AGENTS.md` | 개발 규칙 (팀·도구 공통) |
