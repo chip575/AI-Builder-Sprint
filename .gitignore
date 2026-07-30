@@ -22,3 +22,4 @@ dist/
 *.rar
 *.tar
 *.tar.gz
+batch.log
