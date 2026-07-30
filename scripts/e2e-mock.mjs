@@ -137,6 +137,18 @@ if (res.status !== 403 || body.error.code !== "GATE_ESIGN_INVALID")
   fail("유언 문서 생성이 차단되지 않음: " + res.status);
 if (!body.error.message.includes("민법")) fail("조문 인용 없음");
 console.log("13. GATE 차단 ok — 유언장 403 ·", body.error.message.match(/민법 §\d+/)?.[0]);
+if (!body.error.route?.includes("/will/handwriting")) fail("자필 가이드 경로 미제시");
+
+// 13.5 필사 가이드 (FR-302) — 차단의 목적지. 서명할 방법이 없다는 것이 산출물이다
+res = await fetch(base + `/api/will/draft/${willSid}/print`);
+body = await res.json();
+if (!body.ok) fail("필사 가이드 " + res.status + " " + JSON.stringify(body.error));
+const g = body.data;
+if (g.checklist.length !== 4) fail("체크리스트 4항목 아님");
+if (!g.draftText.includes("(인)")) fail("날인 자리 없음");
+if (!g.statutes.some((s) => s.id === "민법 §1066")) fail("§1066 미인용");
+if (JSON.stringify(g).match(/signUrl|embedUrl|modusign/)) fail("서명 필드가 존재한다");
+console.log("13.5 필사 가이드 ok — 4항목 · 서명 필드 부재 · §1066 인용");
 
 // 14. 카운터 정직성 — 문서 생성 단계 거부는 '서명 시도 차단'이 아니다
 res = await fetch(base + "/api/admin/gate-stats");

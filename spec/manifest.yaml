@@ -382,7 +382,7 @@ modules:
   spec: spec/fr/01.2-will-estate.md
   test: pnpm test handwriting
   model: haiku
-  status: todo
+  status: done
 
 - id: M-BRANCH-DETECT
   mvp: M2

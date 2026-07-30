@@ -105,8 +105,13 @@ export async function POST(req: Request) {
               : "이 문서는 서명 없이 보관되는 문서입니다.",
           nextAction:
             verdict.alternativeRoute === "HANDWRITING_GUIDE"
-              ? "자필 작성 안내로 이동해 주세요."
+              ? "자필로 옮겨 쓰는 방법을 안내해 드릴게요."
               : "보관 안내를 확인해 주세요.",
+          // ESIGN_INVALID의 목적지 — 화면이 이 경로로 이동한다 (FR-302)
+          route:
+            verdict.alternativeRoute === "HANDWRITING_GUIDE"
+              ? `/will/handwriting?intentId=${session.id}`
+              : null,
         },
       },
       { status: 403 },
