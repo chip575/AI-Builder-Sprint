@@ -57,6 +57,19 @@ Upstage Solar / Document Parse / Information Extract / Embeddings
 - MCP는 적용 **후** 검증 조회용 (테이블 목록·RLS 확인·advisor)
 - RLS 정책·트리거 변경은 사람 리뷰 필수 (보안 5조)
 
+## 원격 저장소 — 포크에만 올린다
+
+이 작업물은 **포크한 우리 레포**(`chip575/AI-Builder-Sprint`)에 올린다.
+**원본 레포(`ApptiveDev/AI-Builder-Sprint`)로 PR·이슈·커밋을 보내지 않는다.**
+
+- `git push` 전에 `git remote -v`로 대상이 포크인지 확인한다
+- PR은 `chip575/AI-Builder-Sprint` 내부(브랜치 → 우리 main)로만 연다.
+  GitHub은 포크에서 PR을 열면 **기본 대상이 원본(upstream)** 이므로,
+  base 저장소를 우리 포크로 **직접 바꿔야 한다** — 이게 오발송의 주원인이다
+- 이슈도 포크 쪽에 등록한다
+- upstream을 remote로 추가해야 한다면 `fetch` 전용으로 두고 push URL은 막는다:
+  `git remote set-url --push upstream DISABLED`
+
 ## 커밋
 
 `feat|fix|docs|test(scope): 제목` · 100자 이내 · 기능 단위로 자주.
