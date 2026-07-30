@@ -8,6 +8,7 @@ import {
   getOrCreateSession,
 } from "@/lib/ai/session/store";
 import { responder } from "@/lib/ai/session/responder";
+import { computeCoverage } from "@/lib/rules/question-bank";
 import { detectExpress } from "@/lib/rules/express-detect";
 import { track } from "@/lib/observability/track";
 import { getCurrentUserId } from "@/lib/auth/session";
@@ -55,7 +56,12 @@ export async function POST(req: Request) {
   const meta = SessionMessageRes.parse({
     sessionId: session.id,
     utteranceId: utterance.id,
-    axisCoverage: [], // 질문은행 커버리지는 M-QUESTION-BANK(M2)에서 채워진다
+    // 방금 발화까지 포함해 센다 — 화면이 답을 보내자마자 진도가 움직여야 한다.
+    // 삭제된 발화는 세지 않는다 (store가 이미 제외한 목록을 준다)
+    axisCoverage: computeCoverage([
+      ...session.utterances.map((u) => u.text),
+      parsed.data.text,
+    ]),
     expressBranch: proposal
       ? { branchType: proposal.branchType, proposalId: proposal.id }
       : null,
