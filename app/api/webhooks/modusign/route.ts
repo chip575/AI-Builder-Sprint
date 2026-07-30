@@ -9,6 +9,21 @@ import { drainOutbox } from "./outbox";
 
 const ok = () => Response.json({ ok: true, data: null }); // out: always-200
 
+// 실 페이로드 구조는 공식 문서에 없다 — 우리 ModusignWebhookPayload는 추정이다.
+// 첫 수신 1회만 원문을 덤프해 키 도착 날 스키마 확정을 "재현 시도"가 아니라
+// "로그 읽기"로 만든다. 개인정보는 마스킹한다 (NFR-714).
+let dumpedOnce = false;
+function dumpFirstPayload(raw: unknown) {
+  if (dumpedOnce) return;
+  dumpedOnce = true;
+  const masked = JSON.stringify(raw, (key, value) => {
+    if (typeof value !== "string") return value;
+    if (/email|phone|mobile|tel|name|address/i.test(key)) return "***";
+    return value.length > 120 ? `${value.slice(0, 120)}…` : value;
+  });
+  console.log("[webhook] 첫 페이로드 원문(마스킹):", masked);
+}
+
 /** 상수 시간 비교 — 문자열 ===는 타이밍 누출이 있다. 검증 코드의 표준 */
 function secretMatches(expected: string, provided: string | null): boolean {
   const a = Buffer.from(expected);
@@ -35,6 +50,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => null);
+  dumpFirstPayload(body);
   const parsed = ModusignWebhookPayload.safeParse(body);
   if (!parsed.success) {
     // 스키마 드리프트로 재시도 폭주를 만들지 않는다 — 기록만 남기고 200
