@@ -3,6 +3,7 @@
 // DO NOTHING이 버린 중복은 200만 반환하고 아무 일도 하지 않는다 (멱등).
 // 형식 오류·모르는 문서도 200 — 4xx는 모두싸인 재시도(5회)를 유발할 뿐이다.
 import { timingSafeEqual } from "node:crypto";
+import { after } from "next/server";
 import { ModusignWebhookPayload } from "@/lib/contracts";
 import { store } from "@/lib/store";
 import { drainOutbox } from "./outbox";
@@ -66,10 +67,19 @@ export async function POST(req: Request) {
   });
 
   if (result === "INSERTED") {
-    // fire-and-forget — 응답을 막지 않는다. 실패해도 미처리로 남아 다음 드레인이 줍는다
-    void drainOutbox().catch((err) =>
-      console.warn("[webhook] 드레인 실패 — 다음 기회에 재시도:", (err as Error).message),
-    );
+    // 응답을 막지 않되 **실행은 보장한다.** 서버리스는 응답을 보내는 순간 인스턴스를
+    // 얼릴 수 있어, 맨 void 호출은 배포에서 조용히 실행되지 않는다 (실측: 이벤트는
+    // 적재되는데 processed_at이 영원히 NULL). after()가 응답 이후 실행을 붙잡아 준다.
+    const drain = () =>
+      drainOutbox().catch((err) =>
+        console.warn("[webhook] 드레인 실패 — 다음 기회에 재시도:", (err as Error).message),
+      );
+    try {
+      after(drain);
+    } catch {
+      // 요청 컨텍스트 밖(단위 테스트) — after()는 쓸 수 없다. 종전대로 즉시 실행
+      void drain();
+    }
   }
   return ok();
 }
