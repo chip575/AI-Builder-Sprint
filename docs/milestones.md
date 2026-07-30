@@ -1,7 +1,24 @@
-# 마일스톤별 개발 — 브랜치 분리
+# 마일스톤별 개발 — 폴더 + 브랜치
 
 층(M0~M3)은 **증명 가능한 명제** 단위다(`spec/03.0-mvp.md`).
-아직 서로 연결하지 않으므로 **층마다 독립 브랜치에서 개발**한다.
+
+## 파일에서 층 보기 — 라우트 그룹
+
+```
+app/api/(m0)/   app/api/(m1)/     ← API를 층별로
+app/(ui)/(m0)/  app/(ui)/(m1)/    ← 화면을 층별로
+```
+
+`(m0)`·`(m1)`은 Next.js **라우트 그룹**이라 **URL에 나타나지 않는다** —
+`app/api/(m0)/session/message` → `/api/session/message`.
+파일 트리에서 층이 보이되 주소는 그대로다. 각 그룹 폴더의 README에 그 층의 목록이 있다.
+
+`lib/`은 층으로 나누지 않는다 — 계약·룰테이블·스토어·어댑터는 **모든 층이 공유하는
+토대**이고, 나누면 같은 파일을 여러 층이 참조하며 경계가 거짓이 된다.
+
+## 진행에서 층 보기 — 브랜치
+
+아직 서로 연결하지 않을 층은 **독립 브랜치에서 개발**한다.
 
 ```
 main   ← M0 완료. 항상 동작하는 상태를 유지한다 (데모·심사 대상)
@@ -40,17 +57,17 @@ main   ← M0 완료. 항상 동작하는 상태를 유지한다 (데모·심사
 | M-RULES-DONATION (FR-202·203) | `lib/rules/hometown-donation.ts` — 검산 3케이스 |
 | M-MOCK (NFR-707) | `lib/signer/mock/` — 키 없이 전 흐름 |
 | M-PERSISTENCE (D-18) | `supabase/migrations/`, `lib/store/` — 인메모리·Supabase 이중 구현 |
-| M-SESSION-MSG (FR-101·110·115B) | `app/api/session/message/`, `lib/rules/express-detect.ts` |
-| M-EXTRACT (FR-102) | `app/api/extract/`, `lib/ai/extract/` |
-| M-FACTS-CONFIRM (FR-103) | `app/api/facts/` — 확인 버튼이 P1 강제 지점 |
-| M-DOCUMENTS (FR-501) | `app/api/documents/` — 미확정·게이트 비통과는 403 |
-| M-SIGN (FR-501·502) | `app/api/sign/`, `lib/signer/` |
-| M-WEBHOOK (FR-503) | `app/api/webhooks/modusign/` — 멱등·아웃박스 |
-| M-EVIDENCE (FR-505) | `app/api/evidence/` — 해시·15분 만료 URL |
-| M-REWARDS (FR-203) | `app/api/rewards/` — 한도 초과는 서버가 거부 |
-| M-AUTH | `lib/auth/`, `app/api/auth/`, `middleware.ts` |
-| 화면 S1~S7 | `app/(ui)/` — auth·chat·confirm·rewards·doc·vault |
-| real 어댑터 | `lib/signer/real/`, `lib/ai/extract/real/` — 키 없이 픽스처 테스트 |
+| M-SESSION-MSG (FR-101·110·115B) | `app/api/(m0)/session/message/`, `lib/rules/express-detect.ts` |
+| M-EXTRACT (FR-102) | `app/api/(m0)/extract/`, `lib/ai/extract/` |
+| M-FACTS-CONFIRM (FR-103) | `app/api/(m0)/facts/` — 확인 버튼이 P1 강제 지점 |
+| M-DOCUMENTS (FR-501) | `app/api/(m0)/documents/` — 미확정·게이트 비통과는 403 |
+| M-SIGN (FR-501·502) | `app/api/(m0)/sign/`, `lib/signer/` |
+| M-WEBHOOK (FR-503) | `app/api/(m0)/webhooks/modusign/` — 멱등·아웃박스 |
+| M-EVIDENCE (FR-505) | `app/api/(m0)/evidence/` — 해시·15분 만료 URL |
+| M-REWARDS (FR-203) | `app/api/(m0)/rewards/` — 한도 초과는 서버가 거부 |
+| M-AUTH | `lib/auth/`, `app/api/(m0)/auth/`, `middleware.ts` |
+| 화면 S1~S7 | `app/(ui)/(m0)/` — auth·chat·confirm·rewards·doc·vault |
+| real 어댑터 | `lib/signer/real/`, `lib/ai/extract/real/`, `lib/ai/session/real/` — 키 없이 픽스처 테스트 |
 
 **완료 판정 (03.0)**: 실 서명 왕복 1건 — **미달**. 코드는 끝났고 PM 계정 작업 대기.
 **검증**: `pnpm test`(139) · `pnpm e2e`(14단계, 키 유무 양쪽) · `pnpm gate:check`(8종)
@@ -61,19 +78,22 @@ main   ← M0 완료. 항상 동작하는 상태를 유지한다 (데모·심사
 
 **명제**: 서명 이후에도 계약이 살아 있고, 연동은 유실에도 견딘다.
 
-| 모듈 | 내용 |
+### 완료
+
+| 모듈 | 구현 위치 |
 |---|---|
-| M-GATE-COUNTER (FR-509) | 게이트 차단 카운터. 집계는 `ESIGN_INVALID ∧ was_sign_attempt`만 |
-| M-OBSERVABILITY (NFR-709) | 6단계 실행 지표 화면. 계측 지점은 M0에 선삽입됨 |
-| M-RECONCILER (FR-504) | 웹훅 유실 보정 폴링 |
-| M-SIGN-LIFECYCLE (FR-506·507) | 거절 사유·48h 리마인드 |
-| M-OBLIGATIONS (FR-508) | 갱신·재검토 스케줄 |
-| M-ADMIN / M-ADMIN-OPS (FR-601~605) | 대시보드·일괄 리마인드·집계 |
-| M-PAPER-SCAN (FR-401) | 종이 약정 옮기기 (DP+IE) |
-| M-TIMETRAVEL | 시간 압축 데모 |
+| M-GATE-COUNTER (FR-509) | `app/api/(m1)/admin/gate-stats/` · `lib/observability/gate-log.ts` · `app/(ui)/(m1)/org/gate-counter/` |
+| M-OBSERVABILITY (NFR-709) | `app/api/(m1)/admin/pipeline-stats/` · `lib/observability/{track,stages}.ts` · `lib/store/percentile.ts` · `app/(ui)/(m1)/org/pipeline/` |
+| M-RECONCILER (FR-504) | `app/api/(m1)/cron/reconcile/` · `app/(ui)/(m1)/org/` |
+| M-PAPER-SCAN (FR-401·NFR-711) | `app/api/(m1)/paper-scan/` · `lib/ai/document/` · `app/(ui)/(m1)/branch/paper-scan/` |
+
+### 잔여
+
+M-SIGN-LIFECYCLE(FR-506·507) · M-OBLIGATIONS(FR-508) ·
+M-ADMIN / M-ADMIN-OPS(FR-601~605) · M-TIMETRAVEL
 
 DB는 이미 준비돼 있다 — `gate_verdicts`·`pipeline_metrics`·`obligations` 테이블은
-0001 마이그레이션에 포함됐다. M1은 적재·조회·화면만 붙인다.
+첫 마이그레이션에 포함됐다. 남은 모듈도 적재·조회·화면만 붙이면 된다.
 
 ---
 
