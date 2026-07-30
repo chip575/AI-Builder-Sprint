@@ -267,6 +267,26 @@ export class InMemoryStore implements StorePort {
     return summarizeMetrics(this.metrics);
   }
 
+  private reconciles: { at: string; corrected: number }[] = [];
+
+  async listStaleRequestedDrafts(olderThanMs: number): Promise<DraftRecord[]> {
+    const cutoff = Date.now() - olderThanMs;
+    return [...this.drafts.values()].filter(
+      (d) => d.status === "REQUESTED" && new Date(d.createdAt).getTime() <= cutoff,
+    );
+  }
+
+  async recordReconcile(corrected: number): Promise<void> {
+    this.reconciles.push({ at: new Date().toISOString(), corrected });
+  }
+
+  async getReconcileState() {
+    return {
+      lastSyncAt: this.reconciles.at(-1)?.at ?? null,
+      correctedTotal: this.reconciles.reduce((n, r) => n + r.corrected, 0),
+    };
+  }
+
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {
     const record: EvidenceRecord = {
       ...input,

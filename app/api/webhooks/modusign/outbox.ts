@@ -50,30 +50,46 @@ async function processOne(
   const target = doc?.status ?? EVENT_TO_STATUS[event];
   if (!target) return; // 모르는 이벤트 유형 — 무시
 
-  if (!canTransition(draft.status, target)) {
+  if (canTransition(draft.status, target)) {
+    await store.syncDraftStatus(draft.draftId, target, doc?.rejectReason ?? undefined);
+  } else if (draft.status !== target) {
     // 역행·중복 전이는 스킵 + 로그 (02.3 §3 — 이벤트 순서 보장 없음)
-    if (draft.status !== target) {
-      console.warn(`[webhook] 전이 스킵 ${draft.status} → ${target} (draft=${draft.draftId})`);
-    }
+    console.warn(`[webhook] 전이 스킵 ${draft.status} → ${target} (draft=${draft.draftId})`);
     return;
   }
 
-  await store.syncDraftStatus(draft.draftId, target, doc?.rejectReason ?? undefined);
-
-  // 완료 → 증빙 확보 (02.3 §3 7단계, FR-505). 이미 있으면 재생성하지 않는다 (멱등)
+  // ⚠ 증빙 확보를 전이 성공에 묶지 않는다.
+  //    폴링(GET status)이 먼저 COMPLETED로 동기화하면 여기서 전이가 '불가'가 되고,
+  //    그러면 증빙이 영원히 생성되지 않는다 (실제로 났던 경합).
+  //    "완료 상태이면 증빙이 있어야 한다"가 불변식이고, 누가 먼저 도착했는지는 무관하다.
   if (target === "COMPLETED") {
-    const existing = await store.getEvidenceByDraft(draft.draftId);
-    if (!existing) {
-      const signedAt = doc?.completedAt ?? new Date().toISOString();
-      await store.createEvidence({
-        draftId: draft.draftId,
-        pdfStoragePath: `evidences/${draft.draftId}.pdf`,
-        // mock — 실 연동에서는 다운로드한 PDF 바이트의 해시 (FR-505)
-        sha256: createHash("sha256").update(`${documentId}:${signedAt}`).digest("hex"),
-        signedAt,
-        parties: doc?.parties ?? [],
-      });
-    }
-    // Obligation 생성(02.3 §3 8단계)은 M-OBLIGATIONS(M1) — 정기후원 체결 시 여기 연결
+    await ensureEvidence(draft.draftId, documentId, doc);
+  }
+  // Obligation 생성(02.3 §3 8단계)은 M-OBLIGATIONS(M1) — 정기후원 체결 시 여기 연결
+}
+
+/** 완료 문서의 증빙을 보장한다 (FR-505). 이미 있으면 아무것도 하지 않는다 — 멱등 */
+export async function ensureEvidence(
+  draftId: string,
+  documentId: string,
+  doc: { completedAt?: string | null; parties?: unknown[] } | null,
+): Promise<void> {
+  const existing = await store.getEvidenceByDraft(draftId);
+  if (existing) return;
+  const signedAt = doc?.completedAt ?? new Date().toISOString();
+  try {
+    await store.createEvidence({
+      draftId,
+      pdfStoragePath: `evidences/${draftId}.pdf`,
+      // mock — 실 연동에서는 다운로드한 PDF 바이트의 해시 (FR-505)
+      sha256: createHash("sha256").update(`${documentId}:${signedAt}`).digest("hex"),
+      signedAt,
+      parties: doc?.parties ?? [],
+    });
+  } catch (err) {
+    // 확인과 삽입 사이에 웹훅·폴링·리컨실러 중 다른 경로가 먼저 넣을 수 있다.
+    // draft_id UNIQUE가 최종 방어이고, 위반은 "이미 목표 상태"라는 뜻이므로 성공으로 읽는다.
+    if (await store.getEvidenceByDraft(draftId)) return;
+    throw err;
   }
 }

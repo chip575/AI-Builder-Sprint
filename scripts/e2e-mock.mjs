@@ -41,6 +41,10 @@ if (!body.data.deduction || body.data.deduction.deductionAmount !== 276000)
   fail("세액공제 검산 불일치: " + JSON.stringify(body.data.deduction));
 console.log("3.5 FACTSHEET ok — 예상공제", body.data.deduction.deductionAmount, "· 미확정");
 
+// 정책 거부가 장애로 새는지 보려면 이번 실행분 증가만 봐야 한다 (DB는 영속)
+const draftFailBefore = (await (await fetch(base + "/api/admin/pipeline-stats")).json())
+  .data.stages.find((s) => s.stage === "DRAFT").fail;
+
 // 4. 미확정 문서 생성 → 403 (P1)
 res = await fetch(base + "/api/documents", j({ intentId: sid }));
 if (res.status !== 403) fail("미확정 403 아님: " + res.status);
@@ -147,6 +151,23 @@ console.log(
   "15. METRICS ok — 6단계 전부 기록 ·",
   pipe.totalRecords + "건 · 첫 토큰 p95",
   conv.p95Ms + "ms",
+);
+// 정책 거부는 장애가 아니다 — 게이트 차단·미확정 403이 fail로 새면 안 된다
+const draftStage = pipe.stages.find((s) => s.stage === "DRAFT");
+if (draftStage.fail !== draftFailBefore)
+  fail(`정책 거부가 장애(fail)로 집계됨: +${draftStage.fail - draftFailBefore}`);
+
+// 16. 리컨실러 (FR-504) — 응답 형식 + 멱등. 상태 대조가 실제로 도는지
+res = await fetch(base + "/api/cron/reconcile?staleMs=0", { method: "POST" });
+const rec = (await res.json()).data;
+if (typeof rec.corrected !== "number" || !rec.lastSyncAt) fail("리컨실 응답 형식 이상");
+res = await fetch(base + "/api/cron/reconcile");
+const recState = (await res.json()).data;
+if (!recState.lastSyncAt) fail("마지막 동기화 시각이 기록되지 않음");
+console.log(
+  "16. RECONCILE ok — 이번 교정",
+  rec.corrected + "건 · 누적",
+  recState.correctedTotal + "건",
 );
 
 console.log("\nE2E PASS — 발화→구조화→확정→게이트→초안→서명→웹훅→증빙 + 게이트 차단 카운터 (키 없이)");

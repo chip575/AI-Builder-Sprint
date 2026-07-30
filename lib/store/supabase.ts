@@ -400,6 +400,37 @@ export class SupabaseStore implements StorePort {
     return summarizeMetrics((data ?? []) as MetricRecord[]);
   }
 
+  async listStaleRequestedDrafts(olderThanMs: number): Promise<DraftRecord[]> {
+    const cutoff = new Date(Date.now() - olderThanMs).toISOString();
+    const { data, error } = await this.db
+      .from("document_drafts")
+      .select("*")
+      .eq("status", "REQUESTED")
+      .lte("updated_at", cutoff);
+    if (error) this.fail("drafts.stale", error);
+    return (data ?? []).map(toDraft);
+  }
+
+  async recordReconcile(corrected: number): Promise<void> {
+    // 전용 테이블 없이 audit_logs를 쓴다 — 리컨실 이력은 append-only가 오히려 맞다
+    await this.audit("reconcile.run", "cron", { corrected });
+  }
+
+  async getReconcileState() {
+    const { data, error } = await this.db
+      .from("audit_logs")
+      .select("detail, created_at")
+      .eq("action", "reconcile.run")
+      .order("id", { ascending: false })
+      .limit(500);
+    if (error) this.fail("audit.reconcile", error);
+    const rows = (data ?? []) as Row[];
+    return {
+      lastSyncAt: rows[0] ? iso(rows[0].created_at) : null,
+      correctedTotal: rows.reduce((n, r) => n + Number(r.detail?.corrected ?? 0), 0),
+    };
+  }
+
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {
     const row = {
       id: randomUUID(),

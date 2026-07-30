@@ -68,7 +68,8 @@ export async function POST(req: Request) {
   const unconfirmed =
     session.facts.length === 0 || session.facts.some((f) => !f.confirmed);
   if (unconfirmed || missing.length > 0) {
-    track("DRAFT", false, Date.now() - t0);
+    // 정책적 거부(P1)는 장애가 아니다 — pipeline_metrics.fail로 세지 않는다.
+    // 실행 지표의 fail은 '장애'만 뜻해야 화면의 빨간 숫자가 정직해진다
     return Response.json(
       {
         ok: false,
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
   logGateVerdict(docType, verdict, false);
 
   if (verdict.verdict !== "ESIGN_OK") {
-    track("DRAFT", false, Date.now() - t0);
+    // 게이트 차단도 정책이다 — 이 사건의 기록은 gate_verdicts가 이미 갖고 있다
     const statuteIds = verdict.statutes.map((s) => s.id).join(", ");
     return Response.json(
       {

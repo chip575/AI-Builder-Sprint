@@ -82,6 +82,12 @@ export interface StorePort {
   recordMetric(input: MetricRecord): Promise<void>;
   getPipelineStats(): Promise<StageStat[]>;
 
+  // ── reconciler (FR-504) ───────────────────────────────────
+  /** 진행 중인데 오래 갱신되지 않은 draft — 웹훅 유실 후보 */
+  listStaleRequestedDrafts(olderThanMs: number): Promise<DraftRecord[]>;
+  recordReconcile(corrected: number): Promise<void>;
+  getReconcileState(): Promise<{ lastSyncAt: string | null; correctedTotal: number }>;
+
   // ── evidences ─────────────────────────────────────────────
   createEvidence(
     input: Omit<EvidenceRecord, "id" | "createdAt">,

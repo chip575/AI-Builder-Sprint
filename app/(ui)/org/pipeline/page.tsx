@@ -54,7 +54,7 @@ export default function PipelineStatsPage() {
               <tr>
                 <th className="p-3 text-left font-normal">단계</th>
                 <th className="p-3 text-right font-normal">성공</th>
-                <th className="p-3 text-right font-normal">실패</th>
+                <th className="p-3 text-right font-normal">장애</th>
                 <th className="p-3 text-right font-normal">p50</th>
                 <th className="p-3 text-right font-normal">p95</th>
               </tr>
@@ -83,6 +83,9 @@ export default function PipelineStatsPage() {
           대화 단계의 시간은 <strong>첫 토큰까지</strong>입니다. 전체 응답이 끝나는
           시간이 아니라, 사용자가 기다리기 시작해서 첫 글자를 보기까지의 시간입니다.
           기록이 없는 단계는 &ldquo;—&rdquo;로 표시됩니다 — 0ms와 다릅니다.
+          <br />
+          <strong>장애</strong>는 시스템 오류만 셉니다. 게이트 차단이나 확인 전 거부처럼
+          <strong>의도된 정책 거부는 포함되지 않습니다</strong> — 그건 유효성 게이트 화면에서 봅니다.
         </Notice>
       </div>
     </Shell>
