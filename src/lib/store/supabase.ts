@@ -720,6 +720,58 @@ export class SupabaseStore implements StorePort {
     return chain.find((n) => n.id === nodeId);
   }
 
+  async saveEmbeddings(
+    intentId: string,
+    rows: { utteranceId: string; vector: number[] }[],
+  ): Promise<number> {
+    if (rows.length === 0) return 0;
+    const { data, error } = await this.db
+      .from("utterance_embeddings")
+      .upsert(
+        rows.map((r) => ({
+          utterance_id: r.utteranceId,
+          intent_id: intentId,
+          // pgvector는 '[a,b,c]' 문자열 리터럴을 받는다
+          embedding: `[${r.vector.join(",")}]`,
+        })),
+        { onConflict: "utterance_id", ignoreDuplicates: true },
+      )
+      .select("utterance_id");
+    if (error) this.fail("embeddings.save", error);
+    return (data ?? []).length;
+  }
+
+  async listUnembeddedUtterances(intentId: string) {
+    // 소프트 삭제된 발화는 애초에 대상이 아니다 — 지운 이야기를 벡터로 남기지 않는다
+    const { data, error } = await this.db
+      .from("utterances")
+      .select("id, text, utterance_embeddings(utterance_id)")
+      .eq("intent_id", intentId)
+      .is("deleted_at", null);
+    if (error) this.fail("embeddings.listUnembedded", error);
+    return (data ?? [])
+      .filter((r: Row) => !r.utterance_embeddings?.length)
+      .map((r: Row) => ({ utteranceId: r.id, text: r.text }));
+  }
+
+  async searchSimilarUtterances(intentId: string, queryVector: number[], k: number) {
+    // ⚠ ANN 인덱스가 없다(4096차원은 pgvector 인덱스 상한 밖 — 마이그레이션 주석 참조).
+    //    순차 스캔이므로 이 규모에서는 문제가 없고 정확도는 오히려 더 높다.
+    const { data, error } = await this.db.rpc("search_utterances", {
+      p_intent_id: intentId,
+      p_query: `[${queryVector.join(",")}]`,
+      p_k: k,
+    });
+    if (error) this.fail("embeddings.search", error);
+    return (data ?? []).map((r: Row) => ({
+      utteranceId: r.utterance_id,
+      sessionId: r.intent_id,
+      text: r.text,
+      spokenAt: iso(r.spoken_at),
+      score: Number(r.score),
+    }));
+  }
+
   async requestFamilyAcks(
     ledgerNodeId: string,
     targets: (FamilyAckTarget & { documentId: string | null })[],

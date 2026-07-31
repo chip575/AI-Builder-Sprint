@@ -149,6 +149,25 @@ export interface StorePort {
     declinedReason?: string | null,
   ): Promise<FamilyAckRecord | undefined>;
 
+  // ── 임베딩 (02.5 §3 · D-07) ───────────────────────────────
+  /** 발화 벡터 적재 — 세션 종료 시 배치로만 부른다 (대화 중 실시간 호출 금지, 비용 가드).
+   *  이미 있는 발화는 건너뛴다 — 재적재는 같은 벡터를 다시 사는 일이다 */
+  saveEmbeddings(
+    intentId: string,
+    rows: { utteranceId: string; vector: number[] }[],
+  ): Promise<number>;
+  /** 아직 벡터가 없는 발화 — 배치 대상. 소프트 삭제된 발화는 제외된다 */
+  listUnembeddedUtterances(
+    intentId: string,
+  ): Promise<{ utteranceId: string; text: string }[]>;
+  /** 유사도 상위 k. **소프트 삭제된 발화는 결과에서 빠진다** —
+   *  지운 이야기가 검색으로 되살아나면 삭제권이 무의미해진다 (D-10) */
+  searchSimilarUtterances(
+    intentId: string,
+    queryVector: number[],
+    k: number,
+  ): Promise<{ utteranceId: string; sessionId: string; text: string; spokenAt: string; score: number }[]>;
+
   // ── evidences ─────────────────────────────────────────────
   createEvidence(
     input: Omit<EvidenceRecord, "id" | "createdAt">,

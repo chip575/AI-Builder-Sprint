@@ -1,6 +1,7 @@
 // 인메모리 StorePort — mock·테스트·키 없는 채점 경로(NFR-707)의 기본 구현.
 // DB 트리거 전체를 흉내내지 않는다 — store-contract 스위트가 요구하는 규칙만 구현한다.
 import { randomUUID } from "node:crypto";
+import { cosine } from "../ai/embed/port";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
@@ -461,6 +462,51 @@ export class InMemoryStore implements StorePort {
       if (found) return withDerivedStatus(chain).find((n) => n.id === nodeId);
     }
     return undefined;
+  }
+
+  /** key = utteranceId. 인메모리는 pgvector가 없으니 코사인을 직접 센다 —
+   *  같은 순위가 나와야 두 구현이 하나의 계약을 지킨다 */
+  private embeddings = new Map<string, { intentId: string; vector: number[] }>();
+
+  async saveEmbeddings(
+    intentId: string,
+    rows: { utteranceId: string; vector: number[] }[],
+  ): Promise<number> {
+    let saved = 0;
+    for (const r of rows) {
+      if (this.embeddings.has(r.utteranceId)) continue; // 재적재하지 않는다
+      this.embeddings.set(r.utteranceId, { intentId, vector: [...r.vector] });
+      saved += 1;
+    }
+    return saved;
+  }
+
+  async listUnembeddedUtterances(intentId: string) {
+    const session = this.sessions.get(intentId);
+    if (!session) return [];
+    return session.utterances
+      .filter((u) => u.deletedAt === null && !this.embeddings.has(u.id))
+      .map((u) => ({ utteranceId: u.id, text: u.text }));
+  }
+
+  async searchSimilarUtterances(intentId: string, queryVector: number[], k: number) {
+    const session = this.sessions.get(intentId);
+    if (!session) return [];
+    const scored = [];
+    for (const u of session.utterances) {
+      // 지운 이야기는 검색으로 되살아나지 않는다 (D-10)
+      if (u.deletedAt !== null) continue;
+      const e = this.embeddings.get(u.id);
+      if (!e) continue;
+      scored.push({
+        utteranceId: u.id,
+        sessionId: intentId,
+        text: u.text,
+        spokenAt: u.at,
+        score: cosine(queryVector, e.vector),
+      });
+    }
+    return scored.sort((a, b) => b.score - a.score).slice(0, k);
   }
 
   private familyAcks: FamilyAckRecord[] = [];
