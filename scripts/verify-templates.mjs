@@ -71,7 +71,11 @@ function collectLabels(tpl) {
   return found;
 }
 
+/** 조회에도 빈도 제한(429)이 있다 — 서명 잔여와는 무관하지만 몰아서 부르면 막힌다 */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const rows = [];
+let first = true;
 for (const code of Object.keys(TEMPLATE_LABELS)) {
   const id = templateIdFor(code);
   if (!id) {
@@ -79,7 +83,13 @@ for (const code of Object.keys(TEMPLATE_LABELS)) {
     continue;
   }
 
-  const { data, error } = await fetchTemplate(id);
+  if (!first) await sleep(2000);
+  first = false;
+  let { data, error } = await fetchTemplate(id);
+  if (error?.startsWith("429")) {
+    await sleep(6000); // 한 번은 더 기다려 본다
+    ({ data, error } = await fetchTemplate(id));
+  }
   if (error) {
     rows.push({ code, status: "조회 실패", detail: error });
     continue;
@@ -92,16 +102,34 @@ for (const code of Object.keys(TEMPLATE_LABELS)) {
     continue;
   }
 
+  // 참여자별 필드 소속까지 본다 — 초과 라벨이 **다른 역할**에 붙어 있으면
+  // 서명자가 늘어나 문서가 완료되지 않는다. 스크린샷 해석보다 이쪽이 정확하다
+  const parts = (data.participants ?? []).map((p) => ({
+    role: p.role ?? p.name ?? "?",
+    order: p.signingOrder ?? null,
+    count: (p.fields ?? []).length,
+  }));
+  const emptyRoles = parts.filter((p) => p.count === 0).map((p) => p.role);
+
   const ours = new Set(Object.values(TEMPLATE_LABELS[code]));
   const missing = [...ours].filter((l) => !actual.has(l)); // 우리에만 있음 = 죽은 라벨
   const extra = [...actual].filter((l) => !ours.has(l)); // 콘솔에만 있음 = 안 채우는 칸
 
   rows.push({
     code,
-    status: missing.length === 0 ? (extra.length === 0 ? "일치" : "초과 있음") : "불일치",
+    status:
+      missing.length > 0
+        ? "불일치"
+        : emptyRoles.length > 0
+          ? "빈 역할" // 서명할 칸이 없는 참여자 — 문서가 완료되지 않는다
+          : extra.length === 0
+            ? "일치"
+            : "초과 있음",
     detail:
       (missing.length ? `죽은 라벨 ${missing.length}: ${missing.join(",")} ` : "") +
-      (extra.length ? `미사용 ${extra.length}: ${extra.join(",")}` : ""),
+      (emptyRoles.length ? `필드 0개 역할: ${emptyRoles.join(",")} ` : "") +
+      (extra.length ? `미사용 ${extra.length} ` : "") +
+      parts.map((p) => `${p.role}(${p.count})`).join(" · "),
   });
 }
 
@@ -116,11 +144,14 @@ for (const [code, roles] of Object.entries(TEMPLATE_ROLES)) {
   console.log(`  ${code.padEnd(20)} ${roles.join(" → ")}`);
 }
 
-const bad = rows.filter((r) => r.status === "불일치").length;
+const bad = rows.filter((r) => r.status === "불일치" || r.status === "빈 역할").length;
 console.log(
   `\n${rows.filter((r) => r.status === "일치").length}/${rows.length} 일치 · 불일치 ${bad}`,
 );
 if (bad > 0) {
-  console.error("[verify] ⚠ 죽은 라벨이 있습니다. 그대로 보내면 서면에 빈칸이 인쇄됩니다.");
+  console.error(
+    "[verify] ⚠ 죽은 라벨 또는 빈 역할이 있습니다. 죽은 라벨은 서면에 인쇄되지 않고, " +
+      "빈 역할은 그 참여자가 서명할 칸이 없어 문서가 완료되지 않습니다.",
+  );
   process.exit(1);
 }
