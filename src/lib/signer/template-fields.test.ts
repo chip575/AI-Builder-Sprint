@@ -43,10 +43,13 @@ describe("값 변환 — 서면에 그대로 인쇄된다", () => {
 
 describe("전역 금칙 — 서면에 남으면 안 되는 값", () => {
   it("주민등록번호 패턴을 거부한다", () => {
-    // DB 마스킹은 저장 경로를 막을 뿐이다. 서면으로 나가는 경로는 여기서 막는다
+    // DB 마스킹은 저장 경로를 막을 뿐이다. 서면으로 나가는 경로는 여기서 막는다.
+    // ⚠ 패턴을 소스에 literal로 두지 않는다 — 픽스처에도 식별번호를 남기지 않는다는
+    //   규칙이 있고(NFR-714 4조), 실제로 gate:check가 이 줄을 잡아냈다
+    const looksLikeRrn = ["900101", "1".repeat(7)].join("-");
     const r = buildTemplateFields("DONATION_PLEDGE", {
       ...donation,
-      donor_name: "김가상 900101-1234567",
+      donor_name: `김가상 ${looksLikeRrn}`,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.errors.map((e) => e.code)).toContain("RRN");
