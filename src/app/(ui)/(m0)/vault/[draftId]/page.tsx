@@ -96,8 +96,10 @@ export default function VaultPage() {
               하지 않으셔도 괜찮습니다.
             </p>
             <div className="mt-3 flex gap-2">
+              {/* 축 세션의 입구는 /recall이다. /chat으로 보내면 가지 대화로 돌아가
+                  "이야기로 정리해 보자"는 제안과 도착지가 어긋난다 */}
               <Link
-                href="/chat"
+                href="/recall"
                 className="min-h-11 flex-1 rounded-xl border border-stone-300 px-4 py-3 text-center text-sm"
               >
                 이야기 시작하기

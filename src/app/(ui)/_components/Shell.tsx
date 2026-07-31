@@ -96,13 +96,32 @@ export function PrimaryButton({
   );
 }
 
-/** 서버 error envelope의 nextAction을 그대로 보여준다 (NFR-705 — 기술 코드 노출 금지) */
-export function ErrorNote({ error }: { error: { message: string; nextAction: string } | null }) {
+/** 서버 error envelope의 nextAction을 그대로 보여준다 (NFR-705 — 기술 코드 노출 금지)
+ *
+ *  error.route가 있으면 **거기로 가는 링크를 함께 낸다.** 서버가 대체 경로를 실어 보내는데
+ *  화면이 안 읽으면, 사용자는 "자필로 옮겨 쓰는 방법을 안내해 드릴게요"라는 문장만 보고
+ *  갈 길이 없다 — 막는 것까지만 하고 대안을 주지 않는 화면이 된다 (FR-302).
+ *  전 화면이 이 컴포넌트를 쓰므로 여기 한 곳이면 모든 대체 경로가 살아난다. */
+export function ErrorNote({
+  error,
+}: {
+  error: { message: string; nextAction: string; route?: string | null } | null;
+}) {
   if (!error) return null;
   return (
     <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900">
       <p>{error.message}</p>
-      <p className="mt-1 font-medium">{error.nextAction}</p>
+      {error.route ? (
+        // 같은 문장을 안내문과 버튼에 두 번 쓰지 않는다 — 갈 곳이 있으면 그것이 곧 안내다
+        <Link
+          href={error.route}
+          className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-rose-900 px-5 text-stone-50 transition hover:bg-rose-800"
+        >
+          {error.nextAction}
+        </Link>
+      ) : (
+        <p className="mt-1 font-medium">{error.nextAction}</p>
+      )}
     </div>
   );
 }

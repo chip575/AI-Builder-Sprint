@@ -44,6 +44,35 @@ async function confirmedSession(
   return s;
 }
 
+describe("🔴 M-DOCUMENTS — 게이트가 확정보다 먼저다", () => {
+  // 순서가 뒤집히면 "항목을 확인해 주세요" → 확인 → "그런데 전자서명이 안 됩니다"가 되어
+  // **무효인 걸 알면서 확정부터 시키는** 흐름이 된다. 게이트도 확정 검사도 각각은 정상이라
+  // 유닛으로는 영영 안 잡히던 조합이다 — 순서 자체를 물증으로 고정한다
+  async function unconfirmedSession(branchType: "HANDWRITTEN_WILL" | "DONATION_NOW") {
+    const s = await getOrCreateSession();
+    const u = await addUtterance(s.id, "유언장을 준비하고 싶어요");
+    await addProposal(s.id, branchType, "EXPRESS", u.id);
+    return s; // facts 없음 = 미확정 상태
+  }
+
+  it("유언장 가지는 항목이 하나도 확정되지 않아도 게이트로 막힌다", async () => {
+    const s = await unconfirmedSession("HANDWRITTEN_WILL");
+    const res = await post(s.id);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    // 뒤집혀 있으면 여기서 FACTS_UNCONFIRMED가 나오고 게이트 차단 화면은 영영 안 뜬다
+    expect(body.error.code).toBe("GATE_ESIGN_INVALID");
+    expect(body.error.route).toContain("/will/handwriting");
+  });
+
+  it("게이트를 통과하는 가지는 여전히 확정을 요구한다 — 순서를 바꿨다고 확정이 면제되지 않는다", async () => {
+    const s = await unconfirmedSession("DONATION_NOW");
+    const res = await post(s.id);
+    expect(res.status).toBe(403);
+    expect((await res.json()).error.code).toBe("FACTS_UNCONFIRMED");
+  });
+});
+
 describe("M-DOCUMENTS — 게이트 3분기 (FR-104)", () => {
   it("유언장 가지 → 403 + 민법 조문 인용 + 자필 경로 안내 (P2 물증)", async () => {
     const s = await confirmedSession("HANDWRITTEN_WILL");

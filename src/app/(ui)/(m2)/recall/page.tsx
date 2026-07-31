@@ -5,6 +5,7 @@
 // 질문 문장·순서·머무름 문구는 전부 lib/rules/question-bank.ts가 정한다 — 화면은 고르지 않는다.
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { postSse } from "@/lib/sse";
 import { ErrorNote, Notice, PrimaryButton, Shell } from "@/app/(ui)/_components/Shell";
@@ -195,6 +196,16 @@ export default function RecallPage() {
           <Notice>
             다음에 오시면 이어서 하실 수 있습니다. 남긴 이야기는 마음 유언의 바탕이 됩니다.
           </Notice>
+          {/* "마음 유언의 바탕이 됩니다"라고 말했으면 거기로 가는 길이 있어야 한다.
+              sessionId를 실어 보낸다 — 사용자가 대화 번호를 손으로 적을 방법은 없다 */}
+          {sessionId && (
+            <Link
+              href={`/heartwill?sessionId=${sessionId}`}
+              className="inline-flex min-h-11 items-center rounded-xl bg-stone-900 px-6 text-stone-50 transition hover:bg-stone-700"
+            >
+              마음 유언 정리해 보기
+            </Link>
+          )}
         </section>
       )}
 

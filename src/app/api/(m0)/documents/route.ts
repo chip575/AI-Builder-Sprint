@@ -58,37 +58,18 @@ export async function POST(req: Request) {
     );
   }
 
-  // 403 ① — 확인 버튼을 누르지 않으면 서버가 거부한다 (FR-103 수락 기준, P1 물증).
-  // 필수 슬롯은 스냅숏이 아니라 현재 fact 값으로 재검증한다 (FR-102)
-  const required = requiredSlotsFor(branchType);
-  const missing = required.filter((key) => {
-    const fact = session.facts.find((f) => f.key === key);
-    return !fact || fact.value === null || fact.value === "";
-  });
-  const unconfirmed =
-    session.facts.length === 0 || session.facts.some((f) => !f.confirmed);
-  if (unconfirmed || missing.length > 0) {
-    // 정책적 거부(P1)는 장애가 아니다 — pipeline_metrics.fail로 세지 않는다.
-    // 실행 지표의 fail은 '장애'만 뜻해야 화면의 빨간 숫자가 정직해진다
-    return Response.json(
-      {
-        ok: false,
-        error: {
-          code: "FACTS_UNCONFIRMED",
-          message: "아직 확인되지 않은 항목이 있습니다.",
-          nextAction: "확인 화면에서 내용을 확인해 주세요.",
-        },
-      },
-      { status: 403 },
-    );
-  }
-
-  // 403 ② — 게이트 비통과. 판정은 lib/rules 순수 함수 (FR-104)
+  // 403 ① — 게이트 비통과. 판정은 lib/rules 순수 함수 (FR-104)
+  //
+  // **확정 검사보다 앞에 둔다.** evaluateGate는 docType만 보는 순수 함수라 fact와 무관하다 —
+  // 유언장은 항목을 아무리 확정해도 ESIGN_INVALID다. 그런데 확정을 먼저 요구하면
+  //   "항목을 확인해 주세요" → 확인 → "그런데 이건 전자서명이 안 됩니다"
+  // 가 되어, **무효인 걸 알면서 확정부터 시키는** 순서가 된다.
+  // 부수 효과가 아니라 이것이 이유다: 안 되는 것은 먼저 말한다.
   const docType = BRANCH_PRIMARY_DOC[branchType];
   const g0 = Date.now();
   const verdict = evaluateGate(docType);
   track("GATE", true, Date.now() - g0);
-  // 3분기 전부 기록 — 분포 화면의 근거. 문서 생성 단계이므로 서명 시도는 아니다 (FR-509)
+  // 3분기 전부 기록 — 분포 화면의 근거 (FR-509)
   logGateVerdict(docType, verdict, false);
 
   if (verdict.verdict !== "ESIGN_OK") {
@@ -112,6 +93,31 @@ export async function POST(req: Request) {
             verdict.alternativeRoute === "HANDWRITING_GUIDE"
               ? `/will/handwriting?intentId=${session.id}`
               : null,
+        },
+      },
+      { status: 403 },
+    );
+  }
+
+  // 403 ② — 확인 버튼을 누르지 않으면 서버가 거부한다 (FR-103 수락 기준, P1 물증).
+  // 필수 슬롯은 스냅숏이 아니라 현재 fact 값으로 재검증한다 (FR-102)
+  const required = requiredSlotsFor(branchType);
+  const missing = required.filter((key) => {
+    const fact = session.facts.find((f) => f.key === key);
+    return !fact || fact.value === null || fact.value === "";
+  });
+  const unconfirmed =
+    session.facts.length === 0 || session.facts.some((f) => !f.confirmed);
+  if (unconfirmed || missing.length > 0) {
+    // 정책적 거부(P1)는 장애가 아니다 — pipeline_metrics.fail로 세지 않는다.
+    // 실행 지표의 fail은 '장애'만 뜻해야 화면의 빨간 숫자가 정직해진다
+    return Response.json(
+      {
+        ok: false,
+        error: {
+          code: "FACTS_UNCONFIRMED",
+          message: "아직 확인되지 않은 항목이 있습니다.",
+          nextAction: "확인 화면에서 내용을 확인해 주세요.",
         },
       },
       { status: 403 },
