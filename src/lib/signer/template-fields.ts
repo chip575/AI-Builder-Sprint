@@ -214,11 +214,13 @@ export function toPrintable(field: string, value: unknown): string {
     return value ? "익명 희망" : "실명 공개";
   }
   if (typeof value === "number") {
+    // ⚠ 단위는 **서식이 이미 가진 것과 겹치지 않게** 붙인다.
+    //   ①②의 금액 칸 라벨은 "기부 금액"·"월 후원금액"이라 단위가 없다 → "원"을 붙인다.
+    //   ②의 기간 칸은 라벨이 "후원 기간(개월)"이라 이미 단위가 있다 → 숫자만 넣는다.
+    //   (typst/lib.typ에 단위를 덧붙이는 코드가 없음을 원본에서 확인, 2026-07-31)
     return field.endsWith("_krw")
       ? `${value.toLocaleString("ko-KR")}원`
-      : field === "period_months"
-        ? `${value}개월`
-        : String(value);
+      : String(value);
   }
   const s = String(value);
   // YYYY-MM-DD → YYYY년 M월 D일

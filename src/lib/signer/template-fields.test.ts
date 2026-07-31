@@ -36,8 +36,9 @@ describe("값 변환 — 서면에 그대로 인쇄된다", () => {
     expect(toPrintable("is_anonymous", true)).toBe("익명 희망");
     expect(toPrintable("is_anonymous", false)).toBe("실명 공개");
   });
-  it("기간은 개월이 붙는다", () => {
-    expect(toPrintable("period_months", 12)).toBe("12개월");
+  it("기간에는 단위를 붙이지 않는다 — 서식 라벨이 '후원 기간(개월)'이라 겹친다", () => {
+    // 붙이면 서면에 "후원 기간(개월) 12개월"이 인쇄된다
+    expect(toPrintable("period_months", 12)).toBe("12");
   });
 });
 
