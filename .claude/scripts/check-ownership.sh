@@ -43,10 +43,14 @@ case "$FILE" in
 esac
 
 # 역할별 소유 경로
+# ⚠ 라우트 그룹 `(m0)`·`(m1)`이 api/와 세그먼트 사이에 낀다 — `api/(m0)/session/`.
+#   그래서 그룹 세그먼트를 선택적으로 허용해야 한다. 이게 없으면 워커가 **자기 경로에서**
+#   차단된다 (2026-07-31 탐침에서 발견 — be1·be2 둘 다 첫 파일에서 죽었을 상태).
+G='(\([^/)]*\)/)?'   # 있어도 되고 없어도 되는 라우트 그룹
 case "$ROLE" in
-  be1) echo "$FILE" | grep -qE 'lib/ai/|app/api/(session|extract|gate)/' || deny "BE-1 소유 경로 밖: $FILE" ;;
-  be2) echo "$FILE" | grep -qE 'lib/signer/|lib/ledger/|app/api/(documents|sign|webhooks|cron|evidence|ledger|dev)/|supabase/' || deny "BE-2 소유 경로 밖: $FILE" ;;
-  fe)  echo "$FILE" | grep -qE 'app/\(ui\)/|components/|app/api/(facts|rewards|admin|heartwill|will)/' || deny "FE 소유 경로 밖: $FILE" ;;
+  be1) echo "$FILE" | grep -qE "lib/ai/|app/api/${G}(session|extract|gate|recall|obligations)/" || deny "BE-1 소유 경로 밖: $FILE" ;;
+  be2) echo "$FILE" | grep -qE "lib/signer/|lib/ledger/|app/api/${G}(documents|sign|webhooks|cron|evidence|ledger|dev|family-ack)/|supabase/" || deny "BE-2 소유 경로 밖: $FILE" ;;
+  fe)  echo "$FILE" | grep -qE "app/\(ui\)/|components/|app/api/${G}(facts|rewards|admin|heartwill|will)/" || deny "FE 소유 경로 밖: $FILE" ;;
   unknown) : ;;   # WORKER_ROLE 미설정 시 역할 검사 생략 (전원 금지 규칙은 이미 적용됨)
 esac
 exit 0

@@ -7,6 +7,8 @@
 import { LedgerNodeReq, LedgerRes } from "@/lib/contracts";
 import { judgeMateriality, verifyChain } from "@/lib/ledger/chain";
 import { store } from "@/lib/store";
+import { evaluateGate } from "@/lib/rules/validity-gate";
+import { createDraft } from "@/app/api/(m0)/documents/store";
 
 function bad(code: string, message: string, nextAction: string, status: number) {
   return Response.json({ ok: false, error: { code, message, nextAction } }, { status });
@@ -37,12 +39,35 @@ export async function POST(req: Request) {
 
   const materiality = judgeMateriality(parsed.data.changeSummary);
 
+  // MATERIAL이면 의사 확인서를 함께 만든다 (FR-552 — 실질 변경만 재서명).
+  // ⚠ 문서명에 "유언"을 쓰지 않는다 (FR-551). DocType은 INTENT_AFFIRMATION이고
+  //    게이트 판정도 그 타입으로 받는다 — 원장이 판정을 흉내내지 않는다.
+  // 노드보다 draft를 먼저 만든다. 노드는 append-only라 나중에 draftId를 채울 수 없다 —
+  // 순서가 뒤집히면 "확인서 없는 MATERIAL 노드"가 영구히 남는다.
+  let draftId: string | null = null;
+  if (materiality === "MATERIAL") {
+    try {
+      const verdict = evaluateGate("INTENT_AFFIRMATION");
+      const draft = await createDraft(parsed.data.subjectId, "INTENT_AFFIRMATION", verdict);
+      draftId = draft.draftId;
+    } catch (err) {
+      // 확인서를 못 만들면 노드도 만들지 않는다. 재서명 없는 실질 변경을 남기면
+      // 그게 나중에 "본인이 확인하지 않은 변경"으로 공격받는 자리가 된다
+      console.warn("[ledger] 의사 확인서 생성 실패:", (err as Error).message);
+      return bad(
+        "AFFIRMATION_FAILED",
+        "본인 확인서를 준비하지 못했습니다.",
+        "잠시 후 다시 시도해 주세요. 이전 기록은 그대로 있습니다.",
+        503,
+      );
+    }
+  }
+
   try {
     await store.appendLedgerNode({
       ...parsed.data,
       materiality,
-      // MATERIAL이면 의사 확인서 재서명이 뒤따른다 (FR-552) — 그 흐름은 M3 범위 밖이다
-      draftId: null,
+      draftId,
     });
   } catch {
     // 원인 문자열에는 subject_id·사유 원문이 섞일 수 있다 — 사용자에게 넘기지 않는다

@@ -20,3 +20,4 @@
 2026-07-31 | AI(Claude) | M-FAMILY-ACK 구현 — 가족 응답을 별도 API가 아닌 서명 웹훅으로 받게 설계(인지 주장에 서명 근거가 붙도록). solar-responder에 연결 타임아웃 부재를 발견해 추가
 2026-07-31 | AI(Claude) | M-EMBEDDINGS 구현 — 임베딩 차원을 문서 대신 실제 호출로 확인(4096), 그 결과 pgvector ANN 인덱스 상한(2000) 밖임을 발견해 순차 스캔으로 설계
 2026-07-31 | AI(Claude) | M1 잔여 3종(OBLIGATIONS·TIMETRAVEL·ADMIN-OPS) 구현. SIGN-LIFECYCLE은 계약(RemindReq) 부재로 제외 — 서식 잔여 건수(10)를 감안해 계약 신설도 보류
+2026-07-31 | AI(Claude) | WORKER_ROLE 훅 실검증(11케이스) — 라우트 그룹 도입 후 역할 패턴이 안 맞아 be1·be2가 자기 경로에서 차단되던 것을 발견해 수정. 정상 통과 케이스를 함께 재지 않았으면 못 잡았다
