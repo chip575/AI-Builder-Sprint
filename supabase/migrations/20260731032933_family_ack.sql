@@ -17,8 +17,11 @@ create table public.family_acks (
   -- 통지 대상. 연락처 원문은 두지 않는다 — 발송은 서명 서비스가 하고
   -- 우리는 "누구에게 알렸는가"만 안다 (NFR-714 1조)
   recipient_id    uuid not null,
-  recipient_name  text not null,
-  relation        text not null,
+  -- 계약(FamilyAckReq)은 recipientId만 준다. 이름·관계를 서버가 지어낼 수는 없으므로
+  -- NULL을 허용한다 — 모르는 것을 아는 척하는 컬럼을 만들지 않는다.
+  -- (수신자 명부가 생기면 그때 채운다. 계약 변경은 4인 합의 사항이다)
+  recipient_name  text,
+  relation        text,
   status          text not null default 'PENDING'
     check (status in ('PENDING', 'ACKNOWLEDGED', 'DECLINED')),
   notified_at     timestamptz not null default now(),

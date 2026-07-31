@@ -43,6 +43,10 @@ export interface SolarResponderOptions {
   model?: string;
 }
 
+/** 첫 응답(헤더)까지 기다리는 한계. 스트림이 시작된 뒤에는 적용하지 않는다 —
+ *  긴 답변을 중간에 끊으면 사용자가 문장을 잃는다. */
+const CONNECT_TIMEOUT_MS = 20_000;
+
 export class SolarResponder implements ResponderPort {
   private fetchImpl: typeof fetch;
   private base: string;
@@ -59,7 +63,16 @@ export class SolarResponder implements ResponderPort {
       ? BRANCH_GOAL[input.branchType]
       : "무엇을 남기고 싶으신지, 마음에 남는 사람이나 장면부터 편하게 여쭙는다.";
 
-    const res = await this.fetchImpl(`${this.base}/chat/completions`, {
+    // 타임아웃이 없으면 상류가 응답을 시작하지 않을 때 **에러 없이 매달린다** —
+    // 사용자에게는 "커서만 깜빡이는 화면"으로 보이고 로그에는 아무것도 남지 않는다.
+    // 스트림이 시작된 뒤에는 해제한다. 긴 답변을 중간에 끊으면 안 되기 때문이다.
+    const ctl = new AbortController();
+    const connectTimer = setTimeout(() => ctl.abort(), CONNECT_TIMEOUT_MS);
+
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.base}/chat/completions`, {
+      signal: ctl.signal,
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.opts.apiKey}`,
@@ -74,7 +87,10 @@ export class SolarResponder implements ResponderPort {
           ...input.utterances.map((u) => ({ role: "user" as const, content: u.text })),
         ],
       }),
-    });
+      });
+    } finally {
+      clearTimeout(connectTimer);
+    }
 
     if (!res.ok || !res.body) {
       // 조용히 mock으로 떨어지지 않는다 (보안 7조) — 라우트가 사용자 문구로 번역한다

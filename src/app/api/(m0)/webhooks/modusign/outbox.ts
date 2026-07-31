@@ -42,6 +42,19 @@ async function processOne(
     if (metaDraftId) draft = await store.getDraft(metaDraftId);
   }
   if (!draft) {
+    // draft가 아니면 가족 인지 서명일 수 있다 (FR-554).
+    // 가족의 응답을 별도 API로 받지 않는 이유가 여기 있다 — "인지했다"는 기록에
+    // 서명이라는 근거가 항상 붙는다. 상태 매핑은 본인 서명과 같은 어휘를 쓴다.
+    const ackStatus = EVENT_TO_STATUS[event];
+    if (ackStatus === "COMPLETED" || ackStatus === "REJECTED") {
+      const ack = await store.resolveFamilyAck(
+        documentId,
+        ackStatus === "COMPLETED" ? "ACKNOWLEDGED" : "DECLINED",
+        doc?.rejectReason ?? null,
+      );
+      // 거부여도 본인 확인서는 건드리지 않는다. 거부 사실만 남는다 (FR-554)
+      if (ack) return;
+    }
     // 모르는 문서 — 200은 이미 나갔고, 여기선 로그만. 재시도를 유발하지 않는다
     console.warn(`[webhook] 대응 draft 없음 — documentId=${documentId}, event=${event}`);
     return;

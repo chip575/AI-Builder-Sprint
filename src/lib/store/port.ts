@@ -130,6 +130,8 @@ export interface StorePort {
   appendLedgerNode(input: LedgerAppendInput): Promise<LedgerNode>;
   /** seq 오름차순. status는 저장값이 아니라 유도값으로 내보낸다 (FR-555 최신성) */
   listLedgerNodes(subjectId: string): Promise<LedgerNode[]>;
+  /** 노드 1건 — 가족 인지 요청이 대상 노드를 확인할 때 쓴다 */
+  getLedgerNode(nodeId: string): Promise<LedgerNode | undefined>;
 
   // ── 가족 인지 (FR-554) ────────────────────────────────────
   /** 통지 대상에게 인지 요청을 남긴다. **빈 배열이면 아무것도 만들지 않는다** —

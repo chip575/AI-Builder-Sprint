@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { use } from "react";
 import { ErrorNote, Notice, Shell } from "@/app/(ui)/_components/Shell";
-import type { LedgerNode, LedgerRes } from "@/lib/contracts";
+import type { FamilyAckRes, LedgerNode, LedgerRes } from "@/lib/contracts";
 
 const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
   ACTIVE: { label: "지금의 뜻", cls: "border-stone-800 bg-stone-800 text-white" },
@@ -31,6 +31,8 @@ export default function LedgerPage({
   const { subjectId } = use(params);
   const [data, setData] = useState<LedgerRes | null>(null);
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
+  /** 노드별 가족 인지 현황 (FR-554). 없으면 표시하지 않는다 — 알리지 않은 것도 정상이다 */
+  const [acks, setAcks] = useState<Record<string, FamilyAckRes>>({});
 
   useEffect(() => {
     let alive = true;
@@ -38,8 +40,22 @@ export default function LedgerPage({
       .then(async (res) => {
         const body = await res.json();
         if (!alive) return;
-        if (body.ok) setData(body.data as LedgerRes);
-        else setError(body.error);
+        if (!body.ok) {
+          setError(body.error);
+          return;
+        }
+        const ledger = body.data as LedgerRes;
+        setData(ledger);
+        // 인지 현황은 노드마다 따로 묻는다. 실패해도 이력 화면은 그대로 뜬다 —
+        // 부가 정보가 본 화면을 죽이지 않는다
+        for (const n of ledger.nodes) {
+          fetch(`/api/family-ack?ledgerNodeId=${n.id}`)
+            .then((r) => r.json())
+            .then((b) => {
+              if (alive && b.ok) setAcks((prev) => ({ ...prev, [n.id]: b.data }));
+            })
+            .catch(() => {});
+        }
       })
       .catch(() =>
         setError({
@@ -101,6 +117,26 @@ export default function LedgerPage({
 
                 {node.conditionNote && (
                   <p className="mt-2 text-sm text-stone-500">{node.conditionNote}</p>
+                )}
+                {/* 인지 현황 — "동의를 받았다"가 아니라 "알렸고 확인했다"는 기록이다 */}
+                {acks[node.id] && acks[node.id]!.requested > 0 && (
+                  <p className="mt-2 text-sm text-stone-500">
+                    가족 인지{" "}
+                    {(() => {
+                      const a = acks[node.id]!.acks;
+                      const done = a.filter((x) => x.status === "ACKNOWLEDGED").length;
+                      const declined = a.filter((x) => x.status === "DECLINED").length;
+                      const pending = a.length - done - declined;
+                      return [
+                        done > 0 ? `확인 ${done}` : null,
+                        pending > 0 ? `대기 ${pending}` : null,
+                        // 거부는 숨기지 않는다. 다만 본인의 뜻은 그대로다
+                        declined > 0 ? `거부 ${declined}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ");
+                    })()}
+                  </p>
                 )}
                 {node.witness && node.witness.length > 0 && (
                   <p className="mt-2 text-sm text-stone-500">

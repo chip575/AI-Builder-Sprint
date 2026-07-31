@@ -454,6 +454,15 @@ export class InMemoryStore implements StorePort {
     return withDerivedStatus(this.ledger.get(subjectId) ?? []);
   }
 
+  async getLedgerNode(nodeId: string): Promise<LedgerNode | undefined> {
+    for (const chain of this.ledger.values()) {
+      const found = chain.find((n) => n.id === nodeId);
+      // 상태는 저장값이 아니라 유도값이다 — 목록과 같은 규칙으로 내보낸다 (FR-555)
+      if (found) return withDerivedStatus(chain).find((n) => n.id === nodeId);
+    }
+    return undefined;
+  }
+
   private familyAcks: FamilyAckRecord[] = [];
 
   async requestFamilyAcks(
@@ -466,8 +475,8 @@ export class InMemoryStore implements StorePort {
       id: randomUUID(),
       ledgerNodeId,
       recipientId: t.recipientId,
-      recipientName: t.recipientName,
-      relation: t.relation,
+      recipientName: t.recipientName ?? null,
+      relation: t.relation ?? null,
       status: "PENDING" as const,
       documentId: t.documentId,
       notifiedAt: now,

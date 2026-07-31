@@ -163,8 +163,8 @@ export interface FamilyAckRecord {
   id: string;
   ledgerNodeId: string;
   recipientId: string;
-  recipientName: string;
-  relation: string;
+  recipientName: string | null;
+  relation: string | null;
   status: "PENDING" | "ACKNOWLEDGED" | "DECLINED";
   documentId: string | null;
   notifiedAt: string;
@@ -175,7 +175,7 @@ export interface FamilyAckRecord {
 /** 통지 대상 지정 — 본인이 고른다. 빈 배열이면 아무에게도 알리지 않는다 (P4) */
 export interface FamilyAckTarget {
   recipientId: string;
-  recipientName: string;
-  relation: string;
+  recipientName?: string | null;
+  relation?: string | null;
 }
 

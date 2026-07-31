@@ -706,6 +706,20 @@ export class SupabaseStore implements StorePort {
     return withDerivedStatus((data ?? []).map(toLedgerNode));
   }
 
+  async getLedgerNode(nodeId: string): Promise<LedgerNode | undefined> {
+    const { data, error } = await this.db
+      .from("intent_ledger_nodes")
+      .select("subject_id")
+      .eq("id", nodeId)
+      .limit(1);
+    if (error) this.fail("ledger.getNode", error);
+    const subjectId = (data ?? [])[0]?.subject_id;
+    if (!subjectId) return undefined;
+    // 같은 체인을 통째로 읽어 유도 상태를 붙인다 — 한 건만 읽으면 ACTIVE 판정이 불가능하다
+    const chain = await this.listLedgerNodes(subjectId);
+    return chain.find((n) => n.id === nodeId);
+  }
+
   async requestFamilyAcks(
     ledgerNodeId: string,
     targets: (FamilyAckTarget & { documentId: string | null })[],
@@ -715,8 +729,8 @@ export class SupabaseStore implements StorePort {
       id: randomUUID(),
       ledger_node_id: ledgerNodeId,
       recipient_id: t.recipientId,
-      recipient_name: t.recipientName,
-      relation: t.relation,
+      recipient_name: t.recipientName ?? null,
+      relation: t.relation ?? null,
       status: "PENDING",
       document_id: t.documentId,
     }));
