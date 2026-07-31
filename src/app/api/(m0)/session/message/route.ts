@@ -2,11 +2,8 @@
 // 응답: SSE. token 이벤트로 본문을 흘리고, 마지막 meta 이벤트 하나로
 // SessionMessageRes를 보낸다. 프론트 라우팅 판단은 meta에서만 한다.
 import { SessionMessageReq, SessionMessageRes } from "@/lib/contracts";
-import {
-  addProposal,
-  addUtterance,
-  getOrCreateSession,
-} from "@/lib/ai/session/store";
+import { addUtterance, getOrCreateSession } from "@/lib/ai/session/store";
+import { createProposal, proposeBranches } from "@/lib/ai/branch/propose";
 import { responder } from "@/lib/ai/session/responder";
 import { computeCoverage } from "@/lib/rules/question-bank";
 import { detectExpress } from "@/lib/rules/express-detect";
@@ -50,8 +47,30 @@ export async function POST(req: Request) {
   const branchType = detection.kind === "EXPRESS" ? detection.branchType : null;
 
   const proposal = branchType
-    ? await addProposal(session.id, branchType, "EXPRESS", utterance.id)
+    ? await createProposal({
+        sessionId: session.id,
+        userId: session.userId,
+        branchType,
+        origin: "EXPRESS",
+        sourceUtteranceId: utterance.id,
+      })
     : null;
+
+  // 대화 중 감지 (FR-115A) — Express로 이미 갈라졌으면 감지하지 않는다.
+  // 응답 스트림보다 **먼저 띄우고 나중에 거둔다**: 감지를 기다렸다가 응답을 시작하면
+  // NFR-702의 기준(첫 토큰 2초)이 모델 두 번 호출 시간이 된다.
+  const livingUtterances = [...session.utterances, utterance];
+  const detecting = proposal
+    ? Promise.resolve([])
+    : proposeBranches({
+        sessionId: session.id,
+        userId: session.userId,
+        utterances: livingUtterances,
+      }).catch((err) => {
+        // 감지 실패가 대화를 죽이지 않는다. 제안 0건은 결함이 아니다
+        console.warn("[branch] 감지 실패:", (err as Error).message);
+        return [];
+      });
 
   const meta = SessionMessageRes.parse({
     sessionId: session.id,
@@ -90,6 +109,11 @@ export async function POST(req: Request) {
           track("CONVERSE", false, Date.now() - t0);
           controller.enqueue(sse("token", "잠시 문제가 있었어요. 다시 말씀해 주시겠어요?"));
         }
+      }
+      // 감지된 제안 — 확인형 문구 그대로 화면에 오른다. 여는 것은 사용자다 (FR-115A).
+      // 응답 뒤에 놓는 이유: 제안이 답보다 먼저 뜨면 그건 대화가 아니라 영업이다
+      for (const proposed of await detecting) {
+        controller.enqueue(sse("proposal", proposed));
       }
       controller.enqueue(sse("meta", meta)); // 항상 마지막 이벤트
       controller.close();
