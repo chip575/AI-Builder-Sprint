@@ -1,0 +1,20 @@
+{
+  "id": "06-period-missing",
+  "title": "정기후원인데 기간 없음",
+  "checker": "llm",
+  "branchType": "DONATION_NOW",
+  "utterances": [
+    "매달 5만원씩 정기후원하고 싶어요",
+    "부산 지역아동센터로요"
+  ],
+  "required": [
+    "amount",
+    "orgName",
+    "period"
+  ],
+  "expected": {
+    "defects": [
+      "PERIOD_MISSING"
+    ]
+  }
+}

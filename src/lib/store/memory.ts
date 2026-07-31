@@ -13,6 +13,8 @@ import {
   type BranchProposalRecord,
   type DraftRecord,
   type EvidenceRecord,
+  type FamilyAckRecord,
+  type FamilyAckTarget,
   type HeartWillApplyResult,
   type HeartWillParagraph,
   type HeartWillParagraphDraft,
@@ -450,6 +452,49 @@ export class InMemoryStore implements StorePort {
 
   async listLedgerNodes(subjectId: string): Promise<LedgerNode[]> {
     return withDerivedStatus(this.ledger.get(subjectId) ?? []);
+  }
+
+  private familyAcks: FamilyAckRecord[] = [];
+
+  async requestFamilyAcks(
+    ledgerNodeId: string,
+    targets: (FamilyAckTarget & { documentId: string | null })[],
+  ): Promise<FamilyAckRecord[]> {
+    // 빈 배열이면 행을 만들지 않는다. "요청 0건"이 정상 상태다 (P4)
+    const now = new Date().toISOString();
+    const created = targets.map((t) => ({
+      id: randomUUID(),
+      ledgerNodeId,
+      recipientId: t.recipientId,
+      recipientName: t.recipientName,
+      relation: t.relation,
+      status: "PENDING" as const,
+      documentId: t.documentId,
+      notifiedAt: now,
+      signedAt: null,
+      declinedReason: null,
+    }));
+    this.familyAcks.push(...created);
+    return created.map((a) => ({ ...a }));
+  }
+
+  async listFamilyAcks(ledgerNodeId: string): Promise<FamilyAckRecord[]> {
+    return this.familyAcks
+      .filter((a) => a.ledgerNodeId === ledgerNodeId)
+      .map((a) => ({ ...a }));
+  }
+
+  async resolveFamilyAck(
+    documentId: string,
+    status: "ACKNOWLEDGED" | "DECLINED",
+    declinedReason?: string | null,
+  ): Promise<FamilyAckRecord | undefined> {
+    const ack = this.familyAcks.find((a) => a.documentId === documentId);
+    if (!ack) return undefined;
+    ack.status = status;
+    ack.signedAt = new Date().toISOString();
+    ack.declinedReason = status === "DECLINED" ? (declinedReason ?? null) : null;
+    return { ...ack };
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

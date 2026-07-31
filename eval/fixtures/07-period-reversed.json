@@ -1,0 +1,21 @@
+{
+  "id": "07-period-reversed",
+  "title": "기간 역전",
+  "checker": "llm",
+  "branchType": "DONATION_NOW",
+  "utterances": [
+    "매달 5만원 정기후원할게요",
+    "2026년 12월부터 2026년 3월까지요",
+    "부산 지역아동센터로요"
+  ],
+  "required": [
+    "amount",
+    "orgName",
+    "period"
+  ],
+  "expected": {
+    "defects": [
+      "PERIOD_REVERSED"
+    ]
+  }
+}

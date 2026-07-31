@@ -1,0 +1,20 @@
+{
+  "id": "12-clean-recurring",
+  "title": "정상 2 — 거짓 양성 확인",
+  "checker": "llm",
+  "branchType": "DONATION_NOW",
+  "utterances": [
+    "매달 3만원씩 정기후원할게요",
+    "2026년 1월부터 2026년 12월까지요",
+    "부산 지역아동센터로 보내주세요",
+    "서울 거주입니다"
+  ],
+  "required": [
+    "amount",
+    "orgName",
+    "period"
+  ],
+  "expected": {
+    "defects": []
+  }
+}

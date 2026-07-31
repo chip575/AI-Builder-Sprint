@@ -1,0 +1,15 @@
+{
+  "id": "08-region-self",
+  "title": "거주지 = 기부처 (법률 제약)",
+  "checker": "rules",
+  "rules": {
+    "fn": "regionSelf",
+    "residence": "부산광역시",
+    "target": "부산광역시"
+  },
+  "expected": {
+    "defects": [
+      "REGION_SELF"
+    ]
+  }
+}

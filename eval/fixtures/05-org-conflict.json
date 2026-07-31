@@ -1,0 +1,20 @@
+{
+  "id": "05-org-conflict",
+  "title": "기부처 모순 — 정정 의사 없음",
+  "checker": "llm",
+  "branchType": "DONATION_NOW",
+  "utterances": [
+    "부산 지역아동센터에 백만원 기부할게요",
+    "대구 복지관에 보내주세요",
+    "서류 준비해 주세요"
+  ],
+  "required": [
+    "amount",
+    "orgName"
+  ],
+  "expected": {
+    "defects": [
+      "ORG_CONFLICT"
+    ]
+  }
+}

@@ -1,0 +1,156 @@
+{
+  "runAt": "2026-07-31T04:01:59.742Z",
+  "model": "solar-pro3",
+  "mode": "real",
+  "total": 12,
+  "scored": 12,
+  "passed": 12,
+  "rate": 1,
+  "falsePositives": 0,
+  "cases": [
+    {
+      "id": "01-amount-missing",
+      "title": "금액 미언급",
+      "checker": "llm",
+      "expected": [
+        "AMOUNT_MISSING"
+      ],
+      "detected": [
+        "AMOUNT_MISSING"
+      ],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "02-amount-conflict",
+      "title": "금액 모순 — 정정 의사 없음",
+      "checker": "llm",
+      "expected": [
+        "AMOUNT_CONFLICT"
+      ],
+      "detected": [
+        "AMOUNT_CONFLICT"
+      ],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "03-amount-corrected",
+      "title": "금액 정정 — 결함 아님",
+      "checker": "llm",
+      "expected": [],
+      "detected": [],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "04-org-missing",
+      "title": "기부처 미언급",
+      "checker": "llm",
+      "expected": [
+        "ORG_MISSING"
+      ],
+      "detected": [
+        "ORG_MISSING"
+      ],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "05-org-conflict",
+      "title": "기부처 모순 — 정정 의사 없음",
+      "checker": "llm",
+      "expected": [
+        "ORG_CONFLICT"
+      ],
+      "detected": [
+        "ORG_CONFLICT"
+      ],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "06-period-missing",
+      "title": "정기후원인데 기간 없음",
+      "checker": "llm",
+      "expected": [
+        "PERIOD_MISSING"
+      ],
+      "detected": [
+        "PERIOD_MISSING"
+      ],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "07-period-reversed",
+      "title": "기간 역전",
+      "checker": "llm",
+      "expected": [
+        "PERIOD_REVERSED"
+      ],
+      "detected": [
+        "PERIOD_REVERSED"
+      ],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "08-region-self",
+      "title": "거주지 = 기부처 (법률 제약)",
+      "checker": "rules",
+      "expected": [
+        "REGION_SELF"
+      ],
+      "detected": [
+        "REGION_SELF"
+      ],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "09-reward-limit",
+      "title": "답례품 한도 초과 (법률 제약)",
+      "checker": "rules",
+      "expected": [
+        "REWARD_LIMIT_EXCEEDED"
+      ],
+      "detected": [
+        "REWARD_LIMIT_EXCEEDED"
+      ],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "10-beneficiary-conflict",
+      "title": "수증자 모순 — 배타적 지정",
+      "checker": "llm",
+      "expected": [
+        "BENEFICIARY_CONFLICT"
+      ],
+      "detected": [
+        "BENEFICIARY_CONFLICT"
+      ],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "11-clean-donation",
+      "title": "정상 — 결함 없음",
+      "checker": "llm",
+      "expected": [],
+      "detected": [],
+      "falsePositive": false,
+      "status": "pass"
+    },
+    {
+      "id": "12-clean-recurring",
+      "title": "정상 2 — 거짓 양성 확인",
+      "checker": "llm",
+      "expected": [],
+      "detected": [],
+      "falsePositive": false,
+      "status": "pass"
+    }
+  ]
+}

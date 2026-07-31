@@ -1,0 +1,19 @@
+{
+  "id": "11-clean-donation",
+  "title": "정상 — 결함 없음",
+  "checker": "llm",
+  "branchType": "DONATION_NOW",
+  "utterances": [
+    "부산 지역아동센터에 백만원을 기부하고 싶습니다",
+    "한 번에 보내겠습니다",
+    "서울에 살고 있어요"
+  ],
+  "required": [
+    "region",
+    "amount",
+    "orgName"
+  ],
+  "expected": {
+    "defects": []
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "01-amount-missing",
+  "title": "금액 미언급",
+  "checker": "llm",
+  "branchType": "DONATION_NOW",
+  "utterances": [
+    "부산에 기부하고 싶어요",
+    "자란 동네에 도움이 되면 좋겠습니다"
+  ],
+  "required": [
+    "region",
+    "amount"
+  ],
+  "expected": {
+    "defects": [
+      "AMOUNT_MISSING"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "04-org-missing",
+  "title": "기부처 미언급",
+  "checker": "llm",
+  "branchType": "DONATION_NOW",
+  "utterances": [
+    "백만원을 기부하고 싶습니다",
+    "부산에 살았어요"
+  ],
+  "required": [
+    "amount",
+    "orgName"
+  ],
+  "expected": {
+    "defects": [
+      "ORG_MISSING"
+    ]
+  }
+}

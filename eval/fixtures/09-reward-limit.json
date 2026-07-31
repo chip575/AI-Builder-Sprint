@@ -1,0 +1,15 @@
+{
+  "id": "09-reward-limit",
+  "title": "답례품 한도 초과 (법률 제약)",
+  "checker": "rules",
+  "rules": {
+    "fn": "rewardLimit",
+    "donationAmount": 100000,
+    "selectedTotal": 50000
+  },
+  "expected": {
+    "defects": [
+      "REWARD_LIMIT_EXCEEDED"
+    ]
+  }
+}

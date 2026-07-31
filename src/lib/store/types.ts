@@ -155,3 +155,27 @@ export interface StageStat {
   p50Ms: number | null;
   p95Ms: number | null;
 }
+
+/** 가족 인지 요청 1건 (FR-554).
+ *  `ack`(인지)이지 `consent`(동의)가 아니다 — 거부해도 본인 확인서는 그대로다.
+ *  documentId는 서명 서비스가 준 문서 id — 웹훅이 이걸로 역참조해 상태를 채운다 */
+export interface FamilyAckRecord {
+  id: string;
+  ledgerNodeId: string;
+  recipientId: string;
+  recipientName: string;
+  relation: string;
+  status: "PENDING" | "ACKNOWLEDGED" | "DECLINED";
+  documentId: string | null;
+  notifiedAt: string;
+  signedAt: string | null;
+  declinedReason: string | null;
+}
+
+/** 통지 대상 지정 — 본인이 고른다. 빈 배열이면 아무에게도 알리지 않는다 (P4) */
+export interface FamilyAckTarget {
+  recipientId: string;
+  recipientName: string;
+  relation: string;
+}
+

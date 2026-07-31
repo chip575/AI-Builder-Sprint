@@ -1,0 +1,21 @@
+{
+  "id": "02-amount-conflict",
+  "title": "금액 모순 — 정정 의사 없음",
+  "checker": "llm",
+  "branchType": "DONATION_NOW",
+  "utterances": [
+    "부산에 십만원 기부할게요",
+    "백만원이면 도움이 될까요",
+    "부산 지역아동센터로 보내주세요"
+  ],
+  "required": [
+    "region",
+    "amount",
+    "orgName"
+  ],
+  "expected": {
+    "defects": [
+      "AMOUNT_CONFLICT"
+    ]
+  }
+}

@@ -6,6 +6,8 @@ import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
 import type {
   BranchProposalRecord,
+  FamilyAckRecord,
+  FamilyAckTarget,
   GateStats,
   GateVerdictRecord,
   LedgerAppendInput,
@@ -128,6 +130,22 @@ export interface StorePort {
   appendLedgerNode(input: LedgerAppendInput): Promise<LedgerNode>;
   /** seq 오름차순. status는 저장값이 아니라 유도값으로 내보낸다 (FR-555 최신성) */
   listLedgerNodes(subjectId: string): Promise<LedgerNode[]>;
+
+  // ── 가족 인지 (FR-554) ────────────────────────────────────
+  /** 통지 대상에게 인지 요청을 남긴다. **빈 배열이면 아무것도 만들지 않는다** —
+   *  알리지 않을 자유가 본인에게 있고, 요청 0건은 결함이 아니다 (P4) */
+  requestFamilyAcks(
+    ledgerNodeId: string,
+    targets: (FamilyAckTarget & { documentId: string | null })[],
+  ): Promise<FamilyAckRecord[]>;
+  listFamilyAcks(ledgerNodeId: string): Promise<FamilyAckRecord[]>;
+  /** 웹훅이 문서 id로 역참조해 응답을 채운다 — 응답 경로가 서명 하나뿐이라
+   *  "가족이 눌렀다"는 주장에 서명이라는 근거가 항상 붙는다 */
+  resolveFamilyAck(
+    documentId: string,
+    status: "ACKNOWLEDGED" | "DECLINED",
+    declinedReason?: string | null,
+  ): Promise<FamilyAckRecord | undefined>;
 
   // ── evidences ─────────────────────────────────────────────
   createEvidence(

@@ -16,3 +16,4 @@
 2026-07-31 | AI(Claude) | M-LEDGER 최소 구현(해시 체인·실질성 판정·최신성 유도·StorePort 2구현·POST /api/ledger). 순수 로직 3케이스만 테스트. 사람 확인 필요: 마이그레이션 미적용, 라우트 경로가 manifest(POST /api/ledger/node)와 다름, MATERIAL 재서명·가족 인지는 미구현.
 2026-07-31 | AI(Claude) | 유족 타임라인(GET /api/ledger/[subjectId] + 화면) 구현 — 밤 배치가 브랜치 전환으로 건너뛴 03. StorePort.recordAudit 추가(열람 기록)
 >>>>>>> m3
+2026-07-31 | AI(Claude) | M-EVAL 픽스처 12케이스·실행기 구현, 실측 12/12. 첫 측정 41.7%는 모델이 아니라 하네스 결함(필수 슬롯 미전달·타임아웃 없음)이었다 — 그 사실 자체를 결과에 남김

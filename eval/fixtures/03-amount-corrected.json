@@ -1,0 +1,19 @@
+{
+  "id": "03-amount-corrected",
+  "title": "금액 정정 — 결함 아님",
+  "checker": "llm",
+  "branchType": "DONATION_NOW",
+  "utterances": [
+    "부산에 십만원 기부할게요",
+    "아니, 30만원으로 하겠습니다",
+    "부산 지역아동센터로요"
+  ],
+  "required": [
+    "region",
+    "amount",
+    "orgName"
+  ],
+  "expected": {
+    "defects": []
+  }
+}

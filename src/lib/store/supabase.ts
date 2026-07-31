@@ -15,6 +15,8 @@ import {
   type BranchProposalRecord,
   type DraftRecord,
   type EvidenceRecord,
+  type FamilyAckRecord,
+  type FamilyAckTarget,
   type HeartWillApplyResult,
   type HeartWillOrigin,
   type HeartWillParagraph,
@@ -41,6 +43,19 @@ type Row = Record<string, any>;
 function iso(v: string | null | undefined): any {
   return v == null ? v : new Date(v).toISOString();
 }
+
+const toFamilyAck = (r: Row): FamilyAckRecord => ({
+  id: r.id,
+  ledgerNodeId: r.ledger_node_id,
+  recipientId: r.recipient_id,
+  recipientName: r.recipient_name,
+  relation: r.relation,
+  status: r.status,
+  documentId: r.document_id ?? null,
+  notifiedAt: iso(r.notified_at),
+  signedAt: iso(r.signed_at) ?? null,
+  declinedReason: r.declined_reason ?? null,
+});
 
 const toFact = (r: Row): IntentFact => ({
   id: r.id,
@@ -689,6 +704,54 @@ export class SupabaseStore implements StorePort {
       .order("seq");
     if (error) this.fail("ledger.select", error);
     return withDerivedStatus((data ?? []).map(toLedgerNode));
+  }
+
+  async requestFamilyAcks(
+    ledgerNodeId: string,
+    targets: (FamilyAckTarget & { documentId: string | null })[],
+  ): Promise<FamilyAckRecord[]> {
+    if (targets.length === 0) return []; // 알리지 않을 자유 (P4)
+    const rows = targets.map((t) => ({
+      id: randomUUID(),
+      ledger_node_id: ledgerNodeId,
+      recipient_id: t.recipientId,
+      recipient_name: t.recipientName,
+      relation: t.relation,
+      status: "PENDING",
+      document_id: t.documentId,
+    }));
+    const { data, error } = await this.db.from("family_acks").insert(rows).select();
+    if (error) this.fail("familyAcks.insert", error);
+    return (data ?? []).map(toFamilyAck);
+  }
+
+  async listFamilyAcks(ledgerNodeId: string): Promise<FamilyAckRecord[]> {
+    const { data, error } = await this.db
+      .from("family_acks")
+      .select("*")
+      .eq("ledger_node_id", ledgerNodeId)
+      .order("notified_at", { ascending: true });
+    if (error) this.fail("familyAcks.list", error);
+    return (data ?? []).map(toFamilyAck);
+  }
+
+  async resolveFamilyAck(
+    documentId: string,
+    status: "ACKNOWLEDGED" | "DECLINED",
+    declinedReason?: string | null,
+  ): Promise<FamilyAckRecord | undefined> {
+    const { data, error } = await this.db
+      .from("family_acks")
+      .update({
+        status,
+        signed_at: new Date().toISOString(),
+        declined_reason: status === "DECLINED" ? (declinedReason ?? null) : null,
+      })
+      .eq("document_id", documentId)
+      .select();
+    if (error) this.fail("familyAcks.resolve", error);
+    const row = (data ?? [])[0];
+    return row ? toFamilyAck(row) : undefined;
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

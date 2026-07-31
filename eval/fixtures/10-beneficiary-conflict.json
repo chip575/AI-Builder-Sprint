@@ -1,0 +1,19 @@
+{
+  "id": "10-beneficiary-conflict",
+  "title": "수증자 모순 — 배타적 지정",
+  "checker": "llm",
+  "branchType": "LEGACY_GIFT",
+  "utterances": [
+    "전액을 모교 장학회에 남기겠습니다",
+    "전부 지역아동센터에 주세요",
+    "다른 곳에는 주지 마세요"
+  ],
+  "required": [
+    "beneficiary"
+  ],
+  "expected": {
+    "defects": [
+      "BENEFICIARY_CONFLICT"
+    ]
+  }
+}

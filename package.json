@@ -9,7 +9,8 @@
     "gate:check": "bash .claude/scripts/gate-check.sh",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "e2e": "node scripts/e2e-mock.mjs"
+    "e2e": "node scripts/e2e-mock.mjs",
+    "eval": "node eval/run.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.9",
