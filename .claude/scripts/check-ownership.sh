@@ -42,13 +42,21 @@ case "$FILE" in
   *spec/manifest.yaml) deny "manifest는 SubagentStop 훅이 갱신합니다" ;;
 esac
 
+# ai-log는 모든 역할이 쓴다 — CLAUDE.md가 작업 종료 시 append를 요구한다.
+# 역할 검사가 이걸 막으면 두 규칙이 충돌하고, 워커는 지시를 지킬 방법이 없어진다.
+# ⚠ 이건 PM 경로의 구멍이 아니다. **ai-log는 워커의 산출물이므로 PM 소유가 아니다** —
+#   decisions.md(PM의 결정 기록)와 성격이 다르고, 그래서 그쪽은 계속 막는다.
+case "$FILE" in
+  */docs/ai-log.md) exit 0 ;;
+esac
+
 # 역할별 소유 경로
 # ⚠ 라우트 그룹 `(m0)`·`(m1)`이 api/와 세그먼트 사이에 낀다 — `api/(m0)/session/`.
 #   그래서 그룹 세그먼트를 선택적으로 허용해야 한다. 이게 없으면 워커가 **자기 경로에서**
 #   차단된다 (2026-07-31 탐침에서 발견 — be1·be2 둘 다 첫 파일에서 죽었을 상태).
 G='(\([^/)]*\)/)?'   # 있어도 되고 없어도 되는 라우트 그룹
 case "$ROLE" in
-  be1) echo "$FILE" | grep -qE "lib/ai/|app/api/${G}(session|extract|gate|recall|obligations)/" || deny "BE-1 소유 경로 밖: $FILE" ;;
+  be1) echo "$FILE" | grep -qE "lib/ai/|app/api/${G}(session|extract|gate|recall|obligations|branch)/" || deny "BE-1 소유 경로 밖: $FILE" ;;
   be2) echo "$FILE" | grep -qE "lib/signer/|lib/ledger/|app/api/${G}(documents|sign|webhooks|cron|evidence|ledger|dev|family-ack)/|supabase/" || deny "BE-2 소유 경로 밖: $FILE" ;;
   fe)  echo "$FILE" | grep -qE "app/\(ui\)/|components/|app/api/${G}(facts|rewards|admin|heartwill|will)/" || deny "FE 소유 경로 밖: $FILE" ;;
   unknown) : ;;   # WORKER_ROLE 미설정 시 역할 검사 생략 (전원 금지 규칙은 이미 적용됨)

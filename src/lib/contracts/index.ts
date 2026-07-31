@@ -13,6 +13,7 @@ export * from "./rewards";
 export * from "./documents";
 export * from "./sign";
 export * from "./webhook";
+export * from "./estate";
 export * from "./evidence";
 export * from "./obligations";
 export * from "./reconcile";

@@ -24,3 +24,21 @@ export const SignStatusRes = z.object({
   rejectReason: z.string().nullish(),
 });
 export type SignStatusRes = z.infer<typeof SignStatusRes>;
+
+/** POST /api/sign/[draftId]/remind — 미서명 리마인드 (FR-507)
+ *  누구에게 보낼지는 입력에 없다. 미서명자는 서버가 이미 안다 (parties[].signedAt).
+ *  수신자를 입력으로 받으면 이미 서명한 사람에게 재발송하는 경로가 열린다.
+ *  ⚠ draftId는 경로에도 있다. **경로가 정본**이고 바디가 다르면 400으로 거절한다 —
+ *    두 출처가 조용히 갈리면 남의 문서에 리마인드를 보내는 경로가 된다 (구현 시 테스트로 고정).
+ *  임계 시간은 코드가 갖는다. 계약에 숫자를 싣지 않는다 (P3). */
+export const RemindReq = z.object({
+  draftId: z.string().uuid(),
+});
+export type RemindReq = z.infer<typeof RemindReq>;
+
+export const RemindRes = z.object({
+  sentAt: z.string().datetime(),
+  /** 이 문서 기준 누적 발송 횟수 — FR-507 "발송 이력이 기록된다"의 관측 가능한 형태 */
+  remindCount: z.number().int().positive(),
+});
+export type RemindRes = z.infer<typeof RemindRes>;

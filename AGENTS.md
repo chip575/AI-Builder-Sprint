@@ -32,6 +32,10 @@ Upstage Solar / Document Parse / Information Extract / Embeddings
 
 `src/lib/contracts/**`는 **누구의 것도 아니다.** 변경은 4인 합의 후 PM만.
 
+**새 라우트 세그먼트를 만들면 `.claude/scripts/check-ownership.sh`의 역할 패턴에
+함께 추가한다.** 안 하면 워커가 **자기 경로에서** 차단돼 첫 파일에서 죽는다.
+지금까지 `recall`·`obligations`·`family-ack`·`branch`가 이 이유로 뒤늦게 추가됐다.
+
 ## 보안 절대 규칙 (NFR-714)
 
 1. 개인정보(주민등록번호·계좌번호·연락처·주소 원문)를 로그, 에러 메시지,
@@ -93,4 +97,9 @@ Upstage Solar / Document Parse / Information Extract / Embeddings
 ## 테스트
 
 `pnpm test` · 게이트(FR-104)와 룰테이블(FR-202)은 유닛테스트 필수.
+
+**차단 검사는 쌍으로 잰다** — 막혀야 할 것과 **통과해야 할 것**을 함께 확인한다.
+막히는 것만 보면 "전부 막는 검사"와 "규칙대로 막는 검사"를 구분할 수 없다.
+실제로 훅의 역할 검사가 라우트 그룹 때문에 워커의 **자기 경로까지** 막고 있었는데,
+통과 케이스를 넣고서야 드러났다 (2026-07-31). gate:check·훅에 검사를 더할 때마다 적용한다.
 검산 3케이스: 100만→276,000 / 특별재난 100만→408,000 / 10만→100,000

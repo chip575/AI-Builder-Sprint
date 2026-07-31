@@ -35,6 +35,7 @@ export const DocType = z.enum([
   "INTENT_AFFIRMATION",       // 의사 확인서 (FR-551 — 문서명에 "유언" 금지)
   "HANDWRITTEN_WILL",         // 유언장 — ESIGN_INVALID, 서명 버튼 금지 (민법 §1066)
   "HEART_LETTER",             // 마음의 편지 — NON_BINDING
+  "DIGITAL_LEGACY_INSTRUCTION", // 디지털 유산 처리 지시서 — NON_BINDING (FR-403)
 ]);
 export type DocType = z.infer<typeof DocType>;
 

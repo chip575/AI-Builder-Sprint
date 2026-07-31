@@ -74,6 +74,8 @@ const GATE_TABLE: Record<DocType, GateVerdict> = {
   },
   // Custodian ≠ 유언집행자 — 약정서 본문 고지는 템플릿 소관 (00.2 §7.1)
   CUSTODIAN_AGREEMENT: { verdict: "ESIGN_OK", statutes: [] },
+  // 서명 없이 보관되는 문서다 (FR-403). 서명 버튼이 붙을 자리가 없어야 한다
+  DIGITAL_LEGACY_INSTRUCTION: { verdict: "NON_BINDING", statutes: [] },
   // 의사 확인서 — 사실확인 문서, 유언 전문 미포함 (FR-551)
   INTENT_AFFIRMATION: { verdict: "ESIGN_OK", statutes: [] },
   // 유언장 — 전자서명 무효. 자필 필사 가이드로 라우팅 (FR-302)

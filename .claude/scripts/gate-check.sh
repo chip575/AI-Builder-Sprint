@@ -33,6 +33,10 @@ HIT=$(grep -rn 'confirmed[_a-zA-Z]*:[[:space:]]*true' --include='*.ts' src/ 2>/d
           prev=""; [ "$line" -gt 1 ] && prev=$(sed -n "$((line-1))p" "$file")
           case "$prev$rest" in
             *P1-CONFIRM-PATH*) ;;
+            # zod .omit({ confirmed: true })는 **필드를 제거**한다 — 기본값을 참으로
+            # 두는 것과 정반대다. 같은 줄에 .omit(이 있으면 위반이 아니다.
+            # (좁게 잡는다: .omit이 없는 줄은 그대로 검사한다)
+            *.omit\(*) ;;
             *) echo "$file:$line:$rest" ;;
           esac
         done)
