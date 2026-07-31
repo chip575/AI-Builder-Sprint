@@ -57,6 +57,15 @@ async function fetchTemplate(id) {
 
 /** 응답 어디에 입력란이 실려 오는지는 문서에 없다 — 흔한 자리를 훑어 모은다.
  *  못 찾으면 그 사실을 보고한다. 찾은 척하지 않는다. */
+/** 요청자 입력란(우리가 채우는 칸)만 따로 뽑는다 — 서명자 칸과 성격이 다르다 */
+function requesterLabels(tpl) {
+  return (tpl.requesterInputs ?? []).map((x) => ({
+    label: x.dataLabel ?? x.customId ?? "?",
+    type: x.type,
+    y: x.position?.y ?? 0,
+  }));
+}
+
 function collectLabels(tpl) {
   const found = new Set();
   const walk = (node) => {
@@ -75,6 +84,7 @@ function collectLabels(tpl) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const rows = [];
+const dumps = [];
 let first = true;
 for (const code of Object.keys(TEMPLATE_LABELS)) {
   const id = templateIdFor(code);
@@ -111,6 +121,15 @@ for (const code of Object.keys(TEMPLATE_LABELS)) {
   }));
   const emptyRoles = parts.filter((p) => p.count === 0).map((p) => p.role);
 
+  dumps.push({
+    code,
+    requester: requesterLabels(data),
+    parts: (data.participants ?? []).map((p) => ({
+      role: p.role ?? p.name ?? "?",
+      labels: (p.fields ?? []).map((f) => `${f.type}:${f.dataLabel}`),
+    })),
+  });
+
   const ours = new Set(Object.values(TEMPLATE_LABELS[code]));
   const missing = [...ours].filter((l) => !actual.has(l)); // 우리에만 있음 = 죽은 라벨
   const extra = [...actual].filter((l) => !ours.has(l)); // 콘솔에만 있음 = 안 채우는 칸
@@ -133,6 +152,24 @@ for (const code of Object.keys(TEMPLATE_LABELS)) {
   });
 }
 
+// --dump: 실제 라벨을 그대로 찍는다. 손으로 옮겨 적으면 59개 중 하나는 틀린다
+if (process.argv.includes("--dump")) {
+  console.log("");
+  console.log("=== 실측 라벨 (요청자 입력란은 문서 위치 순) ===");
+  for (const d of dumps) {
+    console.log("");
+    console.log("  " + d.code);
+    if (d.requester.length === 0) {
+      console.log("    (요청자 입력란 없음 - 모든 칸이 서명자 입력이다)");
+    }
+    for (const f of d.requester.sort((a, b) => a.y - b.y)) {
+      console.log("    " + f.label.padEnd(14) + f.type.padEnd(10) + "y=" + f.y.toFixed(4));
+    }
+    for (const p of d.parts) {
+      console.log("    [서명자 " + p.role + "] " + p.labels.join(" "));
+    }
+  }
+}
 console.log("\n서식      상태        내용");
 console.log("─".repeat(78));
 for (const r of rows) {

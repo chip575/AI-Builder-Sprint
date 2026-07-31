@@ -67,7 +67,12 @@ describe("🔴 필드 키가 라벨 표에 전부 있다", () => {
 
 describe("toDataLabel", () => {
   it("우리 키를 콘솔 라벨로 옮긴다", () => {
-    expect(toDataLabel("DONATION_PLEDGE", "donor_name")).toBe("45ca441f");
+    // 라벨 값 자체를 박아두지 않는다 — 콘솔에서 입력란을 옮기면 값이 새로 생성되고,
+    // 그때마다 이 테스트가 깨져 **진짜 검사(대조 스크립트)가 묻힌다**.
+    // 형식과 일관성만 본다. 값이 실재하는지는 verify-templates.mjs가 API로 확인한다
+    const label = toDataLabel("DONATION_PLEDGE", "donor_name");
+    expect(label).toMatch(/^[0-9a-f]{8}$/);
+    expect(label).toBe(TEMPLATE_LABELS.DONATION_PLEDGE.donor_name);
   });
 
   it("없는 키는 던진다 — 조용히 빈칸이 되지 않게", () => {

@@ -64,19 +64,39 @@ node scripts/verify-templates.mjs   # 조회만 한다. 서명 요청을 보내�
 템플릿을 다시 만들면 `dataLabel`이 새로 생성되고 **그때 증상은 에러가 아니라 빈칸**이다.
 그래서 배포·왕복 전에 `verify-templates.mjs`를 돌린다.
 
+## 구조 — 요청자 입력 / 서명자 입력
+
+8종 전부 이 형태로 맞췄다.
+
+| 칸 | 누가 채우나 | 콘솔 설정 |
+|---|---|---|
+| 성명·금액·기관명 등 데이터 | **우리 서버** | 요청자 입력 (문서 편집) |
+| 말미 성명 · 서명 | 서명자 | 서명자 지정 |
+
+처음에는 모든 칸이 서명자 입력이었다. 그러면 **대화로 정리한 내용을 사용자가
+서명 화면에서 다시 타이핑**하게 되어, 이 서비스의 전제가 무너진다.
+
+⚠ 입력란을 옮기면 `dataLabel`이 **새로 생성된다.** 8종을 옮기면서 라벨 41개가
+한 번에 갈렸다. 그래서 표는 손으로 고치지 않고 API 덤프에서 생성한다:
+
+```bash
+node scripts/verify-templates.mjs --dump   # 실측 라벨을 문서 위치 순으로 출력
+```
+
 ## 실측 결과 (2026-08-01)
 
 ```
-DONATION_PLEDGE     기부자(11)          초과 2 — 기관 날인란, 같은 역할
-RECURRING_CONSENT   후원자(11)          초과 2
-PRIVACY_CONSENT     정보주체(7)         일치
-LEGACY_GIFT         기부자(9)           초과 2
-HERITAGE_PLEDGE     후원자(10)          초과 2
-ATTESTATION         본인(6)             일치
-FAMILY_ACK          본인(8) · 가족(0)   ⚠ 아래 참조
-CUSTODIAN           지킴이(7)           초과 2
+DONATION_PLEDGE     일치   요청자 7 · 기부자(2)
+RECURRING_CONSENT   일치   요청자 7 · 후원자(2)
+PRIVACY_CONSENT     일치   요청자 5 · 정보주체(2)
+LEGACY_GIFT         일치   요청자 5 · 기부자(2)
+HERITAGE_PLEDGE     일치   요청자 6 · 후원자(2)
+ATTESTATION         일치   요청자 4 · 본인(2)
+FAMILY_ACK          일치   요청자 4 · 본인(2) · 가족(2)
+CUSTODIAN           일치   요청자 3 · 지킴이(2)
 
-죽은 라벨 0 — 우리 표의 라벨은 전부 콘솔에 실재한다
+8/8 일치 — 죽은 라벨 0 · 초과 0 · 빈 역할 0
+기관 날인란은 전부 삭제됐다 (⑤에 있던 두 번째 SIGNATURE 포함)
 ```
 
 ### 🔴 ⑦에 남은 수정 하나
