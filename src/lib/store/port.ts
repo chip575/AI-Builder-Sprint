@@ -1,11 +1,14 @@
 // StorePort — 영속화 어댑터 경계 (D-18). 인메모리·Supabase가 같은 규칙을 구현한다.
 // "같은 규칙"의 증명은 문서가 아니라 store-contract.ts 공유 스위트다 — 한 스위트, 두 구현.
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
+import type { Asset, Beneficiary } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
 import type { Obligation, ObligationKind } from "../contracts/obligations";
 import type {
+  AssetWriteInput,
+  BeneficiaryWriteInput,
   BranchProposalRecord,
   FamilyAckRecord,
   FamilyAckTarget,
@@ -195,6 +198,17 @@ export interface StorePort {
   /** 시간 압축 — 미발화 약속의 기한을 당긴다 (NFR-707).
    *  가짜 시계를 만들지 않는다. 스케줄러·상태머신은 실제 그대로 돈다 */
   shiftObligationDueDates(months: number): Promise<number>;
+
+  // ── 자산정리 (FR-401 · FR-402 · FR-404) ───────────────────
+  /** 자산 1건 적재. **확인 여부와 마스킹은 어댑터가 정한다** —
+   *  OCR 산출물은 confirmed=false로 시작하고(P1), 본인이 직접 쓴 값은 그 입력 자체가
+   *  확인이다. 식별번호는 저장 직전 다시 마스킹된다 (NFR-712) */
+  createAsset(input: AssetWriteInput): Promise<Asset>;
+  /** 본인 소유분 전량. 정렬은 등록 순 — 화면의 카테고리 정렬은 집계 계층이 한다 */
+  listAssets(userId: string): Promise<Asset[]>;
+
+  createBeneficiary(input: BeneficiaryWriteInput): Promise<Beneficiary>;
+  listBeneficiaries(userId: string): Promise<Beneficiary[]>;
 
   // ── evidences ─────────────────────────────────────────────
   createEvidence(

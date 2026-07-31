@@ -4,14 +4,18 @@ import { randomUUID } from "node:crypto";
 import { cosine } from "../ai/embed/port";
 import type { Obligation, ObligationKind } from "../contracts/obligations";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
+import type { Asset, Beneficiary } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
 import { buildNode, withDerivedStatus } from "../ledger/chain";
+import { maskIdentifier } from "./mask";
 import type { StorePort } from "./port";
 import { summarizeMetrics } from "./percentile";
 import {
   DEV_USER_ID,
+  type AssetWriteInput,
+  type BeneficiaryWriteInput,
   type BranchProposalRecord,
   type DraftRecord,
   type EvidenceRecord,
@@ -633,6 +637,56 @@ export class InMemoryStore implements StorePort {
     ack.signedAt = new Date().toISOString();
     ack.declinedReason = status === "DECLINED" ? (declinedReason ?? null) : null;
     return { ...ack };
+  }
+
+  /** 소유자와 값을 한 쌍으로 든다 — Asset 안에 userId를 섞으면 계약 밖 필드가
+   *  응답으로 새어 나가는 경로가 생긴다 */
+  private assets: { userId: string; asset: Asset }[] = [];
+  private beneficiaries: { userId: string; beneficiary: Beneficiary }[] = [];
+
+  async createAsset(input: AssetWriteInput): Promise<Asset> {
+    const base = {
+      id: randomUUID(),
+      label: input.label,
+      // 저장 직전 다시 마스킹한다 — 호출부가 무엇을 보내든 표에는 마스킹된 값만 남는다
+      maskedIdentifier: maskIdentifier(input.maskedIdentifier),
+      estimatedValueKrw: input.estimatedValueKrw ?? null,
+      origin: input.origin,
+      confidence: input.confidence ?? null,
+      // 확인 여부는 출처가 정한다. 판독 산출물은 미확인으로 시작하고(P1),
+      // 본인이 직접 쓴 값은 그 입력 자체가 확인이다
+      confirmed: input.origin === "MANUAL",
+      beneficiaryId: input.beneficiaryId ?? null,
+      story: input.story ?? null,
+      sourceUploadId: input.sourceUploadId ?? null,
+    };
+    const asset: Asset =
+      input.category === "DIGITAL"
+        ? { ...base, category: "DIGITAL", disposition: input.disposition }
+        : { ...base, category: input.category };
+    this.assets.push({ userId: input.userId, asset });
+    return { ...asset };
+  }
+
+  async listAssets(userId: string): Promise<Asset[]> {
+    return this.assets.filter((a) => a.userId === userId).map((a) => ({ ...a.asset }));
+  }
+
+  async createBeneficiary(input: BeneficiaryWriteInput): Promise<Beneficiary> {
+    const beneficiary: Beneficiary = {
+      id: randomUUID(),
+      name: input.name,
+      relation: input.relation,
+      recipientId: input.recipientId ?? null,
+    };
+    this.beneficiaries.push({ userId: input.userId, beneficiary });
+    return { ...beneficiary };
+  }
+
+  async listBeneficiaries(userId: string): Promise<Beneficiary[]> {
+    return this.beneficiaries
+      .filter((b) => b.userId === userId)
+      .map((b) => ({ ...b.beneficiary }));
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {
