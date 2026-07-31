@@ -25,3 +25,4 @@ dist/
 batch.log
 .vercel
 .env*
+batch/
