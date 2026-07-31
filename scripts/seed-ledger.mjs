@@ -62,13 +62,20 @@ const { judgeMateriality } = await import("../src/lib/ledger/chain.ts");
 const subjectId = process.argv[2] ?? (await pickLatestIntent());
 
 async function pickLatestIntent() {
+  // intents의 시각 컬럼은 started_at이다. created_at으로 정렬하면 쿼리가 실패하는데,
+  // 예전 코드는 그 실패를 "intent를 찾지 못했습니다"로 보고했다 — 원인이 아니라
+  // 엉뚱한 곳(데이터 없음)을 보게 만드는 메시지다. 실패 원인을 그대로 드러낸다
   const { data, error } = await db
     .from("intents")
     .select("id")
-    .order("created_at", { ascending: false })
+    .order("started_at", { ascending: false })
     .limit(1);
-  if (error || !data?.length) {
-    console.error("[seed] intent를 찾지 못했습니다. subjectId를 인자로 주세요.");
+  if (error) {
+    console.error("[seed] intents 조회 실패:", error.message);
+    process.exit(1);
+  }
+  if (!data?.length) {
+    console.error("[seed] intent가 하나도 없습니다. 대화를 한 번 진행한 뒤 다시 실행하세요.");
     process.exit(1);
   }
   return data[0].id;
