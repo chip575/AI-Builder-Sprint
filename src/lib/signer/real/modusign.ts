@@ -16,6 +16,8 @@
 // ⚠ fetch를 주입받는다 — 네트워크 없이 요청 조립·응답 파싱을 테스트하기 위해서다.
 import type { DocStatus, Party } from "../../contracts/common";
 import { mapModusignStatus } from "../state-machine";
+import { buildTemplateFields, type TemplateKey } from "../template-fields";
+import { TEMPLATE_ROLES, resolveTemplateCode, toDataLabel } from "../template-labels";
 import type {
   DocumentDetail,
   SignerPort,
@@ -65,6 +67,38 @@ interface ModusignDocument {
   metadatas?: { key: string; value?: string }[];
 }
 
+/** 서식 코드가 우리 표에 있는지 — 없으면 조용히 진행하지 않는다 */
+function assertKnown(templateKey: string): TemplateKey {
+  // DocType으로 들어와도 서식 코드로 맞춘다 — 둘은 다른 이름 체계다
+  return resolveTemplateCode(templateKey) as TemplateKey;
+}
+
+function roleFor(templateKey: string): string {
+  const roles = TEMPLATE_ROLES[assertKnown(templateKey)];
+  return roles[0];
+}
+
+/** 우리 키 → 콘솔 dataLabel. 검증을 통과한 값만 번역한다 */
+function buildRequesterInputs(
+  templateKey: string,
+  fields: Record<string, unknown> | undefined,
+): { dataLabel: string; value: string }[] {
+  if (!fields) return [];
+  const key = assertKnown(templateKey);
+  const built = buildTemplateFields(key, fields);
+  if (!built.ok) {
+    // 서면에 인쇄될 값이다 — 경고가 아니라 거부다 (template-fields 주석 참조)
+    throw new Error(
+      `[signer:modusign] 서식 값 검증 실패: ${built.errors
+        .map((e) => `${e.field}(${e.code})`)
+        .join(", ")}`,
+    );
+  }
+  return Object.entries(built.fields)
+    .filter(([, v]) => v !== "") // 빈 선택 항목은 보내지 않는다
+    .map(([field, value]) => ({ dataLabel: toDataLabel(key, field), value }));
+}
+
 export class ModusignSigner implements SignerPort {
   private fetchImpl: typeof fetch;
   private base: string;
@@ -81,8 +115,11 @@ export class ModusignSigner implements SignerPort {
   }
 
   private authHeader(): string {
-    // API Key를 Basic 자격증명으로 전달한다 (02.3 §1)
-    return `Basic ${Buffer.from(`${this.opts.apiKey}:`).toString("base64")}`;
+    // API Key를 Basic 자격증명으로 전달한다 (02.3 §1).
+    // ⚠ 콜론이 **앞**이다 — `:{apiKey}`. `{apiKey}:`로 보내면 400
+    //   "Authentication is failed"가 난다. 문서에 명시가 없어 조회 API로 실측했다
+    //   (2026-08-01). 서명 요청으로 시험했다면 잔여 건수를 태웠을 것이다.
+    return `Basic ${Buffer.from(`:${this.opts.apiKey}`).toString("base64")}`;
   }
 
   /** 429·5xx는 지수 백오프로 재시도한다. 4xx는 즉시 실패 — 재시도해도 같다 (02.3 §5) */
@@ -183,19 +220,27 @@ export class ModusignSigner implements SignerPort {
   }
 
   async requestWithTemplate(input: SignRequestInput): Promise<SignRequestResult> {
+    // 값 검증(칸 넘침·서식별 금칙)을 먼저 통과시킨다 — 서명된 뒤에는 고칠 수 없다
+    const mappings = buildRequesterInputs(input.templateKey, input.fields);
+
     const doc = await this.call<ModusignDocument>("/documents/request-with-template", {
       method: "POST",
       body: {
-        templateId: this.templateIdFor(input.templateKey),
+        templateId: this.templateIdFor(assertKnown(input.templateKey)),
         document: {
           title: `남기다 · ${input.templateKey}`,
           participantMappings: [
             {
-              role: "signer",
+              // 역할명은 콘솔 입력값과 **한 글자도 달라선 안 된다** — 다르면 요청이 거부된다.
+              // 그래서 코드에 문자열을 흩지 않고 표 한 곳에서 가져온다
+              role: roleFor(input.templateKey),
               name: input.signerName,
               signingMethod: { type: "EMAIL", value: input.signerEmail },
             },
           ],
+          // 서식에 인쇄될 값 — 우리 키를 콘솔 dataLabel로 번역해 싣는다.
+          // 번역을 건너뛰면 값이 안 실려 나가고 **에러 없이 빈칸이 인쇄된다**
+          ...(mappings.length > 0 ? { requesterInputMappings: mappings } : {}),
           // 역참조 — 웹훅이 문서 ID만 줄 때 우리 draft를 찾는 경로 (02.3 §1)
           metadatas: [{ key: META_DRAFT_ID, value: input.draftId }],
         },

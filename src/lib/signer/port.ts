@@ -9,6 +9,9 @@ export interface SignRequestInput {
   draftId: string;
   signerName: string;
   signerEmail: string;
+  /** 서식에 인쇄될 값 (우리 키 기준). 어댑터가 콘솔 dataLabel로 번역한다 —
+   *  번역은 어댑터의 일이지 호출부의 일이 아니다 */
+  fields?: Record<string, unknown>;
 }
 
 export interface SignRequestResult {
