@@ -4,6 +4,7 @@ import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
+import type { Obligation, ObligationKind } from "../contracts/obligations";
 import type {
   BranchProposalRecord,
   FamilyAckRecord,
@@ -92,6 +93,8 @@ export interface StorePort {
   // ── reconciler (FR-504) ───────────────────────────────────
   /** 진행 중인데 오래 갱신되지 않은 draft — 웹훅 유실 후보 */
   listStaleRequestedDrafts(olderThanMs: number): Promise<DraftRecord[]>;
+  /** 상태별 문서 건수 — 기관 대시보드 (FR-601) */
+  countDraftsByStatus(): Promise<Record<string, number>>;
   recordReconcile(corrected: number): Promise<void>;
   getReconcileState(): Promise<{ lastSyncAt: string | null; correctedTotal: number }>;
 
@@ -167,6 +170,22 @@ export interface StorePort {
     queryVector: number[],
     k: number,
   ): Promise<{ utteranceId: string; sessionId: string; text: string; spokenAt: string; score: number }[]>;
+
+  // ── obligations (FR-204 · FR-508) ─────────────────────────
+  /** 이행 약속 1건. 같은 (kind, subjectId)로 아직 발화되지 않은 게 있으면 만들지 않는다 —
+   *  같은 갱신을 두 번 알리면 그건 안내가 아니라 독촉이 된다 (FR-113) */
+  createObligation(input: {
+    kind: ObligationKind;
+    subjectId: string;
+    dueAt: string;
+  }): Promise<Obligation | undefined>;
+  /** 기한이 지났고 아직 발화되지 않은 것들 */
+  listDueObligations(now: string): Promise<Obligation[]>;
+  markObligationFired(id: string, firedAt: string): Promise<void>;
+  listObligations(subjectId?: string): Promise<Obligation[]>;
+  /** 시간 압축 — 미발화 약속의 기한을 당긴다 (NFR-707).
+   *  가짜 시계를 만들지 않는다. 스케줄러·상태머신은 실제 그대로 돈다 */
+  shiftObligationDueDates(months: number): Promise<number>;
 
   // ── evidences ─────────────────────────────────────────────
   createEvidence(

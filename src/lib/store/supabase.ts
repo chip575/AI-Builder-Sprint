@@ -7,6 +7,7 @@ import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode, LedgerNodeStatus, Materiality } from "../contracts/ledger";
+import type { Obligation, ObligationKind } from "../contracts/obligations";
 import { buildNode, withDerivedStatus } from "../ledger/chain";
 import type { StorePort } from "./port";
 import { summarizeMetrics } from "./percentile";
@@ -43,6 +44,14 @@ type Row = Record<string, any>;
 function iso(v: string | null | undefined): any {
   return v == null ? v : new Date(v).toISOString();
 }
+
+const toObligation = (r: Row): Obligation => ({
+  id: r.id,
+  kind: r.kind,
+  subjectId: r.subject_id,
+  dueAt: iso(r.due_at),
+  firedAt: iso(r.fired_at) ?? null,
+});
 
 const toFamilyAck = (r: Row): FamilyAckRecord => ({
   id: r.id,
@@ -718,6 +727,87 @@ export class SupabaseStore implements StorePort {
     // 같은 체인을 통째로 읽어 유도 상태를 붙인다 — 한 건만 읽으면 ACTIVE 판정이 불가능하다
     const chain = await this.listLedgerNodes(subjectId);
     return chain.find((n) => n.id === nodeId);
+  }
+
+  async countDraftsByStatus(): Promise<Record<string, number>> {
+    const { data, error } = await this.db.from("document_drafts").select("status");
+    if (error) this.fail("drafts.countByStatus", error);
+    const out: Record<string, number> = {};
+    for (const r of (data ?? []) as Row[]) out[r.status] = (out[r.status] ?? 0) + 1;
+    return out;
+  }
+
+  async createObligation(input: {
+    kind: ObligationKind;
+    subjectId: string;
+    dueAt: string;
+  }): Promise<Obligation | undefined> {
+    // 같은 대상의 같은 종류가 아직 발화 전이면 만들지 않는다 (독촉 방지, FR-113)
+    const { data: pending, error: pendErr } = await this.db
+      .from("obligations")
+      .select("id")
+      .eq("kind", input.kind)
+      .eq("subject_id", input.subjectId)
+      .is("fired_at", null)
+      .limit(1);
+    if (pendErr) this.fail("obligations.pending", pendErr);
+    if ((pending ?? []).length > 0) return undefined;
+
+    const { data, error } = await this.db
+      .from("obligations")
+      .insert({ kind: input.kind, subject_id: input.subjectId, due_at: input.dueAt })
+      .select()
+      .single();
+    if (error) this.fail("obligations.create", error);
+    return toObligation(data as Row);
+  }
+
+  async listDueObligations(now: string): Promise<Obligation[]> {
+    const { data, error } = await this.db
+      .from("obligations")
+      .select("*")
+      .is("fired_at", null)
+      .lte("due_at", now)
+      .order("due_at", { ascending: true });
+    if (error) this.fail("obligations.due", error);
+    return (data ?? []).map(toObligation);
+  }
+
+  async markObligationFired(id: string, firedAt: string): Promise<void> {
+    const { error } = await this.db
+      .from("obligations")
+      .update({ fired_at: firedAt })
+      .eq("id", id);
+    if (error) this.fail("obligations.fire", error);
+  }
+
+  async listObligations(subjectId?: string): Promise<Obligation[]> {
+    let q = this.db.from("obligations").select("*").order("due_at", { ascending: true });
+    if (subjectId) q = q.eq("subject_id", subjectId);
+    const { data, error } = await q;
+    if (error) this.fail("obligations.list", error);
+    return (data ?? []).map(toObligation);
+  }
+
+  async shiftObligationDueDates(months: number): Promise<number> {
+    // 가짜 시계 대신 기한을 당긴다 — 스케줄러는 실제 그대로 돈다 (NFR-707)
+    const { data, error } = await this.db
+      .from("obligations")
+      .select("id, due_at")
+      .is("fired_at", null);
+    if (error) this.fail("obligations.shift.list", error);
+    let shifted = 0;
+    for (const row of (data ?? []) as Row[]) {
+      const d = new Date(row.due_at);
+      d.setMonth(d.getMonth() - months);
+      const { error: upErr } = await this.db
+        .from("obligations")
+        .update({ due_at: d.toISOString() })
+        .eq("id", row.id);
+      if (upErr) this.fail("obligations.shift", upErr);
+      shifted += 1;
+    }
+    return shifted;
   }
 
   async saveEmbeddings(

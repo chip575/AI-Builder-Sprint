@@ -6,6 +6,8 @@ import { createHash } from "node:crypto";
 import { signer } from "@/lib/signer";
 import { canTransition, EVENT_TO_STATUS } from "@/lib/signer/state-machine";
 import { store } from "@/lib/store";
+import type { DocType } from "@/lib/contracts";
+import type { ObligationKind } from "@/lib/contracts";
 import { track } from "@/lib/observability/track";
 
 export async function drainOutbox(): Promise<void> {
@@ -78,7 +80,36 @@ async function processOne(
   if (target === "COMPLETED") {
     await ensureEvidence(draft.draftId, documentId, doc);
   }
-  // Obligation 생성(02.3 §3 8단계)은 M-OBLIGATIONS(M1) — 정기후원 체결 시 여기 연결
+  // 체결이 끝나면 다음에 돌아올 약속을 만든다 (02.3 §3 8단계 · FR-204 · FR-508).
+  // 실패가 체결을 되돌리지 않는다 — 약속은 부가물이고 증빙이 본체다
+  if (target === "COMPLETED") {
+    await scheduleFollowUp(draft.draftId, draft.docType).catch((err) =>
+      console.warn("[webhook] 후속 약속 생성 실패:", (err as Error).message),
+    );
+  }
+}
+
+/** 문서 종류가 다음 약속을 정한다.
+ *  ⚠ 간격은 제품 결정이지 법률 수치가 아니다 — 법정 기한(상속포기 3개월 등)은
+ *  lib/rules가 조문과 함께 관리한다. 여기 숫자를 그쪽으로 옮기지 말 것. */
+const FOLLOW_UP_MONTHS: Partial<Record<DocType, { kind: ObligationKind; months: number }>> = {
+  // 정기후원은 한 해가 지나면 "계속하실지" 다시 여쭙는다 (FR-204)
+  RECURRING_CONSENT: { kind: "RECURRING_RENEWAL", months: 12 },
+  // 유산기부는 상황이 바뀌기 쉬워 더 짧게 되짚는다 (FR-305)
+  LEGACY_GIFT_AGREEMENT: { kind: "WILL_REVIEW", months: 6 },
+  INTENT_AFFIRMATION: { kind: "WILL_REVIEW", months: 6 },
+};
+
+async function scheduleFollowUp(draftId: string, docType: DocType): Promise<void> {
+  const rule = FOLLOW_UP_MONTHS[docType];
+  if (!rule) return; // 되짚을 이유가 없는 문서는 약속을 만들지 않는다
+  const due = new Date();
+  due.setMonth(due.getMonth() + rule.months);
+  await store.createObligation({
+    kind: rule.kind,
+    subjectId: draftId,
+    dueAt: due.toISOString(),
+  });
 }
 
 /** 완료 문서의 증빙을 보장한다 (FR-505). 이미 있으면 아무것도 하지 않는다 — 멱등 */

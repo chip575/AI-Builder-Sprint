@@ -2,6 +2,7 @@
 // DB 트리거 전체를 흉내내지 않는다 — store-contract 스위트가 요구하는 규칙만 구현한다.
 import { randomUUID } from "node:crypto";
 import { cosine } from "../ai/embed/port";
+import type { Obligation, ObligationKind } from "../contracts/obligations";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
@@ -507,6 +508,66 @@ export class InMemoryStore implements StorePort {
       });
     }
     return scored.sort((a, b) => b.score - a.score).slice(0, k);
+  }
+
+  async countDraftsByStatus(): Promise<Record<string, number>> {
+    const out: Record<string, number> = {};
+    for (const d of this.drafts.values()) {
+      out[d.status] = (out[d.status] ?? 0) + 1;
+    }
+    return out;
+  }
+
+  private obligations: Obligation[] = [];
+
+  async createObligation(input: {
+    kind: ObligationKind;
+    subjectId: string;
+    dueAt: string;
+  }): Promise<Obligation | undefined> {
+    // 중복 방지 — 같은 대상의 같은 종류가 아직 발화 전이면 새로 만들지 않는다
+    const pending = this.obligations.find(
+      (o) => o.kind === input.kind && o.subjectId === input.subjectId && !o.firedAt,
+    );
+    if (pending) return undefined;
+    const created: Obligation = {
+      id: randomUUID(),
+      kind: input.kind,
+      subjectId: input.subjectId,
+      dueAt: input.dueAt,
+      firedAt: null,
+    };
+    this.obligations.push(created);
+    return { ...created };
+  }
+
+  async listDueObligations(now: string): Promise<Obligation[]> {
+    return this.obligations
+      .filter((o) => !o.firedAt && o.dueAt <= now)
+      .map((o) => ({ ...o }));
+  }
+
+  async markObligationFired(id: string, firedAt: string): Promise<void> {
+    const o = this.obligations.find((x) => x.id === id);
+    if (o) o.firedAt = firedAt;
+  }
+
+  async listObligations(subjectId?: string): Promise<Obligation[]> {
+    return this.obligations
+      .filter((o) => !subjectId || o.subjectId === subjectId)
+      .map((o) => ({ ...o }));
+  }
+
+  async shiftObligationDueDates(months: number): Promise<number> {
+    let shifted = 0;
+    for (const o of this.obligations) {
+      if (o.firedAt) continue;
+      const d = new Date(o.dueAt);
+      d.setMonth(d.getMonth() - months);
+      o.dueAt = d.toISOString();
+      shifted += 1;
+    }
+    return shifted;
   }
 
   private familyAcks: FamilyAckRecord[] = [];
