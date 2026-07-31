@@ -47,8 +47,11 @@ returns table (
 )
 language sql
 stable
-security definer
-set search_path = public
+-- security definer를 쓰지 않는다 — 테이블을 "정책 없음 = 차단"으로 막아놓고
+-- 함수가 definer로 돌면 그게 옆문이 된다 (save_fact와 같은 판단, 0002 참조).
+-- invoker + service role로 충분하다.
+security invoker
+set search_path = public, pg_temp
 as $$
   select u.id, u.intent_id, u.text, u.spoken_at,
          -- <=> 는 코사인 거리다. 유사도는 1 - 거리 (계약이 [0,1]을 요구한다)
@@ -61,6 +64,10 @@ as $$
   order by e.embedding <=> p_query
   limit p_k;
 $$;
+
+-- 실행 권한 회수 — 없으면 PostgREST로 노출돼 클라이언트가 남의 발화를 검색할 수 있다
+revoke execute on function public.search_utterances(uuid, vector, int)
+  from public, anon, authenticated;
 
 -- ── RLS — enable, 정책 없음 = 클라이언트 전면 차단 (D-18) ─────
 alter table public.utterance_embeddings enable row level security;
