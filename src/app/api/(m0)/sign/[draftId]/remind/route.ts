@@ -4,7 +4,7 @@
 // 임계 이전 요청은 실패가 아니라 "아직 때가 아니다"로 돌려보낸다 (NFR-705 · NFR-708).
 import { RemindReq, RemindRes } from "@/lib/contracts";
 import { signer } from "@/lib/signer";
-import { recordRemind, remindAvailableAt, tooEarlyCopy } from "@/lib/signer/remind";
+import { recordRemind, remindAvailableAt, remindHistory, tooEarlyCopy } from "@/lib/signer/remind";
 import { getDraft } from "../../../documents/store";
 
 function fail(status: number, code: string, message: string, nextAction: string) {
@@ -79,7 +79,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ draftId: strin
   // 요청 시각 = 발신자 쪽 시작 시각 (real: startedAt · mock: 문서 생성 시각).
   // 외부가 주지 않으면 초안 생성 시각으로 물러선다.
   const startedAt = doc.parties.find((p) => p.role === "REQUESTER")?.signedAt;
-  const availableAt = remindAvailableAt(startedAt, draft.createdAt);
+  // 직전 리마인드 시각까지 본다 — 임계가 지난 뒤 연속으로 보내지지 않게 (FR-113)
+  const history = await remindHistory(draftId);
+  const availableAt = remindAvailableAt(startedAt, draft.createdAt, history.lastAt);
   const now = new Date();
   if (now < availableAt) {
     const copy = tooEarlyCopy(availableAt, now);

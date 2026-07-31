@@ -100,16 +100,30 @@ describe("M-SIGN-LIFECYCLE — 임계 (FR-507 · NFR-705)", () => {
     expect(sent.data.remindCount).toBe(1);
   });
 
-  it("임계 이후 → remindCount가 쌓인다 (1 → 2)", async () => {
+  it("보낸 직후 다시 보내려 하면 막는다 — 임계는 매 발송마다 다시 센다 (FR-113)", async () => {
+    // 요청 시각만 보면 임계가 한 번 지난 뒤로는 연속 발송이 열린다.
+    // 그건 안내가 아니라 독촉이다 — 직전 발송으로부터 다시 임계를 채워야 한다
     const d = await requested();
     travel(PAST_THRESHOLD);
 
     const first = await (await remind(d.draftId)).json();
     expect(first.ok).toBe(true);
     expect(first.data.remindCount).toBe(1);
-    expect(first.data.sentAt).toBeTruthy();
 
     const second = await (await remind(d.draftId)).json();
+    expect(second.ok).toBe(false);
+    expect(second.error.nextAction).toBeTruthy(); // 실패가 아니라 안내다 (NFR-705)
+  });
+
+  it("직전 발송으로부터 임계가 다시 지나면 보낸다 (1 → 2)", async () => {
+    const d = await requested();
+    travel(PAST_THRESHOLD);
+    const first = await (await remind(d.draftId)).json();
+    expect(first.data.remindCount).toBe(1);
+
+    travel(PAST_THRESHOLD); // 직전 발송으로부터 다시 임계 경과
+    const second = await (await remind(d.draftId)).json();
+    expect(second.ok).toBe(true);
     expect(second.data.remindCount).toBe(2);
   });
 

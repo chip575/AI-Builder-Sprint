@@ -110,6 +110,13 @@ export interface StorePort {
   /** 감사 로그 append (FR-556 열람 기록 등).
    *  ⚠ 기록 실패가 본 흐름을 막으면 안 된다 — 호출부가 삼킨다 */
   recordAudit(action: string, subject: string, detail?: unknown): Promise<void>;
+  /** 같은 (action, subject)의 누적 횟수와 마지막 시각.
+   *  리마인드 재발송 간격 판정에 쓴다 — 프로세스 사본으로 세면 인스턴스가 갈릴 때
+   *  간격이 초기화돼 **연속 발송**이 열린다. 독촉 금지는 영속 값으로 지켜야 한다 (FR-113) */
+  getAuditSummary(
+    action: string,
+    subject: string,
+  ): Promise<{ count: number; lastAt: string | null }>;
 
   // ── mock signer 외부 상태 (MODUSIGN_MODE=mock 전용) ───────
   /** 서버리스는 요청마다 인스턴스가 갈린다. mock이 대역하는 "외부 세계"를 인메모리로만

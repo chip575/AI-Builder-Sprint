@@ -521,6 +521,18 @@ export class SupabaseStore implements StorePort {
     await this.audit(action, subject, detail);
   }
 
+  async getAuditSummary(action: string, subject: string) {
+    const { data, error } = await this.db
+      .from("audit_logs")
+      .select("created_at")
+      .eq("action", action)
+      .eq("subject", subject)
+      .order("id", { ascending: false });
+    if (error) this.fail("audit.summary", error);
+    const rows = (data ?? []) as Row[];
+    return { count: rows.length, lastAt: rows[0] ? iso(rows[0].created_at) : null };
+  }
+
   // mock 전용 상태다. 전용 테이블·RLS 결정을 새로 만들지 않고 append-only 감사 로그에
   // 얹는다 — 최신 행이 현재 상태다 (recordReconcile과 같은 판단).
   async putMockDoc(documentId: string, state: Record<string, unknown>): Promise<void> {

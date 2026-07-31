@@ -333,10 +333,15 @@ export class InMemoryStore implements StorePort {
     };
   }
 
-  private audits: { action: string; subject: string; detail?: unknown }[] = [];
+  private audits: { action: string; subject: string; detail?: unknown; at: string }[] = [];
 
   async recordAudit(action: string, subject: string, detail?: unknown): Promise<void> {
-    this.audits.push({ action, subject, detail });
+    this.audits.push({ action, subject, detail, at: new Date().toISOString() });
+  }
+
+  async getAuditSummary(action: string, subject: string) {
+    const rows = this.audits.filter((a) => a.action === action && a.subject === subject);
+    return { count: rows.length, lastAt: rows.at(-1)?.at ?? null };
   }
 
   private mockDocs = new Map<string, Record<string, unknown>>();

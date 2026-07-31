@@ -12,16 +12,13 @@ export const REMIND_AFTER_MS = 48 * 60 * 60 * 1000;
 /** audit_logs.action — 발송 이력의 정본이 남는 자리 */
 export const REMIND_AUDIT_ACTION = "sign.remind";
 
-// 발송 이력의 정본은 audit_logs다. 다만 StorePort에는 감사 로그를 되읽는 연산이 없고
-// store 확장은 이번 작업의 금지 항목이라, remindCount는 프로세스 안 사본으로 센다.
-// 인스턴스가 갈리면 이 수는 뒤로 갈 수 있다 — 다만 임계 판정은 이 수에 기대지 않고
-// 요청 시각만 보므로 **발송 제어는 영향받지 않는다**(적게 세일 뿐 더 보내지지 않는다).
-// StorePort에 countAudits(action, subject)가 생기면 이 사본은 지운다.
-const g = globalThis as unknown as { __namgidaRemindCounts?: Map<string, number> };
-const counts = (g.__namgidaRemindCounts ??= new Map<string, number>());
-
-export function remindCount(draftId: string): number {
-  return counts.get(draftId) ?? 0;
+// 발송 이력의 정본은 audit_logs다. 프로세스 사본으로 세면 인스턴스가 갈릴 때
+// 횟수가 뒤로 가고, 더 나쁘게는 **재발송 간격이 초기화돼 연속 발송이 열린다**.
+// 독촉 금지(FR-113)는 영속 값으로 지켜야 하는 규칙이라 store를 되읽는다.
+export async function remindHistory(
+  draftId: string,
+): Promise<{ count: number; lastAt: string | null }> {
+  return store.getAuditSummary(REMIND_AUDIT_ACTION, draftId);
 }
 
 /** 발송 후 이력을 남기고 누적 횟수를 돌려준다.
@@ -32,20 +29,26 @@ export async function recordRemind(
   sentAt: string,
   recipients: number,
 ): Promise<number> {
-  const next = remindCount(draftId) + 1;
-  counts.set(draftId, next);
+  const before = await remindHistory(draftId);
   await store
-    .recordAudit(REMIND_AUDIT_ACTION, draftId, { sentAt, recipients, seq: next })
+    .recordAudit(REMIND_AUDIT_ACTION, draftId, { sentAt, recipients, seq: before.count + 1 })
     .catch(() => {});
-  return next;
+  return before.count + 1;
 }
 
-/** 다시 보낼 수 있는 시각 — 서명 요청 시각 + 임계.
- *  요청 시각을 읽지 못하면(외부 응답에 없음) 초안 생성 시각으로 물러선다. */
-export function remindAvailableAt(startedAt: string | null | undefined, fallback: string): Date {
+/** 다시 보낼 수 있는 시각 — **서명 요청 시각과 직전 리마인드 중 나중** + 임계.
+ *  요청 시각만 보면 임계가 한 번 지난 뒤로는 연속 발송이 열린다. 그건 안내가 아니라
+ *  독촉이다 (FR-113). 요청 시각을 읽지 못하면 초안 생성 시각으로 물러선다. */
+export function remindAvailableAt(
+  startedAt: string | null | undefined,
+  fallback: string,
+  lastRemindAt?: string | null,
+): Date {
   const base = Date.parse(startedAt ?? "");
-  const at = Number.isNaN(base) ? Date.parse(fallback) : base;
-  return new Date(at + REMIND_AFTER_MS);
+  const start = Number.isNaN(base) ? Date.parse(fallback) : base;
+  const last = Date.parse(lastRemindAt ?? "");
+  const from = Number.isNaN(last) ? start : Math.max(start, last);
+  return new Date(from + REMIND_AFTER_MS);
 }
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000; // 문구는 한국 시간으로 읽힌다

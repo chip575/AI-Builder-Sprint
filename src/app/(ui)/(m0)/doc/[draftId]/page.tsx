@@ -111,7 +111,13 @@ export default function DocPage() {
         )}
 
         {status?.rejectReason && (
-          <Notice>거절 사유 — {status.rejectReason}</Notice>
+          <Notice>
+            거절 사유 — {status.rejectReason}
+            <br />
+            {/* 거절은 실패가 아니라 상대의 의사다. 문구가 사용자를 탓하지 않게 한다 */}
+            서명하지 않기로 한 것도 상대의 마음입니다. 어떤 생각이셨는지 이야기를
+            나눠 보셔도 좋고, 지금은 그대로 두셔도 괜찮습니다.
+          </Notice>
         )}
 
         <ErrorNote error={error} />
