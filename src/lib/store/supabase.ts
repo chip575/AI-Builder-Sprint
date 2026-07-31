@@ -4,15 +4,19 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
+import type { Asset, AssetOrigin, Beneficiary, DigitalDisposition } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode, LedgerNodeStatus, Materiality } from "../contracts/ledger";
 import type { Obligation, ObligationKind } from "../contracts/obligations";
 import { buildNode, withDerivedStatus } from "../ledger/chain";
+import { maskIdentifier } from "./mask";
 import type { StorePort } from "./port";
 import { summarizeMetrics } from "./percentile";
 import {
   DEV_USER_ID,
+  type AssetWriteInput,
+  type BeneficiaryWriteInput,
   type BranchProposalRecord,
   type DraftRecord,
   type EvidenceRecord,
@@ -64,6 +68,32 @@ const toFamilyAck = (r: Row): FamilyAckRecord => ({
   notifiedAt: iso(r.notified_at),
   signedAt: iso(r.signed_at) ?? null,
   declinedReason: r.declined_reason ?? null,
+});
+
+const toAsset = (r: Row): Asset => {
+  const base = {
+    id: r.id,
+    label: r.label,
+    maskedIdentifier: r.masked_identifier,
+    // bigint·numeric은 PostgREST가 문자열로 줄 수 있다 — 계약은 number다 (형식 변환은 어댑터의 일)
+    estimatedValueKrw: r.estimated_value_krw == null ? null : Number(r.estimated_value_krw),
+    origin: r.origin as AssetOrigin,
+    confidence: r.confidence == null ? null : Number(r.confidence),
+    confirmed: r.confirmed,
+    beneficiaryId: r.beneficiary_id,
+    story: r.story,
+    sourceUploadId: r.source_upload_id,
+  };
+  return r.category === "DIGITAL"
+    ? { ...base, category: "DIGITAL", disposition: r.disposition as DigitalDisposition }
+    : { ...base, category: r.category };
+};
+
+const toBeneficiary = (r: Row): Beneficiary => ({
+  id: r.id,
+  name: r.name,
+  relation: r.relation,
+  recipientId: r.recipient_id ?? null,
 });
 
 const toFact = (r: Row): IntentFact => ({
@@ -958,6 +988,63 @@ export class SupabaseStore implements StorePort {
     if (error) this.fail("familyAcks.resolve", error);
     const row = (data ?? [])[0];
     return row ? toFamilyAck(row) : undefined;
+  }
+
+  async createAsset(input: AssetWriteInput): Promise<Asset> {
+    const row = {
+      id: randomUUID(),
+      user_id: input.userId,
+      category: input.category,
+      label: input.label,
+      // 저장 직전 다시 마스킹한다 — 호출부가 무엇을 보내든 표에는 마스킹된 값만 남는다 (NFR-712)
+      masked_identifier: maskIdentifier(input.maskedIdentifier),
+      estimated_value_krw: input.estimatedValueKrw ?? null,
+      origin: input.origin,
+      confidence: input.confidence ?? null,
+      // 확인 여부는 출처가 정한다. 판독 산출물은 미확인으로 시작하고(P1),
+      // 본인이 직접 쓴 값은 그 입력 자체가 확인이다
+      confirmed: input.origin === "MANUAL",
+      beneficiary_id: input.beneficiaryId ?? null,
+      story: input.story ?? null,
+      source_upload_id: input.sourceUploadId ?? null,
+      disposition: input.category === "DIGITAL" ? input.disposition : null,
+    };
+    const { data, error } = await this.db.from("assets").insert(row).select().single();
+    if (error) this.fail("assets.insert", error);
+    return toAsset(data as Row);
+  }
+
+  async listAssets(userId: string): Promise<Asset[]> {
+    const { data, error } = await this.db
+      .from("assets")
+      .select("*")
+      .eq("user_id", userId) // 소유 필터는 코드가 명시적으로 건다 (D-18)
+      .order("created_at", { ascending: true });
+    if (error) this.fail("assets.list", error);
+    return (data ?? []).map(toAsset);
+  }
+
+  async createBeneficiary(input: BeneficiaryWriteInput): Promise<Beneficiary> {
+    const row = {
+      id: randomUUID(),
+      user_id: input.userId,
+      name: input.name,
+      relation: input.relation,
+      recipient_id: input.recipientId ?? null,
+    };
+    const { data, error } = await this.db.from("beneficiaries").insert(row).select().single();
+    if (error) this.fail("beneficiaries.insert", error);
+    return toBeneficiary(data as Row);
+  }
+
+  async listBeneficiaries(userId: string): Promise<Beneficiary[]> {
+    const { data, error } = await this.db
+      .from("beneficiaries")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
+    if (error) this.fail("beneficiaries.list", error);
+    return (data ?? []).map(toBeneficiary);
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

@@ -22,3 +22,4 @@
 2026-07-31 | AI(Claude) | M-SIGN-LIFECYCLE 리마인드 구현 — 임계 기준점을 draft 생성이 아닌 외부 문서의 발신 시각(startedAt)으로 잡고, 완료·거절 판정도 로컬이 아닌 외부 상태로 함(웹훅 유실 시 오발송 방지). remindCount는 StorePort에 감사로그 되읽기가 없어 프로세스 사본으로 셈 — 사람 판단 필요
 2026-07-31 | AI(Claude) | C트랙 병합 후 보완 — 리마인드 간격을 '직전 발송 기준'으로 바로잡음(요청 시각만 보면 임계 통과 후 연속 발송이 열려 독촉이 된다, FR-113). 발송 횟수를 프로세스 사본에서 audit_logs 조회로 이전
 2026-07-31 | AI(Claude) | 민법 §1019 상속 승인·포기 기간을 lib/rules에 추가(PM 승인). D-day를 계산하지 않는 것과 전문가 상담 권고를 테스트로 고정 — 기산점이 사망일이 아니라 '안 날'이라 우리가 알 수 없다
+2026-07-31 | AI(Claude) | M4 ESTATE 4a 인벤토리 구현(스키마 3표·StorePort 2구현·POST/GET /api/estate/assets·beneficiaries·assets/scan). 파이프라인은 한 줄도 고치지 않았다 — 판독은 M-PAPER-SCAN의 DP+IE와 업로드 보관소를 그대로 재사용. 마스킹을 라우트가 아니라 저장 계층에 둠(호출부를 하나라도 빠뜨리면 원문이 앉으므로). 사람 확인 필요: 마이그레이션 미적용(db push 금지), mask.ts는 보안 5조 리뷰 대상, 채무 안내(민법 §1019)는 lib/rules 부재로 debtNotice=null

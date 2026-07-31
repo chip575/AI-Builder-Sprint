@@ -6,6 +6,7 @@ import type {
   DocStatus,
   DocType,
 } from "../contracts/common";
+import type { AssetOrigin, AssetUpsertReq, BeneficiaryUpsertReq } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNodeReq, Materiality } from "../contracts/ledger";
@@ -181,4 +182,21 @@ export interface FamilyAckTarget {
   recipientName?: string | null;
   relation?: string | null;
 }
+
+// ── 자산정리 (FR-401~404) ───────────────────────────────────
+// 레코드 타입을 따로 만들지 않는다 — contracts/estate.ts의 Asset·Beneficiary가
+// 그대로 저장 단위다 (Obligation·LedgerNode와 같은 규약).
+
+/** 자산 1건의 적재 입력.
+ *  `confirmed`가 **없다.** 확인 여부는 출처가 정하고 그 판단은 어댑터가 소유한다 —
+ *  호출부가 "확인됨"을 주장할 수 있으면 P1은 라우트마다 다시 지켜야 하는 규칙이 된다.
+ *  `maskedIdentifier`도 어댑터가 저장 직전 다시 마스킹한다 (NFR-712 · mask.ts). */
+export type AssetWriteInput = AssetUpsertReq & {
+  userId: string;
+  origin: AssetOrigin;
+  /** 판독 신뢰도. 수기 입력은 null — 사람이 쓴 값에 신뢰도를 붙이지 않는다 */
+  confidence?: number | null;
+};
+
+export type BeneficiaryWriteInput = BeneficiaryUpsertReq & { userId: string };
 
