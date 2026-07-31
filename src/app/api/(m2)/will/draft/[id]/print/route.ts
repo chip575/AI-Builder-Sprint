@@ -27,9 +27,16 @@ export async function GET(
     );
   }
 
-  // 확정된 사실만으로 초안을 만든다 — 미확정 값으로 유언 문안을 쓰지 않는다 (P1)
+  // 확정된 사실만으로 초안을 만든다 — 미확정 값으로 유언 문안을 쓰지 않는다 (P1).
   const confirmed = session.facts.filter((f) => f.confirmed);
-  if (confirmed.length === 0) {
+
+  // **두 경우를 가른다.** 예전에는 확정 0건이면 무조건 막았는데, 그러면 게이트가
+  // 이 화면으로 보낸 사용자가 곧바로 403을 만난다 — 막기만 하고 대안을 못 주는 상태다.
+  //   · 추출된 항목이 있는데 전부 미확정 → 막는다. 확인 안 된 AI 산출물이 종이에 인쇄된다
+  //   · 추출된 항목이 아예 없음        → 빈칸 서식을 준다. 인쇄될 개인 내용이 없으므로
+  //                                      P1이 지키려는 위험 자체가 없고, 4요건 안내는
+  //                                      항목과 무관하게 유효하다 (FR-302)
+  if (confirmed.length === 0 && session.facts.length > 0) {
     return Response.json(
       {
         ok: false,

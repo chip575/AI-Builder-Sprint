@@ -5,7 +5,7 @@
 //    "법이 인정하는 방식으로만"의 실물이다.
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import type { HandwritingGuideRes } from "@/lib/contracts";
 import { ErrorNote, Notice, PrimaryButton, Shell } from "@/app/(ui)/_components/Shell";
@@ -24,10 +24,10 @@ const NOTARIAL = {
 };
 
 function HandwritingGuide() {
-  const router = useRouter();
   const intentId = useSearchParams().get("intentId");
   const [guide, setGuide] = useState<HandwritingGuideRes | null>(null);
   const [checked, setChecked] = useState<string[]>([]);
+  const [printed, setPrinted] = useState(false);
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
 
   useEffect(() => {
@@ -158,15 +158,29 @@ function HandwritingGuide() {
         </ul>
       </section>
 
+      {/* 이 화면의 완결점은 **인쇄**다 (FR-302). 원래 `/vault-will`로 보내고 있었는데
+          그 경로는 manifest에도 코드에도 없어 404였다 — 화면이 지어낸 목적지였다.
+          자필 유언의 보관 안내는 법률 내용이라 lib/rules에 근거가 생기기 전에는 만들지 않는다 */}
       <div className="print:hidden">
         <PrimaryButton
           disabled={!allChecked}
-          onClick={() => router.push(`/vault-will?intentId=${intentId}`)}
+          onClick={() => {
+            setPrinted(true);
+            window.print();
+          }}
         >
           {allChecked
-            ? "네 가지 모두 확인했어요 — 보관 안내로"
+            ? "네 가지 모두 확인했어요 — 인쇄하기"
             : `확인이 남았어요 (${checked.length}/${guide.checklist.length})`}
         </PrimaryButton>
+        {/* 인쇄물을 그대로 유언장으로 오해하는 것이 이 화면의 가장 큰 위험이다.
+            전문 자서(민법 §1066)가 요건이므로 인쇄물 자체는 유언이 아니다 */}
+        {printed && (
+          <Notice>
+            인쇄한 초안을 보고 <strong>직접 손으로</strong> 옮겨 적으세요. 인쇄물 자체는
+            유언으로서 효력이 없습니다.
+          </Notice>
+        )}
       </div>
 
       {/* NFR-706 — 화면·인쇄물 모두에 상시 노출한다 (print:hidden을 붙이지 않는다) */}

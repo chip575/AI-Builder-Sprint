@@ -2,6 +2,7 @@
 // 트랙 선택 UI는 존재하지 않는다. 한 문장으로 시작하고, 명시적 의사면 가지로 직행한다.
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
@@ -182,6 +183,15 @@ export default function ChatPage() {
             지금까지 {covered}가지 이야기가 정리되어 있습니다. 다음에 오셔도 이어집니다.
           </p>
         )}
+
+        {/* 회상은 **축 세션의 일부**지 별도 트랙이 아니다 — 그래서 홈이 아니라
+            대화 안에서 이어진다. 대화 중 제안이므로 FR-110의 트랙 선택에 해당하지 않는다 */}
+        <Link
+          href="/recall"
+          className="inline-block text-sm text-stone-500 underline underline-offset-4 hover:text-stone-700"
+        >
+          천천히 회상하며 정리해 볼까요?
+        </Link>
 
         <ErrorNote error={error} />
       </div>

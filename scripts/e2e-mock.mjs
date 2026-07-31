@@ -11,6 +11,38 @@ const fail = (m) => {
   process.exit(1);
 };
 
+// ⚠ 실과금 가드 — 이 스크립트는 대화를 여러 턴 돌린다. UPSTAGE_MODE=real이면
+//   턴마다 실제 요금이 나간다. 실제로 프론트 점검 한 번에 5턴이 과금됐다 (2026-08-01).
+//   dev 서버가 어떤 모드로 떴는지는 .env가 정한다 — 여기서 그걸 읽어 먼저 막는다.
+//   의도적으로 실호출을 확인하려면 E2E_ALLOW_REAL=1 을 붙인다.
+{
+  const { readFileSync } = await import("node:fs");
+  // ⚠ **.env.local이 .env를 덮는다** (Next 규칙, lib/observability/mode.ts도 같은 말을 한다).
+  //   .env만 읽으면 .env.local에 real이 들어 있을 때 "mock이다"라고 잘못 안심시킨다 —
+  //   가드가 조용히 틀리는 쪽으로 실패한다. 우선순위 순서대로 먼저 찾은 값을 쓴다.
+  const read = (k) => {
+    for (const file of [".env.local", ".env"]) {
+      try {
+        const v = readFileSync(file, "utf-8")
+          .match(new RegExp(`^[ \\t]*${k}[ \\t]*=[ \\t]*([^\\r\\n]*)`, "m"))?.[1]
+          ?.trim();
+        if (v) return v;
+      } catch {
+        /* 파일이 없을 수 있다 */
+      }
+    }
+    return undefined;
+  };
+  const mode = process.env.UPSTAGE_MODE ?? read("UPSTAGE_MODE") ?? "mock";
+  if (mode === "real" && process.env.E2E_ALLOW_REAL !== "1") {
+    console.error(
+      "E2E 중단: UPSTAGE_MODE=real 입니다. 이 스크립트는 대화를 여러 턴 돌려 실과금됩니다.\n" +
+        "  .env에서 UPSTAGE_MODE=mock 으로 바꾸거나, 알고 하는 것이면 E2E_ALLOW_REAL=1 을 붙이세요.",
+    );
+    process.exit(1);
+  }
+}
+
 // 1. 대화 시작 (Express)
 let res = await fetch(base + "/api/session/message", j({ text: "부산에 기부하고 싶어요" }));
 if (res.status !== 200) fail("session " + res.status);
@@ -127,10 +159,10 @@ res = await fetch(base + "/api/session/message", j({ text: "유언장을 준비�
 meta = JSON.parse([...(await res.text()).matchAll(/^data: (.*)$/gm)].at(-1)[1]);
 if (meta.expressBranch?.branchType !== "HANDWRITTEN_WILL") fail("유언 가지 미감지");
 const willSid = meta.sessionId;
-// fact가 하나도 없으면 게이트 이전(미확정)에서 막혀 게이트를 못 태운다
-await fetch(base + "/api/session/message", j({ sessionId: willSid, text: "부산에 살고 있어요" }));
-await fetch(base + "/api/extract", j({ intentId: willSid }));
-await fetch(base + "/api/facts/confirm", j({ intentId: willSid }));
+// **발화 하나로 바로 문서 생성을 시도한다.** 예전에는 fact를 억지로 만들어 넣었는데
+// (지역·금액을 말하게 해서), 그건 게이트를 태우기 위한 우회였고 실제 사용자는 그렇게
+// 말하지 않는다. 게이트가 확정 검사보다 앞에 있으므로 이제 우회가 필요 없다 —
+// 이 단계가 곧 "UI 경로에서 유언 차단이 실제로 발생하는가"의 검사다
 res = await fetch(base + "/api/documents", j({ intentId: willSid }));
 body = await res.json();
 if (res.status !== 403 || body.error.code !== "GATE_ESIGN_INVALID")
@@ -150,11 +182,21 @@ if (!g.statutes.some((s) => s.id === "민법 §1066")) fail("§1066 미인용");
 if (JSON.stringify(g).match(/signUrl|embedUrl|modusign/)) fail("서명 필드가 존재한다");
 console.log("13.5 필사 가이드 ok — 4항목 · 서명 필드 부재 · §1066 인용");
 
-// 14. 카운터 정직성 — 문서 생성 단계 거부는 '서명 시도 차단'이 아니다
+// 14. 카운터가 UI 경로에서 실제로 오르는가 (2026-08-01 규칙 변경)
+//
+// 각 부분은 정상인데 조합이 안 되던 종류라 유닛으로는 영영 안 잡힌다:
+// 게이트도 맞고 카운터도 맞았는데, 집계가 wasSignAttempt를 요구하고
+// documents가 그보다 먼저 막아서 **UI 경로로는 도달할 수 없는 조건**이었다.
+// 실측 판정 11건 · 표시 0건. 그 조합을 지키는 것은 이 한 단계뿐이다.
 res = await fetch(base + "/api/admin/gate-stats");
 const gate = (await res.json()).data;
-if (gate.blockedTotal !== blockedBefore) fail("문서 생성 거부가 차단으로 집계됨(지표 부풀림)");
+if (gate.blockedTotal <= blockedBefore)
+  fail(`UI 경로 차단이 카운터에 안 잡힘: ${blockedBefore} → ${gate.blockedTotal}`);
 if (!(gate.byVerdict.ESIGN_INVALID > 0)) fail("판정 분포에 기록되지 않음");
+if (!gate.byStatute.some((s) => s.id === "민법 §1066")) fail("조문별 분포에 §1066 없음");
+// 반대편 — NON_BINDING까지 삼키면 지표가 부풀려진다. 기부(ESIGN_OK)는 차단이 아니다
+if (gate.blockedTotal >= gate.totalEvaluations)
+  fail("모든 판정이 차단으로 집계됨 — 3분기가 구분되지 않는다");
 console.log("14. COUNTER ok — 차단", gate.blockedTotal, "· 전체 판정", gate.totalEvaluations);
 
 // 15. 파이프라인 지표 (NFR-709) — 수치는 환경 따라 변하므로 **존재**만 검증한다

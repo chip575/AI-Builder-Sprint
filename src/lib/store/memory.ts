@@ -303,8 +303,12 @@ export class InMemoryStore implements StorePort {
 
     for (const v of this.gateVerdicts) {
       byVerdict[v.verdict] = (byVerdict[v.verdict] ?? 0) + 1;
-      // 차단 = 무효 판정인데 서명 경로로 가려던 것만 (FR-509)
-      if (v.verdict !== "ESIGN_INVALID" || !v.wasSignAttempt) continue;
+      // 차단 = 무효 판정 전부 (FR-509). **문서 생성 단계의 차단도 차단이다** —
+      // 유언장은 /api/documents에서 막히고 그게 곧 "무효 문서를 만들려는 시도를
+      // 게이트가 막았다"이다. wasSignAttempt를 필터로 쓰면 UI 경로에서 발생하는
+      // 차단이 하나도 안 세어져 카운터가 0으로 고정된다.
+      // NON_BINDING은 여전히 제외한다 — 정상 라우팅을 차단으로 세면 지표가 부풀려진다
+      if (v.verdict !== "ESIGN_INVALID") continue;
       blockedTotal += 1;
       byDocType[v.docType] = (byDocType[v.docType] ?? 0) + 1;
       for (const st of v.statutes) statute.set(st.id, (statute.get(st.id) ?? 0) + 1);

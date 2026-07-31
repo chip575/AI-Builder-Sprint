@@ -504,7 +504,8 @@ export class SupabaseStore implements StorePort {
 
     for (const r of (data ?? []) as Row[]) {
       byVerdict[r.verdict] = (byVerdict[r.verdict] ?? 0) + 1;
-      if (r.verdict !== "ESIGN_INVALID" || !r.was_sign_attempt) continue;
+      // 인메모리와 같은 규칙 — 무효 판정 전부. was_sign_attempt는 상세 열이지 필터가 아니다
+      if (r.verdict !== "ESIGN_INVALID") continue;
       blockedTotal += 1;
       byDocType[r.doc_type] = (byDocType[r.doc_type] ?? 0) + 1;
       for (const st of (r.statutes ?? []) as { id: string }[]) {
