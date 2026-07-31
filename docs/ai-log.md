@@ -21,3 +21,4 @@
 2026-07-31 | AI(Claude) | M-EMBEDDINGS 구현 — 임베딩 차원을 문서 대신 실제 호출로 확인(4096), 그 결과 pgvector ANN 인덱스 상한(2000) 밖임을 발견해 순차 스캔으로 설계
 2026-07-31 | AI(Claude) | M1 잔여 3종(OBLIGATIONS·TIMETRAVEL·ADMIN-OPS) 구현. SIGN-LIFECYCLE은 계약(RemindReq) 부재로 제외 — 서식 잔여 건수(10)를 감안해 계약 신설도 보류
 2026-07-31 | AI(Claude) | WORKER_ROLE 훅 실검증(11케이스) — 라우트 그룹 도입 후 역할 패턴이 안 맞아 be1·be2가 자기 경로에서 차단되던 것을 발견해 수정. 정상 통과 케이스를 함께 재지 않았으면 못 잡았다
+2026-07-31 | AI(Claude) | 계약 4건 적용(estate 신설·remind 추가·DocType/판정 1건) + branch_proposals.status 영속화. B트랙 워커가 금지 경로에 막혀 미완으로 보고한 지점을 사람(=PM 경로)이 이어받음

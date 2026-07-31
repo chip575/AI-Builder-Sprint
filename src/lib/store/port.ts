@@ -39,6 +39,15 @@ export interface StorePort {
     origin: BranchOrigin,
     sourceUtteranceId: string,
   ): Promise<BranchProposalRecord>;
+  /** 제안에 대한 사용자의 결정을 **영속화**한다 (FR-115A).
+   *  메모리에만 두면 인스턴스가 갈릴 때 거절했던 가지가 다시 제안된다 —
+   *  사용자에게는 거절이 무시된 것으로 보인다 */
+  decideProposal(
+    proposalId: string,
+    status: "OPENED" | "PENDING_RECONFIRM" | "DECLINED" | "DEFERRED",
+  ): Promise<BranchProposalRecord | undefined>;
+  /** 이 세션에서 **닫은**(DECLINED) 가지 종류. 재제안 금지 판정에 쓴다 */
+  listDeclinedBranches(sessionId: string): Promise<BranchType[]>;
 
   // ── facts ─────────────────────────────────────────────────
   /** UPSERT (intent_id, key) — 단, confirmed=true 행은 덮지 않는다 (P1의 DB 방어).

@@ -170,6 +170,8 @@ export class SupabaseStore implements StorePort {
           id: r.id,
           branchType: r.branch_type as BranchType,
           origin: r.origin as BranchOrigin,
+          status: (r.status ?? "PROPOSED") as BranchProposalRecord["status"],
+          decidedAt: iso(r.decided_at) ?? null,
           sourceUtteranceId: r.source_utterance_id,
           createdAt: iso(r.created_at),
         }),
@@ -233,9 +235,45 @@ export class SupabaseStore implements StorePort {
       id: data.id,
       branchType: data.branch_type,
       origin: data.origin,
+      status: data.status ?? "PROPOSED",
+      decidedAt: iso(data.decided_at) ?? null,
       sourceUtteranceId: data.source_utterance_id,
       createdAt: iso(data.created_at),
     };
+  }
+
+  async decideProposal(
+    proposalId: string,
+    status: "OPENED" | "PENDING_RECONFIRM" | "DECLINED" | "DEFERRED",
+  ): Promise<BranchProposalRecord | undefined> {
+    const { data, error } = await this.db
+      .from("branch_proposals")
+      .update({ status, decided_at: new Date().toISOString() })
+      .eq("id", proposalId)
+      .select()
+      .maybeSingle();
+    if (error) this.fail("proposals.decide", error);
+    if (!data) return undefined;
+    return {
+      id: data.id,
+      branchType: data.branch_type,
+      origin: data.origin,
+      status: data.status,
+      decidedAt: iso(data.decided_at) ?? null,
+      sourceUtteranceId: data.source_utterance_id,
+      createdAt: iso(data.created_at),
+    };
+  }
+
+  async listDeclinedBranches(sessionId: string): Promise<BranchType[]> {
+    // 닫은 가지는 다시 제안하지 않는다 — 이 조회가 그 판정의 근거다 (FR-115A)
+    const { data, error } = await this.db
+      .from("branch_proposals")
+      .select("branch_type")
+      .eq("intent_id", sessionId)
+      .eq("status", "DECLINED");
+    if (error) this.fail("proposals.declined", error);
+    return [...new Set((data ?? []).map((r: Row) => r.branch_type as BranchType))];
   }
 
   async saveFacts(sessionId: string, facts: IntentFact[]): Promise<IntentFact[]> {

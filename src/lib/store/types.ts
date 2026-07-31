@@ -25,6 +25,9 @@ export interface BranchProposalRecord {
   branchType: BranchType;
   origin: BranchOrigin;
   sourceUtteranceId: string;
+  /** 사용자의 결정. DECLINED는 재제안 금지의 근거다 (FR-115A) */
+  status: "PROPOSED" | "OPENED" | "PENDING_RECONFIRM" | "DECLINED" | "DEFERRED";
+  decidedAt: string | null;
   createdAt: string;
 }
 
