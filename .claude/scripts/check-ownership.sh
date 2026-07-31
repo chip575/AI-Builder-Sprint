@@ -57,7 +57,7 @@ esac
 G='(\([^/)]*\)/)?'   # 있어도 되고 없어도 되는 라우트 그룹
 case "$ROLE" in
   be1) echo "$FILE" | grep -qE "lib/ai/|app/api/${G}(session|extract|gate|recall|obligations|branch)/" || deny "BE-1 소유 경로 밖: $FILE" ;;
-  be2) echo "$FILE" | grep -qE "lib/signer/|lib/ledger/|app/api/${G}(documents|sign|webhooks|cron|evidence|ledger|dev|family-ack)/|supabase/" || deny "BE-2 소유 경로 밖: $FILE" ;;
+  be2) echo "$FILE" | grep -qE "lib/signer/|lib/ledger/|lib/store/|app/api/${G}(documents|sign|webhooks|cron|evidence|ledger|dev|family-ack|estate)/|supabase/" || deny "BE-2 소유 경로 밖: $FILE" ;;
   fe)  echo "$FILE" | grep -qE "app/\(ui\)/|components/|app/api/${G}(facts|rewards|admin|heartwill|will)/" || deny "FE 소유 경로 밖: $FILE" ;;
   unknown) : ;;   # WORKER_ROLE 미설정 시 역할 검사 생략 (전원 금지 규칙은 이미 적용됨)
 esac
