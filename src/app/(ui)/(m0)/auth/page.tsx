@@ -16,6 +16,23 @@ function LoginForm() {
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
 
   async function submit() {
+    // 버튼을 조용히 죽이지 않는다 — 눌렀는데 아무 일도 없으면 사용자는 원인을 모른다.
+    // 화면에서 막는 대신 **왜 안 되는지 말해 준다** (NFR-705).
+    if (!email.includes("@")) {
+      return setError({
+        message: "이메일 주소를 확인해 주세요.",
+        nextAction: "example@mail.com 형태로 입력해 주세요.",
+      });
+    }
+    if (password.length < 8) {
+      return setError({
+        message: "비밀번호는 8자 이상이어야 합니다.",
+        nextAction:
+          mode === "login"
+            ? "예전에 더 짧은 비밀번호로 가입하셨다면 새 계정으로 가입해 주세요."
+            : "8자 이상으로 정해 주세요.",
+      });
+    }
     setBusy(true);
     setError(null);
     const res = await fetch(`/api/auth/${mode}`, {
@@ -77,7 +94,8 @@ function LoginForm() {
 
       <ErrorNote error={error} />
 
-      <PrimaryButton type="submit" disabled={busy || !email || password.length < 8}>
+      {/* 입력이 모자라도 버튼은 살아 있다. 누르면 무엇이 모자란지 알려준다 */}
+      <PrimaryButton type="submit" disabled={busy}>
         {mode === "login" ? "로그인" : "가입하고 시작하기"}
       </PrimaryButton>
 
