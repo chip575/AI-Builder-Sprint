@@ -58,7 +58,8 @@ describe("realSigner — 요청 조립", () => {
     expect(c.url).toBe("https://api.modusign.co.kr/documents/request-with-template");
     expect(c.method).toBe("POST");
     expect(c.headers.Authorization).toBe(
-      `Basic ${Buffer.from("test-key:").toString("base64")}`,
+      // 콜론이 **앞**이다 — 조회 API로 실측했다 (2026-08-01)
+      `Basic ${Buffer.from(":test-key").toString("base64")}`,
     );
     expect(c.headers["Content-Type"]).toContain("charset=utf-8");
 
@@ -74,7 +75,7 @@ describe("realSigner — 요청 조립", () => {
     const { impl } = stubFetch([{ status: 201 }]);
     await expect(
       make(impl).requestWithTemplate({ ...input, templateKey: "LEGACY_GIFT_AGREEMENT" }),
-    ).rejects.toThrow(/MODUSIGN_TEMPLATE_LEGACY_GIFT_AGREEMENT/);
+    ).rejects.toThrow(/MODUSIGN_TEMPLATE_LEGACY_GIFT/ /* DocType이 아니라 서식 코드로 안내한다 */);
   });
 
   it("취소: message 필수(2~200자) + 경로", async () => {
