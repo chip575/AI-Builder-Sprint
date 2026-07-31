@@ -16,7 +16,7 @@ vi.mock("./detect", () => ({
 import { MockDetector } from "./mock-detector";
 import { createProposal, proposeBranches } from "./propose";
 import { NEXT_STEP, resolveDecision } from "./decide";
-import { setProposalStatus } from "./store";
+import { store } from "@/lib/store";
 import { addUtterance, getOrCreateSession } from "../session/store";
 
 const mock = new MockDetector();
@@ -87,8 +87,9 @@ describe("FR-115A — 닫은 가지는 다시 제안하지 않는다", () => {
     const proposal = only(made);
     expect(proposal.branchType).toBe("DONATION_NOW");
 
-    // 사용자가 닫는다
-    setProposalStatus(proposal.id, "DECLINED", new Date().toISOString());
+    // 사용자가 닫는다 — 결정은 **영속 기록**에 남는다.
+    // 메모리 사본에만 쓰면 인스턴스가 갈릴 때 거절이 되살아난다 (FR-115A)
+    await store.decideProposal(proposal.id, "DECLINED");
 
     // 며칠 뒤 새 세션에서 같은 이야기를 다시 한다
     const later = await sessionWith("부산에 기부하고 싶어요", userId);

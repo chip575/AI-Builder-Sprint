@@ -49,8 +49,13 @@ export interface StorePort {
     proposalId: string,
     status: "OPENED" | "PENDING_RECONFIRM" | "DECLINED" | "DEFERRED",
   ): Promise<BranchProposalRecord | undefined>;
-  /** 이 세션에서 **닫은**(DECLINED) 가지 종류. 재제안 금지 판정에 쓴다 */
-  listDeclinedBranches(sessionId: string): Promise<BranchType[]>;
+  /** 제안 1건 — 결정 라우트가 무게·출처를 알아야 상태를 정할 수 있다 */
+  getProposal(
+    proposalId: string,
+  ): Promise<(BranchProposalRecord & { sessionId: string; userId: string }) | undefined>;
+  /** 이 **사람**이 닫은(DECLINED) 가지 종류. 재제안 금지 판정에 쓴다.
+   *  ⚠ 세션 단위가 아니다 — 다른 세션에서 되살아나면 "닫았다"는 말이 무의미해진다 (FR-115A) */
+  listDeclinedBranchesByUser(userId: string): Promise<BranchType[]>;
 
   // ── facts ─────────────────────────────────────────────────
   /** UPSERT (intent_id, key) — 단, confirmed=true 행은 덮지 않는다 (P1의 DB 방어).

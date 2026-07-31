@@ -295,13 +295,35 @@ export class SupabaseStore implements StorePort {
     };
   }
 
-  async listDeclinedBranches(sessionId: string): Promise<BranchType[]> {
-    // 닫은 가지는 다시 제안하지 않는다 — 이 조회가 그 판정의 근거다 (FR-115A)
+  async getProposal(proposalId: string) {
     const { data, error } = await this.db
       .from("branch_proposals")
-      .select("branch_type")
-      .eq("intent_id", sessionId)
-      .eq("status", "DECLINED");
+      .select("*, intents!inner(id, user_id)")
+      .eq("id", proposalId)
+      .maybeSingle();
+    if (error) this.fail("proposals.get", error);
+    if (!data) return undefined;
+    const r = data as Row;
+    return {
+      id: r.id,
+      branchType: r.branch_type as BranchType,
+      origin: r.origin as BranchOrigin,
+      status: (r.status ?? "PROPOSED") as BranchProposalRecord["status"],
+      decidedAt: iso(r.decided_at) ?? null,
+      sourceUtteranceId: r.source_utterance_id,
+      createdAt: iso(r.created_at),
+      sessionId: r.intent_id,
+      userId: r.intents.user_id,
+    };
+  }
+
+  async listDeclinedBranchesByUser(userId: string): Promise<BranchType[]> {
+    // 닫은 가지는 다시 제안하지 않는다 — **사람 단위**다 (FR-115A)
+    const { data, error } = await this.db
+      .from("branch_proposals")
+      .select("branch_type, intents!inner(user_id)")
+      .eq("status", "DECLINED")
+      .eq("intents.user_id", userId);
     if (error) this.fail("proposals.declined", error);
     return [...new Set((data ?? []).map((r: Row) => r.branch_type as BranchType))];
   }

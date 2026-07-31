@@ -154,10 +154,21 @@ export class InMemoryStore implements StorePort {
     return undefined;
   }
 
-  async listDeclinedBranches(sessionId: string): Promise<BranchType[]> {
-    const s = this.sessions.get(sessionId);
-    if (!s) return [];
-    return [...new Set(s.proposals.filter((p) => p.status === "DECLINED").map((p) => p.branchType))];
+  async getProposal(proposalId: string) {
+    for (const s of this.sessions.values()) {
+      const p = s.proposals.find((x) => x.id === proposalId);
+      if (p) return { ...p, sessionId: s.id, userId: s.userId };
+    }
+    return undefined;
+  }
+
+  async listDeclinedBranchesByUser(userId: string): Promise<BranchType[]> {
+    const closed = new Set<BranchType>();
+    for (const s of this.sessions.values()) {
+      if (s.userId !== userId) continue;
+      for (const p of s.proposals) if (p.status === "DECLINED") closed.add(p.branchType);
+    }
+    return [...closed];
   }
 
   async saveFacts(sessionId: string, facts: IntentFact[]): Promise<IntentFact[]> {

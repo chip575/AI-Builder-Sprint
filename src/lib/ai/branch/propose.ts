@@ -6,6 +6,7 @@
 //  ③ 문구는 고정 표에서 나온다 — 모델이 쓰지 않는다 (NFR-708 권유·설득 금지)
 import { BranchProposal } from "../../contracts/branch";
 import type { BranchOrigin, BranchType } from "../../contracts/common";
+import { store } from "../../store";
 import { BRANCH_WEIGHT } from "../../rules/branch-weight";
 import { addProposal } from "../session/store";
 import type { Utterance } from "../session/store";
@@ -79,7 +80,9 @@ export async function proposeBranches(input: ProposeInput): Promise<BranchPropos
 
   // 근거는 **이 세션의 살아있는 발화**여야 한다. 모델이 지어낸 id도, 지워진 발화도 안 된다
   const liveIds = new Set(input.utterances.map((u) => u.id));
-  const closed = declinedBranchTypes(input.userId);
+  // 닫은 가지는 **영속 기록**에서 읽는다 — 메모리에만 두면 인스턴스가 갈릴 때
+  // 거절했던 가지가 되살아나고, 사용자에게는 거절이 무시된 것으로 보인다 (FR-115A)
+  const closed = new Set(await store.listDeclinedBranchesByUser(input.userId));
   const seen = proposedBranchTypes(input.sessionId);
 
   const made: BranchProposal[] = [];
