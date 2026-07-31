@@ -34,7 +34,12 @@
 
 ## 3. cron (리컨실러)
 
-`vercel.json`에 이미 등록돼 있다 — 5분마다 `/api/cron/reconcile`.
+`vercel.json`에 이미 등록돼 있다 — **하루 1회**(03:00) `/api/cron/reconcile`.
+
+⚠ **Hobby 플랜은 크론이 하루 1회로 제한된다.** `*/5 * * * *`를 두면 빌드가 시작되기도
+전에 배포 자체가 거부되고, Deployments 목록에 실패 기록조차 남지 않는다 — 프로덕션이
+옛 커밋에 멈춘 채 원인이 보이지 않는다(실제로 겪었다). 5분 주기가 필요하면 Pro 플랜이다.
+시연에서는 `POST /api/cron/reconcile`을 손으로 눌러 즉시 교정을 보여준다.
 
 ⚠ **Vercel Cron은 GET으로 호출한다.** 그래서 이 라우트의 GET은
 `Authorization: Bearer $CRON_SECRET`이 있으면 **실행**하고, 없으면 상태만 조회한다.

@@ -23,3 +23,5 @@ dist/
 *.tar
 *.tar.gz
 batch.log
+.vercel
+.env*
