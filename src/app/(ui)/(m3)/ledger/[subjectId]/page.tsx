@@ -69,7 +69,7 @@ export default function LedgerPage({
   }, [subjectId]);
 
   return (
-    <Shell title="뜻의 이력" fr={["FR-555", "FR-556"]}>
+    <Shell title="뜻의 이력" fr={["FR-555", "FR-556"]} back={{ href: "/", label: "처음으로" }}>
       {data && (
         // 검증 배지가 이 화면의 결론이다. 이력이 있다는 사실보다
         // 그 이력이 손대지지 않았다는 사실이 유족에게 필요한 정보다.

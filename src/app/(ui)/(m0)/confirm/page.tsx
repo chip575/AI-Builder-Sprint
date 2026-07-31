@@ -134,12 +134,34 @@ function FactSheet() {
         </Notice>
       )}
 
+      {/* 버튼을 조용히 죽이지 않는다 — 회색 버튼만 남으면 무엇을 해야 하는지 알 수 없다.
+          누르면 무엇이 모자란지, 어디로 가야 하는지 알려준다 (NFR-705) */}
       <PrimaryButton
-        onClick={() => void confirm()}
-        disabled={busy || sheet.missingRequired.length > 0}
+        onClick={() => {
+          if (sheet.missingRequired.length > 0) {
+            setError({
+              message: `${sheet.missingRequired
+                .map((k) => LABEL[k] ?? k)
+                .join(", ")} 항목이 아직 비어 있어요.`,
+              nextAction: "대화로 돌아가 그 내용을 말씀해 주시면 이어서 정리해 드릴게요.",
+            });
+            return;
+          }
+          void confirm();
+        }}
+        disabled={busy}
       >
         {sheet.confirmedAt ? "확인함 — 다음으로" : "이대로 확인했어요"}
       </PrimaryButton>
+
+      {/* 나가는 문 — 이게 없으면 이 화면이 막다른 길이 된다 */}
+      <button
+        type="button"
+        onClick={() => router.push("/chat")}
+        className="min-h-11 w-full text-sm text-stone-500 underline underline-offset-4"
+      >
+        대화로 돌아가기
+      </button>
     </div>
   );
 }

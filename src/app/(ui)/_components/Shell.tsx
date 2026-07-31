@@ -12,15 +12,28 @@ export function Shell({
   fr,
   children,
   footer,
+  back,
 }: {
   title: string;
   /** 이 화면이 구현하는 FR — 우상단 배지 */
   fr: string[];
   children: ReactNode;
   footer?: ReactNode;
+  /** 이전 화면으로 — 없으면 사용자는 홈으로 나가는 수밖에 없다.
+   *  "나중에 생각할래요"는 그만두는 문이지 되돌아가는 문이 아니다 */
+  back?: { href: string; label: string };
 }) {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 pb-32 pt-8 text-base">
+      {back && (
+        <Link
+          href={back.href}
+          className="mb-3 inline-flex min-h-11 items-center text-sm text-stone-500 hover:text-stone-700"
+        >
+          ← {back.label}
+        </Link>
+      )}
+
       <header className="mb-6 flex items-start justify-between gap-4">
         <h1 className="text-xl font-semibold text-stone-900">{title}</h1>
         <div className="flex flex-wrap justify-end gap-1">

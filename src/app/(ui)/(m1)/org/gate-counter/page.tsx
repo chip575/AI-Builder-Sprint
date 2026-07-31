@@ -24,14 +24,14 @@ export default function GateCounterPage() {
 
   if (!stats) {
     return (
-      <Shell title="유효성 게이트" fr={["FR-509"]}>
+      <Shell title="유효성 게이트" fr={["FR-509"]} back={{ href: "/org", label: "지표로" }}>
         <p className="text-stone-500">불러오는 중…</p>
       </Shell>
     );
   }
 
   return (
-    <Shell title="유효성 게이트" fr={["FR-509"]}>
+    <Shell title="유효성 게이트" fr={["FR-509"]} back={{ href: "/org", label: "지표로" }}>
       <div className="space-y-5">
         <div className="rounded-xl border border-stone-300 bg-white p-5">
           <p className="text-sm text-stone-500">무효 서명 시도 차단</p>

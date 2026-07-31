@@ -48,7 +48,7 @@ export default async function HeartWillPage({
   const pending = (head?.paragraphs ?? []).filter((p) => p.acceptedAt === null);
 
   return (
-    <Shell title="마음 유언" fr={["FR-111"]}>
+    <Shell title="마음 유언" fr={["FR-111"]} back={{ href: "/chat", label: "대화로" }}>
       {/* 최상단·항상·인쇄물에도 — 이 문서가 무엇이 아닌지부터 말한다 */}
       <div className="mb-6">
         <Notice>
@@ -177,7 +177,9 @@ export default async function HeartWillPage({
                 고를 문장에 추가하기
               </button>
               <p className="text-sm text-stone-500">
-                쓰신 문장도 바로 문서에 들어가지 않습니다. 위에서 고르셔야 담깁니다.
+                {session.utterances.length === 0
+                  ? "먼저 대화에서 이야기를 남겨 주세요. 그 원문이 문단의 근거가 됩니다."
+                  : "쓰신 문장도 바로 문서에 들어가지 않습니다. 위에서 고르셔야 담깁니다."}
               </p>
             </form>
           </section>

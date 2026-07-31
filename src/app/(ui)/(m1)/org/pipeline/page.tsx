@@ -29,7 +29,7 @@ export default function PipelineStatsPage() {
 
   if (!stats) {
     return (
-      <Shell title="파이프라인 지표" fr={["NFR-709"]}>
+      <Shell title="파이프라인 지표" fr={["NFR-709"]} back={{ href: "/org", label: "지표로" }}>
         <p className="text-stone-500">불러오는 중…</p>
       </Shell>
     );

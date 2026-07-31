@@ -101,7 +101,7 @@ export default function RecallPage() {
   const grandTotal = coverage.reduce((n, c) => n + c.total, 0);
 
   return (
-    <Shell title="회상" fr={["FR-301", "FR-110"]}>
+    <Shell title="회상" fr={["FR-301", "FR-110"]} back={{ href: "/chat", label: "대화로" }}>
       {/* 커버리지 — 진도가 아니라 "어느 이야기를 아직 안 했나"를 보여준다 */}
       {coverage.length > 0 && (
         <section className="mb-6 rounded-xl border border-stone-200 p-4">
