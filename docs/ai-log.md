@@ -24,3 +24,4 @@
 2026-07-31 | AI(Claude) | 민법 §1019 상속 승인·포기 기간을 lib/rules에 추가(PM 승인). D-day를 계산하지 않는 것과 전문가 상담 권고를 테스트로 고정 — 기산점이 사망일이 아니라 '안 날'이라 우리가 알 수 없다
 2026-07-31 | AI(Claude) | M4 ESTATE 4a 인벤토리 구현(스키마 3표·StorePort 2구현·POST/GET /api/estate/assets·beneficiaries·assets/scan). 파이프라인은 한 줄도 고치지 않았다 — 판독은 M-PAPER-SCAN의 DP+IE와 업로드 보관소를 그대로 재사용. 마스킹을 라우트가 아니라 저장 계층에 둠(호출부를 하나라도 빠뜨리면 원문이 앉으므로). 사람 확인 필요: 마이그레이션 미적용(db push 금지), mask.ts는 보안 5조 리뷰 대상, 채무 안내(민법 §1019)는 lib/rules 부재로 debtNotice=null
 2026-07-31 | AI(Claude) | A트랙(M4 인벤토리) 병합 + §1019 연결. 워커가 남긴 debtNotice=null 기대값을 룰 생성 후 갱신 — 지시가 임시 상태였던 것을 테스트가 붙잡고 있었다
+2026-07-31 | AI(Claude) | 서식 8종(v3) 필드 검증층 template-fields.ts 신설 — 칸 넘침·서식별 금칙·서면 정합성. 주민번호 검사는 gate:check(소스 grep)·maskIdentifier(DB 저장)와 다른 관문이라 중복이 아님. 통과 케이스가 연락처를 계좌로 오판하던 것을 잡아냄
