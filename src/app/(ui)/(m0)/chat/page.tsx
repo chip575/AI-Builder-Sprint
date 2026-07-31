@@ -12,6 +12,9 @@ interface Turn {
   text: string;
 }
 
+/** 브라우저에 남기는 것은 세션 id뿐이다 — 내용은 서버에 있다 (보안 1조) */
+const SESSION_KEY = "namgida.sessionId";
+
 const BRANCH_LABEL: Record<string, string> = {
   DONATION_NOW: "기부 약정",
   HERITAGE_SUPPORT: "문화유산 후원",
@@ -28,11 +31,30 @@ export default function ChatPage() {
   const [branch, setBranch] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
+  /** 지난 세션에서 이어온 것인지 — 처음 온 사람과 돌아온 사람에게 다른 화면을 준다 */
+  const [resumed, setResumed] = useState(false);
+  const [savedCount, setSavedCount] = useState<number | null>(null);
+  /** 이번 대화에서 다뤄진 이야기 수 — 저장되고 있다는 것이 화면에 보여야 한다 */
+  const [covered, setCovered] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [turns]);
+
+  // 세션 주기와 무관하게 이어쓴다 — 화면 상태로만 들고 있으면 새로 들어온 순간
+  // 지난 이야기로 돌아갈 길이 없어진다 (D-07 · FR-113)
+  useEffect(() => {
+    const saved = localStorage.getItem(SESSION_KEY);
+    if (!saved) return;
+    setSessionId(saved);
+    setResumed(true);
+    // 무엇이 정리돼 있는지 숫자로 보인다 — "저장됐나?"를 사용자가 알 수 있어야 한다
+    fetch(`/api/facts?intentId=${saved}`)
+      .then((r) => r.json())
+      .then((b) => setSavedCount(b.ok ? (b.data.facts?.length ?? 0) : 0))
+      .catch(() => setSavedCount(null));
+  }, []);
 
   async function send() {
     const text = input.trim();
@@ -60,8 +82,14 @@ export default function ChatPage() {
             const m = meta as {
               sessionId: string;
               expressBranch?: { branchType: string } | null;
+              axisCoverage?: { answered: number }[];
             };
+            if (m.axisCoverage) {
+              setCovered(m.axisCoverage.reduce((n, c) => n + c.answered, 0));
+            }
             setSessionId(m.sessionId);
+            // 다음에 들어와도 이 대화로 돌아올 수 있게 남긴다
+            localStorage.setItem(SESSION_KEY, m.sessionId);
             if (m.expressBranch) setBranch(m.expressBranch.branchType);
           },
         },
@@ -99,7 +127,29 @@ export default function ChatPage() {
   return (
     <Shell title="무엇을 남기고 싶으세요?" fr={["FR-101", "FR-110", "FR-115B"]}>
       <div className="space-y-4">
-        {turns.length === 0 && (
+        {turns.length === 0 && resumed && (
+          <div className="rounded-xl border border-stone-300 bg-white p-4">
+            <p className="font-medium text-stone-800">지난번 이야기를 이어갑니다.</p>
+            <p className="mt-1 text-sm text-stone-600">
+              {savedCount === null
+                ? "그동안 남기신 내용은 그대로 있습니다."
+                : `그동안 ${savedCount}가지가 정리되어 있습니다. 아래에서 확인하실 수 있어요.`}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem(SESSION_KEY);
+                setSessionId(null);
+                setResumed(false);
+                setSavedCount(null);
+              }}
+              className="mt-3 min-h-11 text-sm text-stone-500 underline underline-offset-4"
+            >
+              새로 시작할게요
+            </button>
+          </div>
+        )}
+        {turns.length === 0 && !resumed && (
           <p className="text-stone-500">
             떠오르는 대로 이야기해 주세요. 한 번에 하나씩 여쭐게요.
           </p>
@@ -124,6 +174,13 @@ export default function ChatPage() {
             <p className="text-sm text-stone-500">진행 중인 정리</p>
             <p className="mt-1 font-medium">{BRANCH_LABEL[branch] ?? branch}</p>
           </div>
+        )}
+
+        {/* 말한 내용이 남고 있다는 신호. 없으면 사용자는 저장됐는지 알 방법이 없다 */}
+        {covered !== null && covered > 0 && (
+          <p className="text-sm text-stone-500">
+            지금까지 {covered}가지 이야기가 정리되어 있습니다. 다음에 오셔도 이어집니다.
+          </p>
         )}
 
         <ErrorNote error={error} />
@@ -153,7 +210,9 @@ export default function ChatPage() {
           </button>
         </form>
 
-        {sessionId && turns.length >= 2 && (
+        {/* 돌아온 사람에게도 보여야 한다 — 이 조건이 turns에만 걸려 있으면
+            새로 들어온 순간 지난 이야기로 가는 길이 사라진다 */}
+        {sessionId && (turns.length >= 2 || resumed) && (
           <PrimaryButton onClick={() => void toConfirm()} disabled={busy}>
             정리된 내용 확인하기
           </PrimaryButton>
