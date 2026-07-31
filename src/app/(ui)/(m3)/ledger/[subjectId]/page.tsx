@@ -138,6 +138,14 @@ export default function LedgerPage({
                     })()}
                   </p>
                 )}
+                {/* 거부가 있는데 노드는 여전히 "지금의 뜻"이다. 설명이 없으면
+                    유족은 "가족이 반대했는데도 유효한가"로 읽는다 — 화면이 답한다 */}
+                {acks[node.id]?.acks.some((x) => x.status === "DECLINED") && (
+                  <p className="mt-1 rounded-lg bg-stone-50 px-3 py-2 text-xs leading-relaxed text-stone-500">
+                    가족의 확인은 동의가 아니라 <b>알고 있다는 기록</b>입니다. 거부하셨더라도
+                    본인의 뜻은 그대로 유효하며, 거부하신 사실만 함께 남습니다.
+                  </p>
+                )}
                 {node.witness && node.witness.length > 0 && (
                   <p className="mt-2 text-sm text-stone-500">
                     입회 {node.witness.map((w) => `${w.name}(${w.relation})`).join(", ")}

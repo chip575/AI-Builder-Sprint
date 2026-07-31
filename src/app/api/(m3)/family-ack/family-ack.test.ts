@@ -147,4 +147,15 @@ describe("M-FAMILY-ACK — 동의가 아니라 인지 (FR-554)", () => {
     expect(sources[1]).toContain("DECLINED");
     expect(sources[1]).not.toContain("APPROVED");
   });
+
+  it("거부가 있을 때 화면이 '동의가 아니다'를 설명한다", () => {
+    // 원칙이 주석·테스트에만 있고 화면에 없으면 유족은 모른다.
+    // Q&A의 "가족이 반대하면요?"에 대한 답이 화면에 있어야 한다
+    const page = readFileSync(
+      "src/app/(ui)/(m3)/ledger/[subjectId]/page.tsx",
+      "utf-8",
+    );
+    expect(page).toContain("DECLINED");
+    expect(page).toContain("본인의 뜻은 그대로 유효");
+  });
 });
