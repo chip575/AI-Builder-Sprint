@@ -19,3 +19,4 @@
 2026-07-31 | AI(Claude) | M1 잔여 3종(OBLIGATIONS·TIMETRAVEL·ADMIN-OPS) 구현. SIGN-LIFECYCLE은 계약(RemindReq) 부재로 제외 — 서식 잔여 건수(10)를 감안해 계약 신설도 보류
 2026-07-31 | AI(Claude) | WORKER_ROLE 훅 실검증(11케이스) — 라우트 그룹 도입 후 역할 패턴이 안 맞아 be1·be2가 자기 경로에서 차단되던 것을 발견해 수정. 정상 통과 케이스를 함께 재지 않았으면 못 잡았다
 2026-07-31 | AI(Claude) | 계약 4건 적용(estate 신설·remind 추가·DocType/판정 1건) + branch_proposals.status 영속화. B트랙 워커가 금지 경로에 막혀 미완으로 보고한 지점을 사람(=PM 경로)이 이어받음
+2026-07-31 | AI(Claude) | M-SIGN-LIFECYCLE 리마인드 구현 — 임계 기준점을 draft 생성이 아닌 외부 문서의 발신 시각(startedAt)으로 잡고, 완료·거절 판정도 로컬이 아닌 외부 상태로 함(웹훅 유실 시 오발송 방지). remindCount는 StorePort에 감사로그 되읽기가 없어 프로세스 사본으로 셈 — 사람 판단 필요
