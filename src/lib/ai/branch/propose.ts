@@ -11,11 +11,6 @@ import { BRANCH_WEIGHT } from "../../rules/branch-weight";
 import { addProposal } from "../session/store";
 import type { Utterance } from "../session/store";
 import { detector } from "./detect";
-import {
-  declinedBranchTypes,
-  proposedBranchTypes,
-  rememberProposal,
-} from "./store";
 
 /**
  * 확인형 제안 문구 (FR-115A) — "방금 ○○ 이야기를 하셨어요. …정리해볼까요?"
@@ -66,7 +61,6 @@ export async function createProposal(args: {
     sourceUtteranceId: record.sourceUtteranceId,
     message: PROPOSAL_MESSAGE[record.branchType],
   });
-  rememberProposal(proposal, args.sessionId, args.userId);
   return proposal;
 }
 
@@ -83,7 +77,10 @@ export async function proposeBranches(input: ProposeInput): Promise<BranchPropos
   // 닫은 가지는 **영속 기록**에서 읽는다 — 메모리에만 두면 인스턴스가 갈릴 때
   // 거절했던 가지가 되살아나고, 사용자에게는 거절이 무시된 것으로 보인다 (FR-115A)
   const closed = new Set(await store.listDeclinedBranchesByUser(input.userId));
-  const seen = proposedBranchTypes(input.sessionId);
+  // 같은 세션에서 이미 꺼낸 가지 — **영속 기록**에서 읽는다.
+  // 프로세스 사본으로 세면 인스턴스가 갈릴 때 같은 가지를 두 번 묻는다 (FR-113)
+  const session = await store.getSession(input.sessionId);
+  const seen = new Set((session?.proposals ?? []).map((p) => p.branchType));
 
   const made: BranchProposal[] = [];
   for (const signal of signals) {

@@ -6,7 +6,7 @@
 // 이 구분을 지우고 하나로 합치면 둘 중 하나가 반드시 틀린다.
 import type { BranchDecision, BranchDecisionRes } from "../../contracts/branch";
 import { isHeavy } from "../../rules/branch-weight";
-import type { ProposalRecord } from "./store";
+import type { BranchProposalRecord } from "../../store/types";
 
 /** 화면 라우팅 힌트 — 경로가 아니라 기호다. 경로 이름은 화면이 소유한다 */
 export const NEXT_STEP = {
@@ -23,7 +23,7 @@ export const NEXT_STEP = {
  * DEFER는 거절이 아니다 (P4). DEFERRED는 닫힘이 아니므로 재제안 금지에 걸리지 않는다.
  */
 export function resolveDecision(
-  record: Pick<ProposalRecord, "branchType" | "origin">,
+  record: Pick<BranchProposalRecord, "branchType" | "origin">,
   action: BranchDecision["action"],
 ): BranchDecisionRes {
   switch (action) {
@@ -38,7 +38,7 @@ export function resolveDecision(
         : { status: "PENDING_RECONFIRM", nextStep: NEXT_STEP.NEXT_SESSION_RECONFIRM };
 
     case "DECLINE":
-      // 닫힘. 재제안 금지가 여기서 성립한다 (store.declinedBranchTypes)
+      // 닫힘. 재제안 금지가 여기서 성립한다 (StorePort.listDeclinedBranchesByUser)
       return { status: "DECLINED", nextStep: null };
 
     case "DEFER":
