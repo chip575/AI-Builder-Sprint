@@ -3,10 +3,12 @@
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
+import type { LedgerNode } from "../contracts/ledger";
 import type {
   BranchProposalRecord,
   GateStats,
   GateVerdictRecord,
+  LedgerAppendInput,
   MetricRecord,
   StageStat,
   DraftRecord,
@@ -91,6 +93,10 @@ export interface StorePort {
   recordReconcile(corrected: number): Promise<void>;
   getReconcileState(): Promise<{ lastSyncAt: string | null; correctedTotal: number }>;
 
+  /** 감사 로그 append (FR-556 열람 기록 등).
+   *  ⚠ 기록 실패가 본 흐름을 막으면 안 된다 — 호출부가 삼킨다 */
+  recordAudit(action: string, subject: string, detail?: unknown): Promise<void>;
+
   // ── mock signer 외부 상태 (MODUSIGN_MODE=mock 전용) ───────
   /** 서버리스는 요청마다 인스턴스가 갈린다. mock이 대역하는 "외부 세계"를 인메모리로만
    *  두면 서명 요청은 A에서, 완료 시뮬은 B에서 처리되어 문서를 잃는다.
@@ -116,6 +122,12 @@ export interface StorePort {
     sessionId: string,
     acceptedParagraphIds: string[],
   ): Promise<HeartWillApplyResult | null>;
+  // ── intent ledger (FR-550~555) ────────────────────────────
+  /** append-only. UPDATE·DELETE는 존재하지 않는다 — 정정도 새 노드다.
+   *  seq와 해시는 어댑터가 꼬리를 읽어 계산한다 (lib/ledger/chain.buildNode) */
+  appendLedgerNode(input: LedgerAppendInput): Promise<LedgerNode>;
+  /** seq 오름차순. status는 저장값이 아니라 유도값으로 내보낸다 (FR-555 최신성) */
+  listLedgerNodes(subjectId: string): Promise<LedgerNode[]>;
 
   // ── evidences ─────────────────────────────────────────────
   createEvidence(

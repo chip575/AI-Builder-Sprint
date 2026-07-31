@@ -6,6 +6,8 @@ import { randomUUID } from "node:crypto";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
+import type { LedgerNode, LedgerNodeStatus, Materiality } from "../contracts/ledger";
+import { buildNode, withDerivedStatus } from "../ledger/chain";
 import type { StorePort } from "./port";
 import { summarizeMetrics } from "./percentile";
 import {
@@ -18,6 +20,7 @@ import {
   type HeartWillParagraph,
   type HeartWillParagraphDraft,
   type HeartWillVersion,
+  type LedgerAppendInput,
   type SessionRecord,
   type Utterance,
   type GateStats,
@@ -64,6 +67,22 @@ const toDraft = (r: Row): DraftRecord => ({
   status: r.status as DocStatus,
   modusignDocumentId: r.modusign_document_id,
   rejectReason: r.reject_reason,
+  createdAt: iso(r.created_at),
+});
+
+const toLedgerNode = (r: Row): LedgerNode => ({
+  id: r.id,
+  subjectId: r.subject_id,
+  seq: r.seq,
+  materiality: r.materiality as Materiality,
+  changeSummary: r.change_summary,
+  changeReason: r.change_reason,
+  conditionNote: r.condition_note,
+  witness: r.witness,
+  draftId: r.draft_id,
+  prevHash: r.prev_hash,
+  nodeHash: r.node_hash,
+  status: r.status as LedgerNodeStatus,
   createdAt: iso(r.created_at),
 });
 
@@ -436,6 +455,10 @@ export class SupabaseStore implements StorePort {
     };
   }
 
+  async recordAudit(action: string, subject: string, detail?: unknown): Promise<void> {
+    await this.audit(action, subject, detail);
+  }
+
   // mock 전용 상태다. 전용 테이블·RLS 결정을 새로 만들지 않고 append-only 감사 로그에
   // 얹는다 — 최신 행이 현재 상태다 (recordReconcile과 같은 판단).
   async putMockDoc(documentId: string, state: Record<string, unknown>): Promise<void> {
@@ -624,6 +647,48 @@ export class SupabaseStore implements StorePort {
       version: await this.heartWillVersion(documentId, newRow),
       previousParagraphs: previous,
     };
+  }
+
+  async appendLedgerNode(input: LedgerAppendInput): Promise<LedgerNode> {
+    const chain = await this.listLedgerNodes(input.subjectId);
+    // created_at을 명시해 넣는다 — 봉인된 값이라 DB default now()에 맡기면
+    // 우리가 해시한 시각과 저장된 시각이 갈려 재검증이 즉시 깨진다
+    const node = buildNode(chain.at(-1), input, {
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+    });
+    const { data, error } = await this.db
+      .from("intent_ledger_nodes")
+      .insert({
+        id: node.id,
+        subject_id: node.subjectId,
+        seq: node.seq,
+        materiality: node.materiality,
+        change_summary: node.changeSummary,
+        change_reason: node.changeReason,
+        condition_note: node.conditionNote ?? null,
+        witness: node.witness ?? null,
+        draft_id: node.draftId ?? null,
+        prev_hash: node.prevHash,
+        node_hash: node.nodeHash,
+        created_at: node.createdAt,
+      })
+      .select()
+      .single();
+    // UNIQUE(subject_id, seq) · UNIQUE(subject_id, prev_hash) 위반은 동시 추가로
+    // 체인이 갈라졌다는 뜻이다. 삼키지 않는다 — 분기된 원장은 없느니만 못하다
+    if (error) this.fail("ledger.insert", error);
+    return toLedgerNode(data);
+  }
+
+  async listLedgerNodes(subjectId: string): Promise<LedgerNode[]> {
+    const { data, error } = await this.db
+      .from("intent_ledger_nodes")
+      .select("*")
+      .eq("subject_id", subjectId)
+      .order("seq");
+    if (error) this.fail("ledger.select", error);
+    return withDerivedStatus((data ?? []).map(toLedgerNode));
   }
 
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) {

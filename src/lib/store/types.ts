@@ -8,6 +8,7 @@ import type {
 } from "../contracts/common";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
+import type { LedgerNodeReq, Materiality } from "../contracts/ledger";
 
 /** dev·인메모리 경로의 user_id — NULL 대신 이 값 (0002가 SET NOT NULL 한 줄로 끝나게) */
 export const DEV_USER_ID = "00000000-0000-4000-8000-0000000000de";
@@ -111,6 +112,16 @@ export interface HeartWillVersion {
 export interface HeartWillApplyResult {
   version: HeartWillVersion;
   previousParagraphs: HeartWillParagraph[];
+}
+
+/** 원장 노드 추가 입력 (FR-550~553).
+ *  seq·prevHash·nodeHash는 여기에 없다 — 꼬리를 읽어야 정해지므로 어댑터가
+ *  lib/ledger/chain의 buildNode에 맡긴다. 호출자가 해시를 들고 오면 그 순간
+ *  "누가 계산했는지"가 갈려 체인이 증거이길 그만둔다. */
+export interface LedgerAppendInput extends LedgerNodeReq {
+  materiality: Materiality;
+  /** MATERIAL일 때 의사 확인서 draft (FR-552). 재서명 흐름은 M3 범위 밖 — 지금은 null */
+  draftId?: string | null;
 }
 
 /** 게이트 판정 1건의 기록 (FR-509) */
