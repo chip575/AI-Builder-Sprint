@@ -28,12 +28,15 @@ const BRANCH_GOAL: Record<BranchType, string> = {
 const SYSTEM = [
   "너는 인생의 마지막 정리를 돕는 대화 상대다. 존댓말로, 짧고 따뜻하게 답한다.",
   "규칙:",
-  "1. 한 번에 하나만 묻는다. 여러 질문을 나열하지 않는다.",
+  "1. **질문은 정확히 하나만 한다.** 물음표는 답변 전체에서 한 번만 쓴다 — 여러 개를 물으면 사용자가 무엇에 답할지 몰라 대화가 끊긴다.",
   "2. 금액·수증자·기부처를 네가 먼저 제안하지 않는다. 사용자가 정한다.",
   "3. 숫자를 만들어 말하지 않는다. 세금·공제·한도 계산은 다른 곳에서 처리한다.",
   "4. 재촉하지 않는다. '지금', '빨리', '놓치기 전에' 같은 표현을 쓰지 않는다.",
   "5. 언제든 멈출 수 있다는 것을 사용자가 알게 한다.",
   "6. 3문장을 넘기지 않는다.",
+  "7. **이미 알고 있는 항목은 다시 묻지 않는다.** 사용자가 말한 것을 되물으면 듣지 않은 것이 된다.",
+  "8. 괄호로 행동·표정을 묘사하지 않는다. '(고개를 끄덕이며)' 같은 지시문을 쓰지 않는다.",
+  "9. 질문 문장이 주어지면 **그 문장을 그대로** 쓴다. 바꿔 말하거나 다른 질문으로 대체하지 않는다.",
 ].join("\n");
 
 export interface SolarResponderOptions {
@@ -59,9 +62,34 @@ export class SolarResponder implements ResponderPort {
   }
 
   async *respond(input: RespondInput): AsyncIterable<string> {
+    // 코드가 아는 것을 모델에게 넘긴다. 안 넘기면 real 모델도 방금 들은 것을 되묻는다 —
+    // eval 첫 측정이 41.7%였던 원인과 같은 계열이다 (필수 슬롯 미전달)
+    const NL = String.fromCharCode(10);
+    const known = input.knownFacts.map((f) => `- ${f.key}: ${f.value}`).join(NL);
+    const missing = input.missingRequired.join(", ");
+
     const goal = input.branchType
-      ? BRANCH_GOAL[input.branchType]
-      : "무엇을 남기고 싶으신지, 마음에 남는 사람이나 장면부터 편하게 여쭙는다.";
+      ? [
+          BRANCH_GOAL[input.branchType],
+          known ? `이미 확인된 항목(다시 묻지 않는다):${NL}${known}` : "",
+          missing
+            ? `아직 여쭐 항목: ${missing}. 이 중 하나만 묻는다.`
+            : "필요한 항목이 다 모였다. 확인 화면으로 넘어가자고 안내한다.",
+        ]
+          .filter(Boolean)
+          .join(NL + NL)
+      : [
+          "무엇을 남기고 싶으신지 회상으로 여쭙는다.",
+          // 질문 문장은 룰테이블이 정한다 — 모델이 지어내면 매번 다른 질문이 나와
+          // 사용자가 이야기를 이어갈 수 없다
+          // 질문 문장을 그대로 쓰게 한다 — 모델이 바꿔 말하면 매번 다른 질문이 나오고,
+          // 사용자는 지난번에 어디까지 이야기했는지 알 수 없게 된다 (FR-301)
+          input.nextAxisQuestion
+            ? `짧게 공감한 뒤 **아래 문장을 그대로** 여쭙는다. 다른 질문을 덧붙이지 않는다.${NL}"${input.nextAxisQuestion}"`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(NL + NL);
 
     // 타임아웃이 없으면 상류가 응답을 시작하지 않을 때 **에러 없이 매달린다** —
     // 사용자에게는 "커서만 깜빡이는 화면"으로 보이고 로그에는 아무것도 남지 않는다.

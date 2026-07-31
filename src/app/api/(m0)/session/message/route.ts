@@ -8,7 +8,8 @@ import {
   getOrCreateSession,
 } from "@/lib/ai/session/store";
 import { responder } from "@/lib/ai/session/responder";
-import { computeCoverage } from "@/lib/rules/question-bank";
+import { computeCoverage, nextQuestion } from "@/lib/rules/question-bank";
+import { MockExtractor } from "@/lib/ai/extract/mock-extractor";
 import { detectExpress } from "@/lib/rules/express-detect";
 import { track } from "@/lib/observability/track";
 import { getCurrentUserId } from "@/lib/auth/session";
@@ -53,6 +54,27 @@ export async function POST(req: Request) {
     ? await addProposal(session.id, branchType, "EXPRESS", utterance.id)
     : null;
 
+  // ── 응답기에 넘길 세션 지식 ──
+  // 방금 발화까지 포함해 **결정론적으로** 슬롯을 훑는다. LLM 호출이 아니라
+  // 추출기의 규칙 판정이라 비용도 지연도 없다. 이걸 안 넘기면 응답기는
+  // 사용자가 방금 말한 것을 다시 묻는다 (실제로 그렇게 나왔다).
+  const allUtterances = [...session.utterances, utterance];
+  const scan = await new MockExtractor().extract({
+    intentId: session.id,
+    branchType,
+    utterances: allUtterances,
+  });
+  const knownFacts = scan.facts.map((f) => ({ key: f.key, value: f.value as string | number }));
+
+  // 축 세션이면 질문은행이 다음 질문을 고른다 — 가지 세션은 슬롯을 모으지 회상하지 않는다
+  const nextAxisQuestion = branchType
+    ? null
+    : (nextQuestion({
+        utterances: allUtterances.map((u) => u.text),
+        askedIds: [],
+        skippedIds: [],
+      })?.text ?? null);
+
   const meta = SessionMessageRes.parse({
     sessionId: session.id,
     utteranceId: utterance.id,
@@ -72,8 +94,11 @@ export async function POST(req: Request) {
       let firstTokenSent = false;
       try {
         for await (const chunk of responder.respond({
-          utterances: session.utterances,
+          utterances: allUtterances,
           branchType,
+          knownFacts,
+          missingRequired: scan.missingRequired,
+          nextAxisQuestion,
         })) {
           controller.enqueue(sse("token", chunk));
           if (!firstTokenSent) {

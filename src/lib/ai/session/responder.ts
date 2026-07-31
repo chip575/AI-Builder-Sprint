@@ -7,7 +7,7 @@ const mode = process.env.UPSTAGE_MODE ?? "mock";
 
 class MockResponder implements ResponderPort {
   async *respond(input: RespondInput): AsyncIterable<string> {
-    for (const t of tokenize(mockReply(input.branchType))) yield t;
+    for (const t of tokenize(mockReply(input))) yield t;
   }
 }
 

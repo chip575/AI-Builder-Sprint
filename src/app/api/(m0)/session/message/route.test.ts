@@ -2,6 +2,7 @@
 // 라우트 핸들러를 직접 호출해 SSE 스트림을 파싱한다 (meta는 항상 마지막 이벤트).
 import { describe, expect, it } from "vitest";
 import { SessionMessageRes } from "@/lib/contracts";
+import { QUESTIONS } from "@/lib/rules/question-bank";
 import { POST } from "./route";
 
 function post(body: unknown): Promise<Response> {
@@ -41,8 +42,12 @@ describe("M-SESSION-MSG — FR-115B 수락 기준", () => {
     expect(meta.expressBranch?.proposalId).toBeTruthy();
     // 회상 인터뷰 질문이 아니라 슬롯 수집으로 시작한다
     const reply = tokens.join("");
-    expect(reply).toContain("어느 지역");
-    expect(reply).not.toContain("들려주시겠어요");
+    // 🔴 방금 말한 것을 다시 묻지 않는다 — 되물으면 듣지 않은 것이 된다.
+    //    코드가 아는 값(region=부산)을 응답기에 넘기지 않으면 여기서 깨진다
+    expect(reply).toContain("부산");
+    expect(reply).not.toContain("어느 지역");
+    // 비어 있는 슬롯(금액)을 묻는다
+    expect(reply).toContain("얼마");
   });
 
   it('"유언장을 준비하고 싶어요" → EXPRESS + 고지, 재촉 문구 없음', async () => {
@@ -61,7 +66,13 @@ describe("M-SESSION-MSG — FR-115B 수락 기준", () => {
   it('"뭔가 남기고 싶어요" → Express 아님, 축(회상 인터뷰) 시작', async () => {
     const { tokens, meta } = await parseSse(await post({ text: "뭔가 남기고 싶어요" }));
     expect(meta.expressBranch ?? null).toBeNull();
-    expect(tokens.join("")).toContain("들려주시겠어요");
+    // 축 세션의 질문은 **질문은행**이 정한다 — 응답기가 지어내면 매번 달라져
+    // 사용자가 이야기를 이어갈 수 없다 (FR-301)
+    const reply = tokens.join("");
+    const fromBank = QUESTIONS.some((q) => reply.includes(q.text));
+    expect(fromBank).toBe(true);
+    // 가지 슬롯 질문이 축 세션에 섞이지 않는다
+    expect(reply).not.toContain("얼마를 보내고");
   });
 });
 

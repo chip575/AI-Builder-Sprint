@@ -1,31 +1,89 @@
 // M-SESSION-MSG — mock 응답기 (UPSTAGE_MODE=mock · NFR-707)
-// 결정론적 고정 응답. Solar 연동이 붙어도 이 fixtures는 데모·테스트 경로로 유지된다.
+//
+// 결정론적이되 **대화 상태를 따라간다.** 고정 문구 하나만 돌려주면 사용자가 무슨 말을 하든
+// 같은 답이 나오고, 그 순간 "대화로 정리한다"는 전제가 화면에서 무너진다.
+//
+// 두 가지가 응답을 정한다:
+//   · 가지 세션 → **아직 비어 있는 슬롯**을 묻는다. 이미 말한 것은 다시 묻지 않는다
+//   · 축 세션   → **질문은행**(lib/rules/question-bank)이 고른 다음 질문을 던진다
 //
 // 문구 규칙 (P4 · NFR-708): 긴급성 표현("지금", "빨리", "놓치기 전에") 금지.
 // 법률 수치 금지 (P3): 계산 언급은 "확인 화면에서 계산"으로만 — 숫자는 lib/rules가 낸다.
 import type { BranchType } from "../../contracts/common";
+import type { RespondInput } from "./port";
 
-/** 축(회상 인터뷰) 시작 — 한 번에 하나의 질문 (FR-101) */
-const SPINE_OPENER =
-  "말씀 고맙습니다. 편하게 이어가 주세요. 요즘 마음에 자주 머무는 사람이나 장면이 있다면, 그 이야기부터 들려주시겠어요?";
-
-/** Express 직행 — 가지별 슬롯 수집 시작. 회상 질문 없음 (FR-115B 수락 기준) */
-const EXPRESS_REPLIES: Record<BranchType, string> = {
-  DONATION_NOW:
-    "고향에 마음을 보태고 싶으시군요. 기부하실 지역과 금액부터 차근차근 정리해 볼게요. 예상 세액공제는 확인 화면에서 계산해 드립니다. 어느 지역에 기부하고 싶으신가요?",
-  HERITAGE_SUPPORT:
-    "문화유산을 지키는 데 마음을 보태고 싶으시군요. 후원하실 대상과 방식을 정리해 볼게요. 어떤 유산이 마음에 남으셨나요?",
-  ESTATE:
-    "무엇이 어디에 있는지부터 차근차근 정리해 볼게요. 먼저 떠오르는 것 하나만 말씀해 주시겠어요?",
-  // 무거운 가지 — 고지 + 오늘/다음에 선택. 재촉 문구 없음 (FR-115B 수락 기준)
-  LEGACY_GIFT:
-    "남기시려는 뜻이 잘 전해지도록 정리하겠습니다. 사후 기부 약정은 가족의 유류분에 영향을 줄 수 있어, 관련 고지를 먼저 확인해 주세요. 오늘 진행하셔도 되고, 다음에 하셔도 됩니다.",
-  HANDWRITTEN_WILL:
-    "유언장을 준비하려는 마음, 소중히 받겠습니다. 유언장은 법이 정한 자필 방식으로만 효력이 생겨서, 전자서명이 아니라 손으로 옮겨 적는 과정을 안내해 드립니다. 오늘 진행하셔도 되고, 다음에 하셔도 됩니다.",
+/** 가지 진입 첫 인사 — 슬롯을 묻기 전에 마음을 먼저 받는다 */
+const BRANCH_GREETING: Record<BranchType, string> = {
+  DONATION_NOW: "고향에 마음을 보태고 싶으시군요.",
+  HERITAGE_SUPPORT: "문화유산을 지키는 데 마음을 보태고 싶으시군요.",
+  ESTATE: "무엇이 어디에 있는지부터 차근차근 정리해 볼게요.",
+  LEGACY_GIFT: "남기시려는 뜻이 잘 전해지도록 정리하겠습니다.",
+  HANDWRITTEN_WILL: "유언장을 준비하려는 마음, 소중히 받겠습니다.",
 };
 
-export function mockReply(branchType: BranchType | null): string {
-  return branchType ? EXPRESS_REPLIES[branchType] : SPINE_OPENER;
+/** 무거운 가지는 고지가 먼저다. 슬롯 수집으로 바로 들어가지 않는다 (FR-115B) */
+const HEAVY_NOTICE: Partial<Record<BranchType, string>> = {
+  LEGACY_GIFT:
+    "사후 기부 약정은 가족의 유류분에 영향을 줄 수 있어, 관련 고지를 먼저 확인해 주세요. 오늘 진행하셔도 되고, 다음에 하셔도 됩니다.",
+  HANDWRITTEN_WILL:
+    "유언장은 법이 정한 자필 방식으로만 효력이 생겨서, 전자서명이 아니라 손으로 옮겨 적는 과정을 안내해 드립니다. 오늘 진행하셔도 되고, 다음에 하셔도 됩니다.",
+};
+
+/** 슬롯별 질문 — 무엇이 비었느냐에 따라 묻는 말이 달라진다 */
+const SLOT_QUESTION: Record<string, string> = {
+  region: "어느 지역에 마음을 두고 계신가요?",
+  amount: "얼마를 보내고 싶으신지 말씀해 주시겠어요?",
+  orgName: "어떤 곳에 보내고 싶으신가요?",
+};
+
+/** 이미 아는 값을 사람 말로 되짚는다 — "듣고 있다"가 보이는 자리다 */
+const SLOT_LABEL: Record<string, string> = {
+  region: "지역",
+  amount: "금액",
+  orgName: "받는 곳",
+};
+
+function readback(known: RespondInput["knownFacts"]): string {
+  const parts = known
+    .filter((f) => SLOT_LABEL[f.key])
+    .map((f) =>
+      f.key === "amount" && typeof f.value === "number"
+        ? `${SLOT_LABEL[f.key]}은 ${f.value.toLocaleString("ko-KR")}원`
+        : `${SLOT_LABEL[f.key]}은 ${f.value}`,
+    );
+  return parts.length > 0 ? `${parts.join(", ")}으로 정리해 두었어요. ` : "";
+}
+
+/**
+ * 대화 상태에서 응답을 만든다.
+ * ⚠ `missingRequired`를 무시하면 사용자가 방금 말한 것을 다시 묻게 된다.
+ */
+export function mockReply(input: RespondInput): string {
+  const { branchType, knownFacts, missingRequired, nextAxisQuestion } = input;
+
+  // ── 축(회상 인터뷰) — 질문은행이 다음 질문을 고른다 ──
+  if (!branchType) {
+    return nextAxisQuestion
+      ? `말씀 고맙습니다. ${nextAxisQuestion}`
+      : "말씀 고맙습니다. 오늘 남기신 이야기는 그대로 저장되었습니다. 다음에 이어서 하셔도 됩니다.";
+  }
+
+  // ── 무거운 가지 — 고지가 먼저, 슬롯은 그다음 ──
+  const notice = HEAVY_NOTICE[branchType];
+  if (notice && knownFacts.length === 0) {
+    return `${BRANCH_GREETING[branchType]} ${notice}`;
+  }
+
+  // ── 가지 — 비어 있는 것만 묻는다 ──
+  const next = missingRequired[0];
+  const greeting = knownFacts.length === 0 ? `${BRANCH_GREETING[branchType]} ` : "";
+  if (next) {
+    const question = SLOT_QUESTION[next] ?? "조금만 더 말씀해 주시겠어요?";
+    return `${greeting}${readback(knownFacts)}${question}`;
+  }
+
+  // 필요한 것이 다 모였다 — 다음 화면으로 넘어갈 때다
+  return `${readback(knownFacts)}필요한 내용이 모였습니다. 확인 화면에서 함께 살펴보시겠어요? 예상 세액공제도 거기서 계산해 보여 드립니다.`;
 }
 
 /** SSE token 이벤트로 흘릴 조각 — 어절 단위 분할 (결정론적) */
