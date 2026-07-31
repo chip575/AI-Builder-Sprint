@@ -2,6 +2,7 @@
 //
 // 라우트에서 떼어낸 순수 함수다 — 화면이 자체 계산하지 않게 서버가 주는 값이고,
 // 저장소 두 구현 어디서 읽어도 같은 규칙으로 접히는지를 이 함수 하나로 검사한다.
+import { debtNoticeStatutes } from "@/lib/rules/inheritance";
 import {
   AssetCategory,
   InventoryRes,
@@ -35,6 +36,7 @@ export function summarize(assets: Asset[]): InventorySummary {
     });
   }
 
+  const hasDebt = assets.some((a) => a.category === "DEBT");
   return {
     totalCount: assets.length,
     byCategory,
@@ -44,12 +46,11 @@ export function summarize(assets: Asset[]): InventorySummary {
     lowConfidenceCount: assets.filter(
       (a) => a.confidence != null && a.confidence < CONFIRM_THRESHOLD,
     ).length,
-    hasDebt: assets.some((a) => a.category === "DEBT"),
-    // 상속포기·한정승인 안내(FR-402)는 기간 수치가 필요하고, 법률 수치는 lib/rules에만
-    // 존재한다 (절대규칙 2). 그 룰은 아직 없고 사람 리뷰 경로이므로 여기서 만들지 않는다 —
-    // **채무가 있다는 사실(hasDebt)은 룰 없이도 성립하므로 그것만 채운다.**
-    // 숫자를 지어내 채우는 것보다 비어 있는 편이 낫다.
-    debtNotice: null,
+    hasDebt,
+    // 채무가 있으면 상속 승인·포기 기간을 함께 알린다 (FR-402 · 민법 §1019).
+    // 기간·조문만 싣고 **D-day는 계산하지 않는다** — 기산점("상속개시 있음을 안 날")을
+    // 우리가 알 수 없기 때문이다. 수치는 lib/rules가 갖는다 (P3)
+    debtNotice: hasDebt ? debtNoticeStatutes() : null,
   };
 }
 

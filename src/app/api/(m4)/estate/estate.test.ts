@@ -180,9 +180,13 @@ describe("M-ESTATE — 채무도 자산의 한 종류다 (FR-402)", () => {
     const after = await inventory();
     expect(after.summary.hasDebt).toBe(true);
     expect(rollup(after, "DEBT")?.count).toBe(1);
-    // 채무 안내(민법 §1019 기간)는 lib/rules가 생긴 뒤에 붙는다 —
-    // 숫자를 지어내 채우지 않는다 (절대규칙 2). 지금은 "채무가 있다"까지만 사실이다
-    expect(after.summary.debtNotice ?? null).toBeNull();
+    // 채무가 있으면 상속 승인·포기 기간을 함께 알린다 (민법 §1019).
+    // 수치는 lib/rules가 갖고, 여기서는 **조문이 실려 나오는지**만 본다
+    const notice = after.summary.debtNotice ?? [];
+    expect(notice).toHaveLength(1);
+    expect(notice[0]!.id).toContain("1019");
+    // D-day를 계산하지 않는다 — 기산점을 우리가 모른다
+    expect(JSON.stringify(notice)).not.toMatch(/D-\d|남은 \d+일/);
   });
 });
 
