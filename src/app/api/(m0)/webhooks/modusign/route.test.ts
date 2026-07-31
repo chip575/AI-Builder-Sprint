@@ -6,7 +6,7 @@ import { mockSigner, signer } from "@/lib/signer";
 import { evaluateGate } from "@/lib/rules/validity-gate";
 import { store } from "@/lib/store";
 import { drainOutbox } from "./outbox";
-import { POST } from "./route";
+import { POST, maskPayload } from "./route";
 
 function post(body: unknown, headers: Record<string, string> = {}) {
   return POST(
@@ -106,6 +106,48 @@ describe("M-WEBHOOK — 재시도 유발 방지", () => {
   it("형식 불일치 페이로드 → 200 (재시도 폭주 방지)", async () => {
     expect((await post({ hello: "world" })).status).toBe(200);
     expect((await post("not-json{{{")).status).toBe(200);
+  });
+});
+
+describe("M-WEBHOOK — 첫 페이로드 덤프 마스킹 (NFR-714)", () => {
+  // 쌍으로 잰다. 가리는 것만 확인하면 "전부 가리는 마스킹"과 구분이 안 되고,
+  // 전부 가리면 이 덤프의 목적(이벤트 종류 확정)이 사라진다
+  it("개인정보는 가린다", () => {
+    const masked = maskPayload({
+      name: "김가상",
+      signer_name: "이가상",
+      signerEmail: "fake@example.com",
+      requesterEmail: "req@example.com",
+      phoneNumber: "010-0000-0000",
+      address: "가상시 가상구",
+    });
+    expect(masked).not.toContain("김가상");
+    expect(masked).not.toContain("이가상");
+    expect(masked).not.toContain("example.com");
+    expect(masked).not.toContain("0000");
+    expect(masked).not.toContain("가상구");
+  });
+
+  it("시스템 식별자는 통과시킨다 — 이게 막히면 상태 전이 매핑이 추정으로 남는다", () => {
+    const masked = maskPayload({
+      eventName: "document.signed",
+      documentName: "기부약정서",
+      templateName: "DONATION_PLEDGE",
+      fileName: "doc.pdf",
+      documentId: "doc_123",
+      status: "COMPLETED",
+    });
+    expect(masked).toContain("document.signed");
+    expect(masked).toContain("기부약정서");
+    expect(masked).toContain("DONATION_PLEDGE");
+    expect(masked).toContain("doc.pdf");
+    expect(masked).toContain("COMPLETED");
+  });
+
+  it("긴 값은 잘라낸다 — base64 증빙이 통째로 로그에 남지 않게", () => {
+    const masked = maskPayload({ blob: "A".repeat(500) });
+    expect(masked).toContain("…");
+    expect(masked.length).toBeLessThan(200);
   });
 });
 

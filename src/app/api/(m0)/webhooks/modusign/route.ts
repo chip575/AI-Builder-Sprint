@@ -13,16 +13,26 @@ const ok = () => Response.json({ ok: true, data: null }); // out: always-200
 // 실 페이로드 구조는 공식 문서에 없다 — 우리 ModusignWebhookPayload는 추정이다.
 // 첫 수신 1회만 원문을 덤프해 키 도착 날 스키마 확정을 "재현 시도"가 아니라
 // "로그 읽기"로 만든다. 개인정보는 마스킹한다 (NFR-714).
+// 사람 이름만 가린다. `name`·`signer_name`은 잡고 `eventName`·`documentName`은 통과시킨다 —
+// 후자는 개인정보가 아니라 시스템 식별자이고, **이벤트 종류를 못 보면 상태 전이 매핑이
+// 추정으로 남는다.** 이 덤프가 그걸 확정할 유일한 기회라 거기까지 가리면 목적이 사라진다.
+// email·phone·address 계열은 `signerEmail`처럼 접미사로 붙으므로 부분 매칭을 유지한다.
+const PERSONAL_KEY = /email|phone|mobile|tel|address|(^|_|\b)name$|signerName|participantName/i;
+
+/** 덤프용 마스킹. 1회 가드와 분리해 둔다 — 가드가 붙어 있으면 테스트가 실행 순서에 걸린다 */
+export function maskPayload(raw: unknown): string {
+  return JSON.stringify(raw, (key, value) => {
+    if (typeof value !== "string") return value;
+    if (PERSONAL_KEY.test(key)) return "***";
+    return value.length > 120 ? `${value.slice(0, 120)}…` : value;
+  });
+}
+
 let dumpedOnce = false;
 function dumpFirstPayload(raw: unknown) {
   if (dumpedOnce) return;
   dumpedOnce = true;
-  const masked = JSON.stringify(raw, (key, value) => {
-    if (typeof value !== "string") return value;
-    if (/email|phone|mobile|tel|name|address/i.test(key)) return "***";
-    return value.length > 120 ? `${value.slice(0, 120)}…` : value;
-  });
-  console.log("[webhook] 첫 페이로드 원문(마스킹):", masked);
+  console.log("[webhook] 첫 페이로드 원문(마스킹):", maskPayload(raw));
 }
 
 /** 상수 시간 비교 — 문자열 ===는 타이밍 누출이 있다. 검증 코드의 표준 */
