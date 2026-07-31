@@ -90,6 +90,10 @@ export interface StorePort {
   recordReconcile(corrected: number): Promise<void>;
   getReconcileState(): Promise<{ lastSyncAt: string | null; correctedTotal: number }>;
 
+  /** 감사 로그 append (FR-556 열람 기록 등).
+   *  ⚠ 기록 실패가 본 흐름을 막으면 안 된다 — 호출부가 삼킨다 */
+  recordAudit(action: string, subject: string, detail?: unknown): Promise<void>;
+
   // ── mock signer 외부 상태 (MODUSIGN_MODE=mock 전용) ───────
   /** 서버리스는 요청마다 인스턴스가 갈린다. mock이 대역하는 "외부 세계"를 인메모리로만
    *  두면 서명 요청은 A에서, 완료 시뮬은 B에서 처리되어 문서를 잃는다.

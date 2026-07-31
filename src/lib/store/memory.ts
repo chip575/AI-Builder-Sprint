@@ -290,6 +290,12 @@ export class InMemoryStore implements StorePort {
     };
   }
 
+  private audits: { action: string; subject: string; detail?: unknown }[] = [];
+
+  async recordAudit(action: string, subject: string, detail?: unknown): Promise<void> {
+    this.audits.push({ action, subject, detail });
+  }
+
   private mockDocs = new Map<string, Record<string, unknown>>();
 
   async putMockDoc(documentId: string, state: Record<string, unknown>): Promise<void> {

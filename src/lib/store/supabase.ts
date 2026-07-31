@@ -450,6 +450,10 @@ export class SupabaseStore implements StorePort {
     };
   }
 
+  async recordAudit(action: string, subject: string, detail?: unknown): Promise<void> {
+    await this.audit(action, subject, detail);
+  }
+
   // mock 전용 상태다. 전용 테이블·RLS 결정을 새로 만들지 않고 append-only 감사 로그에
   // 얹는다 — 최신 행이 현재 상태다 (recordReconcile과 같은 판단).
   async putMockDoc(documentId: string, state: Record<string, unknown>): Promise<void> {
