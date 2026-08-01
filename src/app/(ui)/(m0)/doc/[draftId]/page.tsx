@@ -136,7 +136,7 @@ export default function DocPage() {
               </Notice>
             )}
             <p className="text-center text-sm text-stone-500">서명을 기다리는 중…</p>
-            {docId && (
+            {docId && process.env.NEXT_PUBLIC_DEV_UI === "1" && (
               <button
                 onClick={() => void simulateComplete()}
                 disabled={busy}

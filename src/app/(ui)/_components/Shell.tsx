@@ -36,16 +36,18 @@ export function Shell({
 
       <header className="mb-6 flex items-start justify-between gap-4">
         <h1 className="text-xl font-semibold text-stone-900">{title}</h1>
-        <div className="flex flex-wrap justify-end gap-1">
-          {fr.map((f) => (
-            <span
-              key={f}
-              className="rounded-full bg-stone-200 px-2 py-0.5 text-xs text-stone-600"
-            >
-              {f}
-            </span>
-          ))}
-        </div>
+        {process.env.NEXT_PUBLIC_DEV_UI === "1" && (
+          <div className="flex flex-wrap justify-end gap-1">
+            {fr.map((f) => (
+              <span
+                key={f}
+                className="rounded-full bg-stone-200 px-2 py-0.5 text-xs text-stone-600"
+              >
+                {f}
+              </span>
+            ))}
+          </div>
+        )}
       </header>
 
       <div className="flex-1">{children}</div>
