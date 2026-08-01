@@ -77,6 +77,9 @@ export class UpstageScanner implements DocumentScannerPort {
     // 1) Document Parse — 판독 (표·손글씨 포함, markdown 출력)
     const form = new FormData();
     form.append("model", "document-parse");
+    // ⚠ output_formats를 안 주면 content.html만 채워지고 markdown·text는 **빈 문자열**로 온다.
+    //   빈 문자열은 ??를 통과하므로 판독문이 조용히 사라진다 (2026-08-01 실호출에서 확인).
+    form.append("output_formats", '["markdown","text"]');
     form.append(
       "document",
       new Blob([input.bytes as unknown as BlobPart], { type: input.mimeType }),
@@ -85,7 +88,12 @@ export class UpstageScanner implements DocumentScannerPort {
     const dp = (await (
       await this.call("/document-digitization", { method: "POST", body: form })
     ).json()) as { content?: { markdown?: string; text?: string } };
-    const parsedText = dp.content?.markdown ?? dp.content?.text ?? "";
+    // ??가 아니라 빈 문자열까지 거른다 — 키는 있는데 값이 빈 것이 실제 응답 모양이다
+    const parsedText = firstNonEmpty(dp.content?.markdown, dp.content?.text);
+    if (!parsedText) {
+      // 판독문이 없으면 화면의 "원문 대조"가 성립하지 않는다. 조용히 통과시키지 않는다 (보안 7조)
+      throw new Error("[scan:upstage] 판독 결과가 비었습니다 (content.markdown·text 모두 없음)");
+    }
 
     // 2) Information Extract — 구조화 (문서 입력 전용, D-06)
     const base64 = Buffer.from(input.bytes).toString("base64");
@@ -144,4 +152,10 @@ export function toFields(
   }
 
   return fields;
+}
+
+/** 빈 문자열까지 거르는 우선순위 선택 — ??는 ""를 통과시킨다 */
+function firstNonEmpty(...vals: (string | undefined)[]): string {
+  for (const v of vals) if (v && v.trim()) return v;
+  return "";
 }
