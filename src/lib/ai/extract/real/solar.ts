@@ -105,11 +105,20 @@ export class SolarExtractor implements ExtractorPort {
    * 신뢰도 산출 — 모델이 아니라 우리가 정한다 (D-08).
    * 근거 발화에 숫자가 명시돼 있으면 HIGH, 수사·어림 표현을 해석했으면 MEDIUM,
    * 근거를 대화에서 못 찾으면 LOW(항상 되묻는다).
+   *
+   * ⚠ 판정 대상은 **근거가 있는 발화 전문**이지 좁힌 조각이 아니다.
+   *   조각("백만원")만 보면 어림 표시("쯤")가 잘려 나가 PARSED가 EXPLICIT으로 승격된다.
+   *   어림을 어림으로 남기는 것이 되묻기 규칙의 전제다 (FR-102).
    */
-  private confidenceFor(key: string, value: unknown, sourceText: string, found: boolean): number {
+  private confidenceFor(
+    key: string,
+    value: unknown,
+    evidenceText: string,
+    found: boolean,
+  ): number {
     if (!found) return CONFIDENCE.LOW;
     if (key === "amount") {
-      const parsed = parseAmount(sourceText);
+      const parsed = parseAmount(evidenceText);
       if (!parsed || parsed.value !== value) return CONFIDENCE.LOW; // 근거와 값이 불일치
       return parsed.source === "EXPLICIT" ? CONFIDENCE.HIGH : CONFIDENCE.MEDIUM;
     }
@@ -186,12 +195,16 @@ export class SolarExtractor implements ExtractorPort {
     const byKey = new Map<string, IntentFact>();
     for (const f of parsed.facts ?? []) {
       if (!active.includes(f.key)) continue; // 요청하지 않은 슬롯은 버린다
-      const source = findSpan(input.utterances, f.sourceText);
+      const source = locateSpan(input.utterances, f.key, f.value, f.sourceText);
+      // 신뢰도는 근거가 놓인 발화 전문으로 판정한다 (조각이면 어림 표시가 잘린다)
+      const evidence = source
+        ? (input.utterances.find((u) => u.id === source.utteranceId)?.text ?? source.text)
+        : "";
       byKey.set(f.key, {
         id: randomUUID(),
         key: f.key,
         value: f.value,
-        confidence: this.confidenceFor(f.key, f.value, f.sourceText, source !== null),
+        confidence: this.confidenceFor(f.key, f.value, evidence, source !== null),
         sourceSpan: source,
         confirmed: false, // AI 산출물은 항상 미확정으로 시작 (P1)
       });
@@ -203,6 +216,66 @@ export class SolarExtractor implements ExtractorPort {
       missingRequired: slots.filter((k) => !byKey.has(k)),
     });
   }
+}
+
+/**
+ * 근거 위치를 정한다 — 모델 문구 → 값 순으로 찾는다.
+ *
+ * 실 Solar는 프롬프트의 "원문 조각" 지시와 달리 **발화를 통째로** 돌려주거나 살짝
+ * 정규화해서 돌려준다. 정확 일치 하나만 쓰면 두 방향으로 다 진다:
+ *   - 정규화되면 못 찾아 전부 LOW로 떨어지고 (어림 표현일수록 그렇다)
+ *   - 통째로 오면 찾아도 발화 전체가 근거가 돼 "이렇게 말씀하셨어요"가 가리킬 곳이 없다
+ * 그래서 조각이 아닐 때는 **값으로 다시 좁힌다.** 값으로도 못 찾으면 그때 LOW다 —
+ * 폴백은 근거를 넓히는 장치이지 없는 근거를 만드는 장치가 아니다 (환각 방어 유지).
+ */
+function locateSpan(
+  utterances: Utterance[],
+  key: string,
+  value: unknown,
+  sourceText: string,
+) {
+  const exact = findSpan(utterances, sourceText);
+  if (exact && !coversWholeUtterance(utterances, exact)) return exact; // 이미 조각이다
+  return findSpanByValue(utterances, key, value) ?? exact;
+}
+
+function coversWholeUtterance(
+  utterances: Utterance[],
+  span: { utteranceId: string; text: string },
+) {
+  const u = utterances.find((x) => x.id === span.utteranceId);
+  return !!u && span.text.trim() === u.text.trim();
+}
+
+/** 값 자체를 발화에서 찾는다 — 모델이 문구를 바꿔도 근거를 잃지 않는다 */
+function findSpanByValue(utterances: Utterance[], key: string, value: unknown) {
+  if (key === "amount" && typeof value === "number") {
+    for (const u of utterances) {
+      const parsed = parseAmount(u.text);
+      if (parsed && parsed.value === value) {
+        // 수사 표기는 앞 공백까지 물고 온다(" 백만원") — 하이라이트가 한 칸 밀리므로 턴다
+        const lead = parsed.text.length - parsed.text.trimStart().length;
+        const text = parsed.text.trim();
+        return {
+          utteranceId: u.id,
+          start: parsed.start + lead,
+          end: parsed.start + lead + text.length,
+          text,
+        };
+      }
+    }
+    return null;
+  }
+  if (typeof value !== "string") return null;
+  const needle = value.trim();
+  if (!needle) return null;
+  for (const u of utterances) {
+    const start = u.text.indexOf(needle);
+    if (start >= 0) {
+      return { utteranceId: u.id, start, end: start + needle.length, text: needle };
+    }
+  }
+  return null;
 }
 
 /** 모델이 준 근거 문구를 실제 발화에서 찾아 위치를 붙인다. 못 찾으면 null → LOW */

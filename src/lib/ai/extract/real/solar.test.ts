@@ -126,6 +126,45 @@ describe("realExtractor — 신뢰도는 우리가 정한다 (D-08)", () => {
     expect(r.facts.find((f) => f.key === "amount")!.confidence).toBe(CONFIDENCE.LOW);
   });
 
+  // 아래 3건은 실 호출에서 드러난 것을 고정한다 (2026-08-01).
+  // 실 Solar는 "원문 조각"을 달라는 지시와 달리 발화를 통째로 주거나 정규화해서 준다.
+  // 통과해야 할 것(폴백이 근거를 살린다)과 막혀야 할 것(없는 근거는 여전히 LOW)을 함께 잰다.
+  it("모델이 문구를 바꿔도 값으로 근거를 찾는다 → MEDIUM 유지", async () => {
+    const u = utt("고향인 부산에 백만원쯤 기부하고 싶어요");
+    const { impl } = stub([
+      {
+        status: 200,
+        // 발화에 없는 정규화 문구 — 정확 일치는 실패한다
+        content: { facts: [{ key: "amount", value: 1_000_000, sourceText: "백만 원 정도" }] },
+      },
+    ]);
+    const r = await make(impl).extract(input(u));
+    const amount = r.facts.find((f) => f.key === "amount")!;
+    expect(amount.sourceSpan?.text).toBe("백만원"); // 조각으로 좁혀 잡힌다
+    expect(amount.confidence).toBe(CONFIDENCE.MEDIUM); // "쯤"이 살아 있어 어림으로 남는다
+  });
+
+  it("모델이 발화를 통째로 주면 값으로 좁힌다", async () => {
+    const u = utt("부산에 기부할게요");
+    const { impl } = stub([
+      { status: 200, content: { facts: [{ key: "region", value: "부산", sourceText: "부산에 기부할게요" }] } },
+    ]);
+    const r = await make(impl).extract(input(u));
+    const region = r.facts.find((f) => f.key === "region")!;
+    expect(region.sourceSpan?.text).toBe("부산"); // 발화 전체가 아니라 조각
+    expect(region.confidence).toBe(CONFIDENCE.HIGH);
+  });
+
+  it("폴백이 없는 근거를 만들어내지는 않는다 — 환각 방어 유지", async () => {
+    const { impl } = stub([
+      { status: 200, content: { facts: [{ key: "region", value: "대구", sourceText: "대구요" }] } },
+    ]);
+    const r = await make(impl).extract(input(SCRIPT.intent)); // "부산에 기부하고 싶어요"
+    const region = r.facts.find((f) => f.key === "region")!;
+    expect(region.sourceSpan).toBeNull();
+    expect(region.confidence).toBe(CONFIDENCE.LOW);
+  });
+
   it("정정 발화 — 같은 key는 나중 것이 이긴다 (mock과 동일 규칙)", async () => {
     const { impl } = stub([
       {
