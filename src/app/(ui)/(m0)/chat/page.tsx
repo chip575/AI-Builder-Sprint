@@ -154,7 +154,7 @@ export default function ChatPage() {
   }
 
   return (
-    <Shell title="무엇을 남기고 싶으세요?" fr={["FR-101", "FR-110", "FR-115B"]}>
+    <Shell title="무엇을 남기고 싶으신가요" fr={["FR-101", "FR-110", "FR-115B"]}>
       <div className="space-y-4">
         {turns.length === 0 && resumed && (
           <div className="rounded-xl border border-stone-300 bg-white p-4">
@@ -189,7 +189,8 @@ export default function ChatPage() {
               className={
                 t.role === "user"
                   ? "inline-block max-w-[85%] rounded-2xl bg-stone-900 px-4 py-3 text-left leading-relaxed text-stone-50"
-                  : "inline-block max-w-[85%] rounded-2xl bg-white px-4 py-3 leading-relaxed text-stone-800 shadow-sm"
+                  : // 묻는 쪽만 명조 — 버튼·라벨의 고딕과 대비를 만든다
+                    "inline-block max-w-[85%] rounded-2xl bg-white px-4 py-3 font-serif leading-relaxed text-stone-800 shadow-sm"
               }
             >
               {t.text || "…"}

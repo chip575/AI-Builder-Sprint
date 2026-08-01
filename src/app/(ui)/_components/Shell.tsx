@@ -35,7 +35,11 @@ export function Shell({
       )}
 
       <header className="mb-6 flex items-start justify-between gap-4">
-        <h1 className="text-xl font-semibold text-stone-900">{title}</h1>
+        {/* 제목은 서비스가 건네는 말이므로 명조. 전 화면 공통이고 화면별 예외는 두지 않는다.
+            ⚠ font-serif는 이 h1에만 건다 — header나 main에 걸면 Notice의 법적 고지·
+            ErrorNote·버튼·금액/해시까지 명조가 되고, 그건 P4(다크패턴 금지)에 걸린다.
+            경계: "서비스가 건네는 말"은 명조, "법적 사실과 조작 요소"는 고딕. */}
+        <h1 className="font-serif text-xl font-semibold text-stone-900">{title}</h1>
         {process.env.NEXT_PUBLIC_DEV_UI === "1" && (
           <div className="flex flex-wrap justify-end gap-1">
             {fr.map((f) => (
