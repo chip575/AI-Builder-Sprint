@@ -76,6 +76,42 @@ describe("M-SESSION-MSG — FR-115B 수락 기준", () => {
   });
 });
 
+describe("🔴 M-SESSION-MSG — 회상 질문이 턴마다 바뀐다", () => {
+  // 질문은행에 askedIds를 넘기지 않으면 축 순위가 그대로인 한 **같은 질문이 영원히**
+  // 나온다. 실제로 사용자가 무슨 말을 해도 "가장 잘했다고 생각하는 결정은
+  // 무엇인가요?"만 반복됐다 (2026-08-01). 유닛 368개가 전부 통과한 채 숨어 있었다 —
+  // 한 턴만 보면 정상이고, **턴 사이의 관계**가 깨진 종류이기 때문이다.
+  it("네 턴 동안 같은 질문을 두 번 하지 않는다", async () => {
+    let sid: string | null = null;
+    const replies: string[] = [];
+    for (const text of ["안녕하세요", "그렇군요", "글쎄요", "음 잘 모르겠어요"]) {
+      const r = await parseSse(await post(sid ? { sessionId: sid, text } : { text }));
+      sid = r.meta.sessionId;
+      replies.push(r.tokens.join(""));
+    }
+
+    // 각 응답에 어떤 은행 질문이 들어 있는지로 센다 — 응답기가 무엇을 쓰든 질문 자체를 본다
+    const asked = replies.map(
+      (reply) => QUESTIONS.find((q) => reply.includes(q.text))?.id ?? null,
+    );
+    const found = asked.filter((x): x is string => x !== null);
+    expect(found.length).toBeGreaterThanOrEqual(2); // 회상 질문이 실제로 나왔는가
+    expect(new Set(found).size).toBe(found.length); // 중복 0
+  });
+
+  it("건너뛰지 않은 질문은 사라지지 않는다 — 순서만 바뀐다", async () => {
+    // 반대편: askedIds를 넘긴다고 질문이 고갈되면 안 된다.
+    // 은행이 20문항이므로 네 턴 뒤에도 다음 질문이 남아 있어야 한다
+    let sid: string | null = null;
+    for (const text of ["네", "그렇죠", "맞아요", "그러네요"]) {
+      const r = await parseSse(await post(sid ? { sessionId: sid, text } : { text }));
+      sid = r.meta.sessionId;
+    }
+    const last = await parseSse(await post({ sessionId: sid!, text: "계속 해주세요" }));
+    expect(last.tokens.join("").length).toBeGreaterThan(0);
+  });
+});
+
 describe("M-SESSION-MSG — 프로토콜 규칙", () => {
   it("meta는 스트림의 마지막 이벤트다", async () => {
     const res = await post({ text: "부산에 기부하고 싶어요" });

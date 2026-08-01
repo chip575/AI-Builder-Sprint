@@ -37,6 +37,14 @@ export function parseSseBuffer(buffer: string): { events: SseEvent[]; rest: stri
 export interface SseHandlers {
   /** 본문 조각 — 도착하는 대로 화면에 이어 붙인다 */
   onToken?: (text: string) => void;
+  /**
+   * 대화 중 감지된 가지 제안 (FR-115A). 서버는 응답 뒤·meta 앞에 이걸 보낸다.
+   *
+   * ⚠ 핸들러가 없으면 이벤트가 **조용히 버려진다.** 실제로 그래서 첫 발화가 아닌
+   *   "서류를 줬으면 좋겠는데요" 같은 말에 화면이 아무 반응을 하지 않았다 —
+   *   서버는 제안을 만들어 보냈는데 클라이언트가 읽지 않았다 (2026-08-01).
+   */
+  onProposal?: (proposal: unknown) => void;
   /** 스트림의 마지막 이벤트. 라우팅 판단은 여기서만 한다 */
   onMeta?: (meta: unknown) => void;
 }
@@ -73,6 +81,7 @@ export async function postSse(
     buffer = rest;
     for (const e of events) {
       if (e.event === "token") handlers.onToken?.(JSON.parse(e.data));
+      else if (e.event === "proposal") handlers.onProposal?.(JSON.parse(e.data));
       else if (e.event === "meta") handlers.onMeta?.(JSON.parse(e.data));
     }
   }

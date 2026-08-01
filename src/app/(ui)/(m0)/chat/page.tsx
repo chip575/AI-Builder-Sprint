@@ -13,6 +13,15 @@ interface Turn {
   text: string;
 }
 
+/** 대화 중 감지된 가지 제안 (FR-115A · contracts/branch.ts BranchProposal) */
+interface Proposal {
+  id: string;
+  branchType: string;
+  weight: string;
+  /** 확인형 문구 — 서버가 만든 문장을 그대로 쓴다. 화면이 권유 문구를 지어내지 않는다 */
+  message: string;
+}
+
 /** 브라우저에 남기는 것은 세션 id뿐이다 — 내용은 서버에 있다 (보안 1조) */
 const SESSION_KEY = "namgida.sessionId";
 
@@ -37,7 +46,23 @@ export default function ChatPage() {
   const [savedCount, setSavedCount] = useState<number | null>(null);
   /** 이번 대화에서 다뤄진 이야기 수 — 저장되고 있다는 것이 화면에 보여야 한다 */
   const [covered, setCovered] = useState<number | null>(null);
+  /** 아직 사용자가 답하지 않은 가지 제안 — 답하면 목록에서 뺀다 */
+  const [proposals, setProposals] = useState<Proposal[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
+
+  /** 제안에 대한 사용자의 결정을 서버에 남긴다. 여는 것도 닫는 것도 사용자다 (FR-115A) */
+  async function decide(p: Proposal, action: "ACCEPT" | "DECLINE" | "DEFER") {
+    setProposals((list) => list.filter((x) => x.id !== p.id));
+    const res = await fetch(`/api/branch/${p.id}/decide`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const body = await res.json();
+    if (!body.ok) return setError(body.error);
+    // 무거운 가지는 승낙만으로 열리지 않는다 — 서버가 재확인 상태를 돌려준다 (FR-115B)
+    if (body.data.status === "OPENED") setBranch(p.branchType);
+  }
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -78,6 +103,9 @@ export default function ChatPage() {
               next[next.length - 1] = { ...last, text: last.text + chunk };
               return next;
             }),
+          // 대화 중 감지된 가지 (FR-115A). 여는 것은 사용자다 — 자동으로 넘어가지 않는다.
+          // 이 핸들러가 없으면 서버가 보낸 제안이 조용히 버려진다
+          onProposal: (p) => setProposals((list) => [...list, p as Proposal]),
           // 라우팅 판단은 meta에서만 (스트림의 마지막 이벤트)
           onMeta: (meta) => {
             const m = meta as {
@@ -183,6 +211,34 @@ export default function ChatPage() {
             지금까지 {covered}가지 이야기가 정리되어 있습니다. 다음에 오셔도 이어집니다.
           </p>
         )}
+
+        {/* 대화 중 감지된 가지 (FR-115A) — 확인형 문구 그대로. 자동으로 넘어가지 않는다.
+            "나중에 생각할래요"가 항상 있어야 한다 (P4) */}
+        {proposals.map((p) => (
+          <div key={p.id} className="rounded-xl border border-stone-400 bg-white p-4">
+            <p className="leading-relaxed text-stone-800">{p.message}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => void decide(p, "ACCEPT")}
+                className="min-h-11 flex-1 rounded-xl bg-stone-900 px-4 py-3 text-sm text-stone-50"
+              >
+                네, 그렇게 할게요
+              </button>
+              <button
+                onClick={() => void decide(p, "DEFER")}
+                className="min-h-11 flex-1 rounded-xl border border-stone-300 px-4 py-3 text-sm text-stone-600"
+              >
+                나중에 생각할래요
+              </button>
+              <button
+                onClick={() => void decide(p, "DECLINE")}
+                className="min-h-11 w-full text-sm text-stone-500 underline underline-offset-4"
+              >
+                이 이야기는 그만할게요
+              </button>
+            </div>
+          </div>
+        ))}
 
         {/* 회상은 **축 세션의 일부**지 별도 트랙이 아니다 — 그래서 홈이 아니라
             대화 안에서 이어진다. 대화 중 제안이므로 FR-110의 트랙 선택에 해당하지 않는다 */}

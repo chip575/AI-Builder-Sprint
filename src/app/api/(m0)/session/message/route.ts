@@ -17,6 +17,26 @@ function sse(event: string, data: unknown): Uint8Array {
   return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+/**
+ * 지금까지 물어본 질문 id — **저장하지 않고 재생해서** 구한다.
+ *
+ * nextQuestion은 (발화, 물어본 것, 건너뛴 것)의 순수 함수라, 매 턴을 순서대로
+ * 다시 돌리면 그때 무엇을 물었는지가 그대로 나온다. 세션 레코드에 열을 추가하거나
+ * 마이그레이션을 돌릴 필요가 없고, 질문은행이 요구하는 결정론과도 맞는다.
+ */
+function askedSoFar(previousTexts: string[]): string[] {
+  const asked: string[] = [];
+  for (let i = 1; i <= previousTexts.length; i++) {
+    const q = nextQuestion({
+      utterances: previousTexts.slice(0, i),
+      askedIds: asked,
+      skippedIds: [],
+    });
+    if (q) asked.push(q.id);
+  }
+  return asked;
+}
+
 export async function POST(req: Request) {
   const t0 = Date.now(); // NFR-709 관측 지점
   const body = await req.json().catch(() => null);
@@ -74,7 +94,10 @@ export async function POST(req: Request) {
     ? null
     : (nextQuestion({
         utterances: allUtterances.map((u) => u.text),
-        askedIds: [],
+        // **이미 물어본 질문을 넘겨야 다음 질문으로 넘어간다.** 빈 배열을 넘기면
+        // 축 순위가 그대로인 한 같은 질문이 영원히 나온다 — 실제로 사용자가
+        // 무슨 말을 해도 같은 문장이 반복됐다 (2026-08-01).
+        askedIds: askedSoFar(session.utterances.map((u) => u.text)),
         skippedIds: [],
       })?.text ?? null);
 
