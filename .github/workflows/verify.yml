@@ -1,0 +1,85 @@
+# 검증 자동화 — README가 약속하는 네 명령을 실제로 돌린다.
+#
+# 왜 있는가: 2026-08-01에 두 가지가 드러났다.
+#   · gate:check가 macOS 기본 bash에서 4번 검사부터 죽어 5~8번이 실행된 적이 없었다
+#   · gate:check 7번은 src/ 이동(81b97e5) 이후 68커밋 동안 빨간불이었다
+# 둘 다 "각자 로컬에서만 돌리는" 구조라 아무도 몰랐다. 검사를 만드는 것과
+# 검사가 도는 것은 다르다 — 그 간격을 메우는 것이 이 파일의 전부다.
+#
+# 키는 넣지 않는다. NFR-707이 "키 없이 전 흐름이 돈다"를 요구하므로
+# CI가 그 요구의 상시 증명이 된다 (DATA=memory · UPSTAGE=mock · MODUSIGN=mock).
+name: verify
+
+on:
+  push:
+    branches: [main, m1, m2, m3, m4]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: 타입 검사
+        run: pnpm typecheck
+
+      - name: 유닛·라우트 테스트
+        run: pnpm test
+
+      # 프로젝트 불변식 8종 (법률 수치 위치·개인정보 패턴·폐기 용어 등).
+      # 6번 검사가 git ls-files를 쓰므로 checkout된 저장소가 전제다.
+      - name: 게이트 검사
+        run: pnpm gate:check
+
+      # 발화→구조화→확정→게이트→초안→서명→웹훅→증빙 16단계 관통.
+      # e2e는 살아있는 서버를 때리므로 먼저 띄운다. .env가 없으니 전부 mock이고,
+      # 스크립트의 실과금 가드도 그대로 통과한다.
+      - name: dev 서버 기동
+        run: |
+          pnpm dev > /tmp/dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3000/; then exit 0; fi
+            sleep 1
+          done
+          echo "::error::dev 서버가 60초 안에 뜨지 않았습니다"
+          cat /tmp/dev.log
+          exit 1
+
+      - name: 기동 모드 확인
+        run: |
+          grep -E '^\[mode\]' /tmp/dev.log || true
+          # 키가 없으면 반드시 mock이어야 한다. real이면 CI가 과금하고 있다는 뜻이다
+          if grep -qE '^\[mode\].*(UPSTAGE=real|MODUSIGN=real)' /tmp/dev.log; then
+            echo "::error::CI에서 real 모드로 떴습니다 — 키가 새어 들어왔습니다"
+            exit 1
+          fi
+
+      - name: e2e 관통
+        run: pnpm e2e
+
+      - name: 실패 시 서버 로그
+        if: failure()
+        run: tail -80 /tmp/dev.log || true
