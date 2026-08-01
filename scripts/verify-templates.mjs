@@ -96,8 +96,13 @@ for (const code of Object.keys(TEMPLATE_LABELS)) {
   if (!first) await sleep(2000);
   first = false;
   let { data, error } = await fetchTemplate(id);
-  if (error?.startsWith("429")) {
-    await sleep(6000); // 한 번은 더 기다려 본다
+  // 429는 실패가 아니라 "나중에"다. 한 번만 기다리면 앞선 실행이 태운 쿼터를 못 넘긴다 —
+  // 실제로 스크립트를 연속으로 두 번 돌렸더니 뒤쪽 서식이 통째로 조회 실패로 떨어졌다.
+  // 점점 길게 세 번까지 기다린다. 조회는 공짜이므로 기다리는 비용밖에 들지 않는다
+  for (const wait of [6000, 15000, 30000]) {
+    if (!error?.startsWith("429")) break;
+    console.error(`[verify] ${code} 429 — ${wait / 1000}초 뒤 재시도`);
+    await sleep(wait);
     ({ data, error } = await fetchTemplate(id));
   }
   if (error) {
