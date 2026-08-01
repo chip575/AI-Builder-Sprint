@@ -59,6 +59,8 @@ export default function WritePage() {
   const [facts, setFacts] = useState<PreviewFacts>({});
   /** 무거운 가지의 숙려 — 서버가 재확인을 요구하면 여기 제안 id가 담긴다 (FR-115B) */
   const [deliberation, setDeliberation] = useState<string | null>(null);
+  /** 대화와 문서는 같은 화면을 나눠 쓰지 않는다 — 미리보기가 말풍선 사이에 끼면 거슬린다 */
+  const [view, setView] = useState<"chat" | "doc">("chat");
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,6 +97,7 @@ export default function WritePage() {
     setInput("");
     setError(null);
     setBusy(true);
+    setView("chat"); // 말을 보내면 대화로 돌아온다 — 답이 문서 뒤에 숨지 않게
     setTurns((t) => [...t, { role: "user", text }, { role: "assistant", text: "" }]);
 
     let expressProposalId: string | null = null;
@@ -351,57 +354,103 @@ export default function WritePage() {
       }
     >
       <div className="space-y-4">
-        {turns.map((t, i) => (
-          <div key={i} className={t.role === "user" ? "text-right" : ""}>
-            <span
-              className={
-                t.role === "user"
-                  ? "inline-block max-w-[85%] rounded-2xl bg-stone-900 px-4 py-2.5 text-left leading-relaxed text-stone-50"
-                  : "inline-block max-w-[85%] whitespace-pre-line rounded-2xl bg-white px-4 py-2.5 font-serif leading-relaxed text-stone-800 shadow-sm"
-              }
-            >
-              {t.text || "…"}
-            </span>
-          </div>
-        ))}
-        <div ref={endRef} />
+        {view === "chat" ? (
+          <>
+            {turns.map((t, i) => (
+              <div key={i} className={t.role === "user" ? "text-right" : ""}>
+                <span
+                  className={
+                    t.role === "user"
+                      ? "inline-block max-w-[85%] rounded-2xl bg-stone-900 px-4 py-2.5 text-left leading-relaxed text-stone-50"
+                      : "inline-block max-w-[85%] whitespace-pre-line rounded-2xl bg-white px-4 py-2.5 font-serif leading-relaxed text-stone-800 shadow-sm"
+                  }
+                >
+                  {t.text || "…"}
+                </span>
+              </div>
+            ))}
+            <div ref={endRef} />
 
-        {/* 숙려 — 무거운 약정은 오늘 할지 한 번 더 묻는다. 재촉하지 않는다 (P4) */}
-        {deliberation && (
-          <div className="rounded-xl border border-stone-400 bg-white p-4">
-            <p className="leading-relaxed text-stone-800">
-              유산 기부는 무게가 있는 결정이라, 진행 전에 한 번 더 여쭙습니다. 오늘
-              준비를 시작할까요?
-            </p>
-            <div className="mt-3 flex gap-2">
+            {/* 숙려 — 무거운 약정은 오늘 할지 한 번 더 묻는다. 재촉하지 않는다 (P4) */}
+            {deliberation && (
+              <div className="rounded-xl border border-stone-400 bg-white p-4">
+                <p className="leading-relaxed text-stone-800">
+                  유산 기부는 무게가 있는 결정이라, 진행 전에 한 번 더 여쭙습니다.
+                  오늘 준비를 시작할까요?
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => void proceed("PROCEED_TODAY")}
+                    className="min-h-11 flex-1 rounded-xl bg-stone-900 px-4 text-sm text-stone-50"
+                  >
+                    오늘 시작할게요
+                  </button>
+                  <button
+                    onClick={() => void proceed("PROCEED_LATER")}
+                    className="min-h-11 flex-1 rounded-xl border border-stone-300 px-4 text-sm text-stone-600"
+                  >
+                    다음에 할게요
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <ErrorNote error={error} />
+
+            {/* 문서는 대화에 끼어들지 않는다 — 현황 한 줄과 문만 남긴다 */}
+            <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-white px-4 py-3">
+              <div className="flex flex-wrap gap-1.5 text-xs">
+                {(docType === "LEGACY_GIFT_AGREEMENT"
+                  ? ([["받으실 곳", facts.orgName], ["금액", facts.amount]] as const)
+                  : ([["지역", facts.region], ["금액", facts.amount]] as const)
+                ).map(([label, v]) => (
+                  <span
+                    key={label}
+                    className={`rounded px-2 py-0.5 ${
+                      v != null
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-stone-100 text-stone-400"
+                    }`}
+                  >
+                    {label} {v != null ? "채움" : "비어 있음"}
+                  </span>
+                ))}
+              </div>
               <button
-                onClick={() => void proceed("PROCEED_TODAY")}
-                className="min-h-11 flex-1 rounded-xl bg-stone-900 px-4 text-sm text-stone-50"
+                type="button"
+                onClick={() => {
+                  setView("doc");
+                  if (sessionId) void refreshFacts(sessionId);
+                }}
+                className="min-h-11 shrink-0 rounded-xl border border-stone-300 px-3 text-sm text-stone-700 hover:bg-stone-100"
               >
-                오늘 시작할게요
-              </button>
-              <button
-                onClick={() => void proceed("PROCEED_LATER")}
-                className="min-h-11 flex-1 rounded-xl border border-stone-300 px-4 text-sm text-stone-600"
-              >
-                다음에 할게요
+                약정서 보기
               </button>
             </div>
-          </div>
+          </>
+        ) : (
+          <>
+            <DocPreview docType={docType} facts={facts} />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setView("chat")}
+                className="min-h-11 flex-1 rounded-xl border border-stone-300 bg-white text-sm text-stone-700 transition hover:bg-stone-100"
+              >
+                대화로 돌아가기
+              </button>
+              <button
+                type="button"
+                onClick={() => void fill()}
+                disabled={busy || !sessionId}
+                className="min-h-11 flex-1 rounded-xl border border-stone-300 bg-white text-sm text-stone-700 transition hover:bg-stone-100 disabled:text-stone-300"
+              >
+                {busy ? "정리하는 중…" : "최신 대화 반영하기"}
+              </button>
+            </div>
+            <ErrorNote error={error} />
+          </>
         )}
-
-        <ErrorNote error={error} />
-
-        {/* 대화가 채우는 약정서 — 이 화면의 주인공 */}
-        <DocPreview docType={docType} facts={facts} />
-        <button
-          type="button"
-          onClick={() => void fill()}
-          disabled={busy || !sessionId}
-          className="min-h-11 w-full rounded-xl border border-stone-300 bg-white text-sm text-stone-700 transition hover:bg-stone-100 disabled:text-stone-300"
-        >
-          {busy ? "정리하는 중…" : "지금까지 이야기를 문서에 채우기"}
-        </button>
       </div>
     </Shell>
   );
