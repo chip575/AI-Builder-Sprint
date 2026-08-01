@@ -38,9 +38,16 @@ export type GateVerdict = z.infer<typeof GateVerdict>;
 /** M-GATE-COUNTER — GET /api/admin/gate-stats (FR-509)
  *  형태는 spec/manifest.yaml의 M-GATE-COUNTER 행이 이미 선언한 것을 코드로 옮긴 것이다.
  *
- *  ⚠ blockedTotal은 **차단**만 센다: verdict=ESIGN_INVALID ∧ wasSignAttempt.
- *    NON_BINDING은 차단이 아니라 정상 라우팅이고, 문서 생성 단계의 거부도
- *    "서명 시도 차단"은 아니다. 부풀린 지표는 없느니만 못하다.
+ *  집계: verdict = 'ESIGN_INVALID'  (2026-08-01 변경)
+ *
+ *  ⚠ 이전 규칙은 `∧ wasSignAttempt` 였다. 문서 생성 단계의 차단도 차단이므로
+ *    제외하지 않는다 — UI 경로에서는 ESIGN_OK가 아닌 draft를 /api/documents가
+ *    애초에 만들지 않아 서명 단계에 도달할 방법이 없고, 그래서 카운터가 영원히
+ *    0이 되는 문제가 있었다 (실측: 판정 11건 · 표시 0건).
+ *    wasSignAttempt는 DB에 그대로 남아 있다. 상세 분해가 필요해지면 그때 필드를 낸다.
+ *
+ *  ⚠ NON_BINDING 제외는 **여전히 유효하다.** 바뀐 것은 sign_attempt 조건뿐이다 —
+ *    정상 라우팅을 차단으로 세면 지표가 부풀려진다.
  *    전체 분포(byVerdict)는 게이트가 3분기를 실제로 태웠다는 증거로 따로 보여준다. */
 export const GateStatsRes = z.object({
   blockedTotal: z.number().int().nonnegative(),
