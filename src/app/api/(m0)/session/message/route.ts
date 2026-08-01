@@ -4,6 +4,7 @@
 import { SessionMessageReq, SessionMessageRes } from "@/lib/contracts";
 import { addUtterance, getOrCreateSession } from "@/lib/ai/session/store";
 import { createProposal, proposeBranches } from "@/lib/ai/branch/propose";
+import { detectGuide } from "@/lib/ai/session/guide";
 import { responder } from "@/lib/ai/session/responder";
 import { computeCoverage, nextQuestion } from "@/lib/rules/question-bank";
 import { MockExtractor } from "@/lib/ai/extract/mock-extractor";
@@ -130,31 +131,44 @@ export async function POST(req: Request) {
       : null,
   });
 
+  // 안내 층 — 질문형 발화는 LLM 없이 코드가 답한다 (P3 · lib/ai/session/guide.ts).
+  // Express가 이미 가지를 열었으면 안내보다 그 흐름이 우선이다.
+  const guide = proposal ? null : detectGuide(parsed.data.text);
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let firstTokenSent = false;
-      try {
-        for await (const chunk of responder.respond({
-          utterances: allUtterances,
-          branchType,
-          knownFacts,
-          missingRequired: scan.missingRequired,
-          nextAxisQuestion,
-        })) {
-          controller.enqueue(sse("token", chunk));
-          if (!firstTokenSent) {
-            firstTokenSent = true;
-            // NFR-702의 기준은 **첫 토큰 2초**다 — 전체 스트림 시간이 아니라
-            // 이 값을 재야 지표가 곧 준수의 증거가 된다
-            track("CONVERSE", true, Date.now() - t0);
+      if (guide) {
+        // 결정론적 안내 — 첫 토큰이 곧 전체다. 응답기(LLM)는 이 턴을 건너뛴다.
+        // 감지(proposal)와 meta는 그대로 흘린다: 안내를 받았어도 발화에 의사가
+        // 실려 있으면 확인형 제안이 뒤따라야 한다 (FR-115A)
+        controller.enqueue(sse("token", guide.reply));
+        firstTokenSent = true;
+        track("CONVERSE", true, Date.now() - t0);
+      } else {
+        try {
+          for await (const chunk of responder.respond({
+            utterances: allUtterances,
+            branchType,
+            knownFacts,
+            missingRequired: scan.missingRequired,
+            nextAxisQuestion,
+          })) {
+            controller.enqueue(sse("token", chunk));
+            if (!firstTokenSent) {
+              firstTokenSent = true;
+              // NFR-702의 기준은 **첫 토큰 2초**다 — 전체 스트림 시간이 아니라
+              // 이 값을 재야 지표가 곧 준수의 증거가 된다
+              track("CONVERSE", true, Date.now() - t0);
+            }
           }
-        }
-      } catch (err) {
-        // 스트림 도중 실패 — 사용자에게 보일 문구로 번역해 마지막에 싣는다 (NFR-705)
-        console.warn("[session] 응답 생성 실패:", (err as Error).message);
-        if (!firstTokenSent) {
-          track("CONVERSE", false, Date.now() - t0);
-          controller.enqueue(sse("token", "잠시 문제가 있었어요. 다시 말씀해 주시겠어요?"));
+        } catch (err) {
+          // 스트림 도중 실패 — 사용자에게 보일 문구로 번역해 마지막에 싣는다 (NFR-705)
+          console.warn("[session] 응답 생성 실패:", (err as Error).message);
+          if (!firstTokenSent) {
+            track("CONVERSE", false, Date.now() - t0);
+            controller.enqueue(sse("token", "잠시 문제가 있었어요. 다시 말씀해 주시겠어요?"));
+          }
         }
       }
       // 감지된 제안 — 확인형 문구 그대로 화면에 오른다. 여는 것은 사용자다 (FR-115A).
