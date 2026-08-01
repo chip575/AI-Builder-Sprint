@@ -6,7 +6,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
-import { ErrorNote, PrimaryButton, Shell } from "@/app/(ui)/_components/Shell";
+import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
+import {
+  ChatSidebarPanel,
+  ChatSidebarToggle,
+} from "@/app/(ui)/_components/ChatSidebar";
 
 interface Turn {
   role: "user" | "assistant";
@@ -43,6 +47,8 @@ export default function ChatPage() {
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
   /** 지난 세션에서 이어온 것인지 — 처음 온 사람과 돌아온 사람에게 다른 화면을 준다 */
   const [resumed, setResumed] = useState(false);
+  /** 곁칸 — 겹쳐서 열리므로 대화 폭에 영향을 주지 않는다. 기본은 닫힘 */
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [savedCount, setSavedCount] = useState<number | null>(null);
   /** 이번 대화에서 다뤄진 이야기 수 — 저장되고 있다는 것이 화면에 보여야 한다 */
   const [covered, setCovered] = useState<number | null>(null);
@@ -139,7 +145,14 @@ export default function ChatPage() {
   }
 
   async function toConfirm() {
-    if (!sessionId) return;
+    // 버튼을 조용히 죽이지 않는다 — 눌렀는데 아무 일도 없으면 사용자는 원인을 모른다.
+    // 흐리게 두되 비활성화하지 않는 이유가 이것이다 (NFR-705)
+    if (!sessionId) {
+      return setError({
+        message: "아직 정리할 이야기가 없어요.",
+        nextAction: "아래에 한 문장만 남겨 주시면 바로 정리해 드릴게요.",
+      });
+    }
     setBusy(true);
     setError(null);
     const res = await fetch("/api/extract", {
@@ -153,32 +166,102 @@ export default function ChatPage() {
     router.push(`/confirm?intentId=${sessionId}`);
   }
 
+  /** 지난 세션을 버리고 처음부터 — 곁칸의 "새로 시작할게요" */
+  function reset() {
+    localStorage.removeItem(SESSION_KEY);
+    setSessionId(null);
+    setResumed(false);
+    setSavedCount(null);
+  }
+
+  // 같은 정보를 두 번 말하지 않는다 — 이번 대화의 수가 있으면 그것이, 없으면 지난 세션의 수가
+  // 곁칸의 유일한 숫자가 된다 (분모는 붙이지 않는다 · P4)
+  const storyCount = covered ?? savedCount;
+
   return (
-    <Shell title="무엇을 남기고 싶으신가요" fr={["FR-101", "FR-110", "FR-115B"]}>
-      <div className="space-y-4">
-        {turns.length === 0 && resumed && (
-          <div className="rounded-xl border border-stone-300 bg-white p-4">
-            <p className="font-medium text-stone-800">지난번 이야기를 이어갑니다.</p>
-            <p className="mt-1 text-sm text-stone-600">
-              {savedCount === null
-                ? "그동안 남기신 내용은 그대로 있습니다."
-                : `그동안 ${savedCount}가지가 정리되어 있습니다. 아래에서 확인하실 수 있어요.`}
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                localStorage.removeItem(SESSION_KEY);
-                setSessionId(null);
-                setResumed(false);
-                setSavedCount(null);
-              }}
-              className="mt-3 min-h-11 text-sm text-stone-500 underline underline-offset-4"
+    <Shell
+      title="무엇을 남기고 싶으신가요"
+      fr={["FR-101", "FR-110", "FR-115B"]}
+      headerBar={{
+        leading: (
+          <ChatSidebarToggle
+            open={sidebarOpen}
+            onToggle={() => setSidebarOpen((v) => !v)}
+          />
+        ),
+        // 흐리게 두되 **비활성화하지 않는다** — 눌러 보고 왜 안 되는지 들을 수 있어야 한다
+        trailing: (
+          <button
+            type="button"
+            onClick={() => void toConfirm()}
+            className={`min-h-11 rounded-xl border px-3 text-sm transition ${
+              storyCount && storyCount > 0
+                ? "border-stone-400 bg-white text-stone-800 hover:bg-stone-100"
+                : "border-stone-200 text-stone-400 hover:bg-stone-100"
+            }`}
+          >
+            정리된 내용 확인
+          </button>
+        ),
+      }}
+      bottomBar={
+        <div className="space-y-2">
+          {/* 성격이 다른 두 문 — 왼쪽은 다른 방식으로 계속하기, 오른쪽은 여기서 멈추기.
+              같은 모양으로 만들면 무게가 같아 보인다 */}
+          <div className="flex items-center justify-between gap-2">
+            <Link
+              href="/recall"
+              className="inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
             >
-              새로 시작할게요
-            </button>
+              천천히 회상할래요
+            </Link>
+            {/* P4 — 전 화면 필수 항목. Shell의 고정 버튼 대신 여기 산다.
+                곁칸이 열려도 덮이지 않는 것은 Shell이 하단 바 자체에 z-50을 걸어 두기 때문이다 */}
+            <Link
+              href="/"
+              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm text-stone-500 transition hover:bg-stone-100 hover:text-stone-700"
+            >
+              나중에 생각할래요
+            </Link>
           </div>
-        )}
-        {turns.length === 0 && !resumed && (
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send();
+            }}
+            className="flex gap-2"
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="예: 고향에 기부하고 싶어요"
+              aria-label="하실 말씀"
+              className="min-h-11 flex-1 rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-stone-500"
+            />
+            <button
+              type="submit"
+              disabled={busy || !input.trim()}
+              className="min-h-11 rounded-xl bg-stone-900 px-5 text-stone-50 disabled:bg-stone-300"
+            >
+              보내기
+            </button>
+          </form>
+        </div>
+      }
+    >
+      {/* 겹쳐서 열린다 — 대화 폭은 열든 닫든 그대로다 */}
+      <ChatSidebarPanel
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        storyCount={storyCount}
+        branchLabel={branch ? (BRANCH_LABEL[branch] ?? branch) : null}
+        onReset={reset}
+      />
+
+      <div className="space-y-4">
+        {/* 이어온 사람에게도 첫 화면이 비어 보이지 않게 한다 — 지난 대화 안내는 곁칸에 있다 */}
+        {turns.length === 0 && (
           <p className="text-stone-500">
             떠오르는 대로 이야기해 주세요. 한 번에 하나씩 여쭐게요.
           </p>
@@ -198,20 +281,6 @@ export default function ChatPage() {
           </div>
         ))}
         <div ref={endRef} />
-
-        {branch && (
-          <div className="rounded-xl border border-stone-300 bg-white p-4">
-            <p className="text-sm text-stone-500">진행 중인 정리</p>
-            <p className="mt-1 font-medium">{BRANCH_LABEL[branch] ?? branch}</p>
-          </div>
-        )}
-
-        {/* 말한 내용이 남고 있다는 신호. 없으면 사용자는 저장됐는지 알 방법이 없다 */}
-        {covered !== null && covered > 0 && (
-          <p className="text-sm text-stone-500">
-            지금까지 {covered}가지 이야기가 정리되어 있습니다. 다음에 오셔도 이어집니다.
-          </p>
-        )}
 
         {/* 대화 중 감지된 가지 (FR-115A) — 확인형 문구 그대로. 자동으로 넘어가지 않는다.
             "나중에 생각할래요"가 항상 있어야 한다 (P4) */}
@@ -241,49 +310,7 @@ export default function ChatPage() {
           </div>
         ))}
 
-        {/* 회상은 **축 세션의 일부**지 별도 트랙이 아니다 — 그래서 홈이 아니라
-            대화 안에서 이어진다. 대화 중 제안이므로 FR-110의 트랙 선택에 해당하지 않는다 */}
-        <Link
-          href="/recall"
-          className="inline-block text-sm text-stone-500 underline underline-offset-4 hover:text-stone-700"
-        >
-          천천히 회상하며 정리해 볼까요?
-        </Link>
-
         <ErrorNote error={error} />
-      </div>
-
-      <div className="mt-6 space-y-3">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void send();
-          }}
-          className="flex gap-2"
-        >
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="예: 부산에 기부하고 싶어요"
-            aria-label="하실 말씀"
-            className="min-h-11 flex-1 rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-stone-500"
-          />
-          <button
-            type="submit"
-            disabled={busy || !input.trim()}
-            className="min-h-11 rounded-xl bg-stone-900 px-5 text-stone-50 disabled:bg-stone-300"
-          >
-            보내기
-          </button>
-        </form>
-
-        {/* 돌아온 사람에게도 보여야 한다 — 이 조건이 turns에만 걸려 있으면
-            새로 들어온 순간 지난 이야기로 가는 길이 사라진다 */}
-        {sessionId && (turns.length >= 2 || resumed) && (
-          <PrimaryButton onClick={() => void toConfirm()} disabled={busy}>
-            정리된 내용 확인하기
-          </PrimaryButton>
-        )}
       </div>
     </Shell>
   );
