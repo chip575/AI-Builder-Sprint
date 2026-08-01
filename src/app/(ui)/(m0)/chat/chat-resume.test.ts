@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const page = readFileSync("src/app/(ui)/(m0)/chat/page.tsx", "utf-8");
+// 사이드바 개편(a436c4e)으로 안내 문구가 곁칸 컴포넌트로 이사했다 — 함께 검사한다
+const sidebar = readFileSync("src/app/(ui)/_components/ChatSidebar.tsx", "utf-8");
 
 describe("S2 — 다시 들어와도 이어진다", () => {
   it("세션 id를 브라우저에 남기고 마운트 때 되살린다", () => {
@@ -15,8 +17,11 @@ describe("S2 — 다시 들어와도 이어진다", () => {
   });
 
   it("확인 버튼이 이번 대화 길이에만 매이지 않는다", () => {
-    // `turns.length >= 2` 하나만 걸려 있으면 돌아온 사람에게는 버튼이 없다
-    expect(page).toContain("turns.length >= 2 || resumed");
+    // `turns.length >= 2` 하나만 걸려 있으면 돌아온 사람에게는 버튼이 없다.
+    // 개편 후 기준은 서버가 아는 이야기 수다 — 이번 대화(covered)가 없으면
+    // 지난 세션(savedCount)이 대신한다. 화면 상태(turns)에 매이지 않는 것이 요점.
+    expect(page).toContain("covered ?? savedCount");
+    expect(page).not.toMatch(/turns\.length\s*>=\s*\d+\s*(\|\||&&)/);
   });
 
   it("새로 시작할 길도 준다 — 이어쓰기가 강제가 되면 안 된다 (P4)", () => {
@@ -29,7 +34,8 @@ describe("S2 — 저장되고 있다는 것이 보인다", () => {
   it("서버가 준 커버리지를 그대로 쓴다 — 화면이 세지 않는다", () => {
     // 화면이 자체 계산하면 서버가 아는 것과 갈라진다 (confirmedAt과 같은 원칙)
     expect(page).toContain("m.axisCoverage");
-    expect(page).toContain("가지 이야기가 정리되어 있습니다");
+    // 안내 문구는 개편으로 곁칸(ChatSidebar)에 산다 — 위치는 옮겨도 문장은 지킨다
+    expect(sidebar).toContain("가지 이야기가 정리되어 있습니다");
   });
 
   it("브라우저에 남기는 것은 식별자뿐이다 — 내용은 서버에 있다 (보안 1조)", () => {

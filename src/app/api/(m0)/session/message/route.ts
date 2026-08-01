@@ -61,12 +61,23 @@ export async function POST(req: Request) {
   const isFirstUtterance = session.utterances.length === 0;
   const utterance = await addUtterance(session.id, parsed.data.text);
 
+  // 안내 층 — 질문형 발화는 LLM 없이 코드가 답한다 (P3 · lib/ai/session/guide.ts)
+  const guide = detectGuide(parsed.data.text);
+
   // Express 판정은 첫 발화에만 적용된다 (FR-115B "첫 발화가 명시적 의사").
   // 코드 판정이 우선 — UNCERTAIN은 Solar 분류 대상이지만 mock에선 축으로 (결정론).
-  const detection = isFirstUtterance
+  // ⚠ 질문형이면 직행하지 않는다 — "유산 기부는 어떻게 하나요?"는 의사가 아니라 질문이다.
+  //   안내가 답하고, 의사는 감지(FR-115A)가 확인형 제안으로 묻는다. 직행은 명시적 의사만.
+  const detection = isFirstUtterance && !guide
     ? detectExpress(parsed.data.text)
     : ({ kind: "NONE" } as const);
-  const branchType = detection.kind === "EXPRESS" ? detection.branchType : null;
+  // 가지는 턴을 넘어도 유지된다 — 열린(OPENED) 가지가 있으면 그 대화는 가지 대화다.
+  // 이게 없으면 둘째 턴부터 branchType=null이 되어 응답기가 회상 질문으로 새고,
+  // 슬롯을 묻던 대화가 갑자기 다른 주제를 꺼낸다 (작성실 흐름에서 드러남).
+  const openBranch =
+    [...session.proposals].reverse().find((p) => p.status === "OPENED")?.branchType ?? null;
+  const branchType =
+    detection.kind === "EXPRESS" ? detection.branchType : openBranch;
 
   const proposal = branchType
     ? await createProposal({
@@ -130,10 +141,6 @@ export async function POST(req: Request) {
       ? { branchType: proposal.branchType, proposalId: proposal.id }
       : null,
   });
-
-  // 안내 층 — 질문형 발화는 LLM 없이 코드가 답한다 (P3 · lib/ai/session/guide.ts).
-  // Express가 이미 가지를 열었으면 안내보다 그 흐름이 우선이다.
-  const guide = proposal ? null : detectGuide(parsed.data.text);
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
