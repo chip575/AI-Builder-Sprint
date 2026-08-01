@@ -8,7 +8,10 @@ import type { BranchType } from "../contracts/common";
 
 export type ExpressDetection =
   | { kind: "EXPRESS"; branchType: BranchType }
-  | { kind: "UNCERTAIN" } // 대상 또는 의지 중 하나만 있음 → Solar 분류 (mock에선 축으로)
+  // 대상은 있는데 의지가 안 보임. **어느 가지의 신호였는지 함께 돌려준다** —
+  // 이 값을 버리면 소비하는 쪽이 확인 문구를 만들 수 없어 신호가 통째로 사라진다.
+  // (실제로 "부산에 기부는 어떻게 해?"가 아무 데도 닿지 못하고 축으로 떨어졌다)
+  | { kind: "UNCERTAIN"; branchType: BranchType }
   | { kind: "NONE" };     // 신호 없음 → 축(회상 인터뷰) 시작
 
 interface Rule {
@@ -54,13 +57,14 @@ const RULES: Rule[] = [
  * "뭔가 남기고 싶어요"처럼 대상이 없는 발화는 EXPRESS가 아니다 — 축으로 시작한다.
  */
 export function detectExpress(text: string): ExpressDetection {
-  let sawTargetOnly = false;
+  let targetOnly: BranchType | null = null;
   for (const rule of RULES) {
     const hasTarget = rule.target.test(text);
     const hasIntent = rule.intent.test(text);
     if (hasTarget && hasIntent) return { kind: "EXPRESS", branchType: rule.branchType };
-    if (hasTarget) sawTargetOnly = true;
+    // 규칙 순서가 곧 우선순위다 — 먼저 맞은 것을 남긴다 ("유산 기부"가 "기부"보다 앞)
+    if (hasTarget && targetOnly === null) targetOnly = rule.branchType;
   }
-  // 대상 언급은 있는데 의지가 안 보이면 애매 — Solar 분류 대상 (mock에선 축)
-  return sawTargetOnly ? { kind: "UNCERTAIN" } : { kind: "NONE" };
+  // 대상 언급은 있는데 의지가 안 보이면 애매 — 확인형 제안으로 넘긴다 (FR-115A)
+  return targetOnly ? { kind: "UNCERTAIN", branchType: targetOnly } : { kind: "NONE" };
 }

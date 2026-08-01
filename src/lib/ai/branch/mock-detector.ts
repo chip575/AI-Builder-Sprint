@@ -12,7 +12,18 @@ export class MockDetector implements DetectorPort {
     const latest = input.utterances[input.utterances.length - 1];
     if (!latest) return [];
     const hit = detectExpress(latest.text);
-    if (hit.kind !== "EXPRESS") return [];
+    // EXPRESS(확신)와 UNCERTAIN(신호) 둘 다 제안 대상이다.
+    //
+    // 확신 수준에 따라 **개입 강도**가 다르다: EXPRESS는 첫 발화에서 가지로 직행하고,
+    // UNCERTAIN은 여기서 확인형 제안이 되어 사용자가 연다. "부산에 기부는 어떻게 해?"는
+    // 의지 표명이 아니라 질문이므로 바로 약정으로 끌고 가지 않는 것이 맞다.
+    //
+    // UNCERTAIN을 버리면 규칙이 놓친 발화가 **아무 데도 닿지 못하고** 축으로 떨어진다 —
+    // 규칙은 확신 케이스만 잡고 나머지를 넘기라고 있는 것이므로, 넘길 곳이 없으면
+    // 3분기 설계를 2분기로 소비하는 셈이다.
+    //
+    // 재제안 금지·중복 방지는 proposeBranches가 closed/seen으로 건다 — 여기서 걸지 않는다
+    if (hit.kind === "NONE") return [];
     return [{ branchType: hit.branchType, sourceUtteranceId: latest.id }];
   }
 }

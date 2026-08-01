@@ -19,18 +19,20 @@ function post(body: unknown): Promise<Response> {
 async function parseSse(res: Response) {
   const text = await res.text();
   const tokens: string[] = [];
+  const proposals: { id: string; branchType: string; message: string }[] = [];
   let meta: unknown = null;
   for (const block of text.split("\n\n").filter(Boolean)) {
     const event = /^event: (.+)$/m.exec(block)?.[1];
     const data = /^data: (.+)$/m.exec(block)?.[1];
     if (!event || data === undefined) continue;
     if (event === "token") tokens.push(JSON.parse(data));
+    if (event === "proposal") proposals.push(JSON.parse(data));
     if (event === "meta") {
       expect(meta).toBeNull(); // meta는 정확히 1회
       meta = JSON.parse(data);
     }
   }
-  return { text, tokens, meta: SessionMessageRes.parse(meta) };
+  return { text, tokens, proposals, meta: SessionMessageRes.parse(meta) };
 }
 
 describe("M-SESSION-MSG — FR-115B 수락 기준", () => {
@@ -109,6 +111,42 @@ describe("🔴 M-SESSION-MSG — 회상 질문이 턴마다 바뀐다", () => {
     }
     const last = await parseSse(await post({ sessionId: sid!, text: "계속 해주세요" }));
     expect(last.tokens.join("").length).toBeGreaterThan(0);
+  });
+});
+
+describe("🔴 M-SESSION-MSG — 규칙이 놓친 발화가 바닥으로 떨어지지 않는다", () => {
+  // detectExpress는 3분기(EXPRESS/UNCERTAIN/NONE)인데 소비하는 쪽이 2분기만 알아서,
+  // "부산에 기부는 어떻게 해?"처럼 **대상은 있고 의지 표현이 없는** 발화가 통째로
+  // 축으로 떨어졌다. 규칙은 확신 케이스만 잡고 나머지를 넘기라고 있는 것이므로,
+  // 넘길 곳(확인형 제안)이 있어야 설계가 완성된다 (FR-115A).
+  it("질문형 발화는 가지로 직행하지 않고 **확인 제안**이 된다", async () => {
+    const { meta, proposals } = await parseSse(await post({ text: "부산에 기부는 어떻게 해?" }));
+    // 의지 표명이 아니므로 자동으로 열지 않는다
+    expect(meta.expressBranch ?? null).toBeNull();
+    // 대신 확인형 제안이 뜬다
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]!.branchType).toBe("DONATION_NOW");
+    expect(proposals[0]!.message).toContain("정리해볼까요"); // 권유가 아니라 확인형
+  });
+
+  it("신호가 없는 발화에는 제안을 만들지 않는다 — 아무 말에나 카드가 뜨면 영업이다", async () => {
+    const { proposals } = await parseSse(await post({ text: "요즘 날씨가 참 좋네요" }));
+    expect(proposals).toHaveLength(0);
+  });
+
+  it("확신 발화는 그대로 직행한다 — 제안 단계를 거치지 않는다", async () => {
+    const { meta, proposals } = await parseSse(await post({ text: "부산에 기부하고 싶어요" }));
+    expect(meta.expressBranch?.branchType).toBe("DONATION_NOW");
+    expect(proposals).toHaveLength(0); // 이미 갈라졌으므로 제안하지 않는다
+  });
+
+  it("같은 세션에서 같은 가지를 두 번 제안하지 않는다 (FR-113)", async () => {
+    const first = await parseSse(await post({ text: "기부는 어떻게 하는 건가요?" }));
+    expect(first.proposals).toHaveLength(1);
+    const second = await parseSse(
+      await post({ sessionId: first.meta.sessionId, text: "기부 말인데요" }),
+    );
+    expect(second.proposals).toHaveLength(0);
   });
 });
 
