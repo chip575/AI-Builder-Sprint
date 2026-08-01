@@ -28,5 +28,14 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   // 화면만 보호한다. API·정적 자산은 대상이 아니다 (위 주석 참조)
-  matcher: ["/chat/:path*", "/confirm/:path*", "/rewards/:path*", "/doc/:path*", "/vault/:path*"],
+  // /write·/guide — 대화 세션(발화 저장)을 만드는 화면은 /chat과 같은 급으로 보호한다
+  matcher: [
+    "/chat/:path*",
+    "/write/:path*",
+    "/guide/:path*",
+    "/confirm/:path*",
+    "/rewards/:path*",
+    "/doc/:path*",
+    "/vault/:path*",
+  ],
 };
