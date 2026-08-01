@@ -31,13 +31,16 @@ HIT=$(grep -rn 'confirmed[_a-zA-Z]*:[[:space:]]*true' --include='*.ts' src/ 2>/d
       | grep -v '\.test\.' \
       | while IFS=: read -r file line rest; do
           prev=""; [ "$line" -gt 1 ] && prev=$(sed -n "$((line-1))p" "$file")
+          # 패턴 앞의 여는 괄호는 장식이 아니다 — macOS 기본 bash 3.2는 $( ) 안의 case를
+          # 파싱할 때 패턴의 닫는 괄호를 명령 치환의 끝으로 오인한다(bash 4에서 수정).
+          # 여는 괄호를 붙여 짝을 맞춰야 3.2에서도 돈다. 지우지 말 것.
           case "$prev$rest" in
-            *P1-CONFIRM-PATH*) ;;
+            (*P1-CONFIRM-PATH*) ;;
             # zod .omit({ confirmed: true })는 **필드를 제거**한다 — 기본값을 참으로
             # 두는 것과 정반대다. 같은 줄에 .omit(이 있으면 위반이 아니다.
             # (좁게 잡는다: .omit이 없는 줄은 그대로 검사한다)
-            *.omit\(*) ;;
-            *) echo "$file:$line:$rest" ;;
+            (*.omit\(*) ;;
+            (*) echo "$file:$line:$rest" ;;
           esac
         done)
 # 마커는 만능 열쇠가 아니다 — 확정 연산이 실제로 사는 곳(confirm 라우트 + store 어댑터)에서만 유효.
