@@ -264,6 +264,8 @@ utterance_embeddings(pgvector)는 M2·M3 마이그레이션에서 — 추가는 
 SET NOT NULL + FK 한 번에 (사전 작성: _pending/pending_user_id_not_null.sql — 승격 시 다음 빈 번호). ④ gate_blocks →
 gate_verdicts 개명, 3분기 전부 기록 + was_sign_attempt 컬럼. FR-509 카운터는
 ESIGN_INVALID AND was_sign_attempt만 집계 — NON_BINDING은 정상 라우팅이다.
+**→ ④의 집계 규칙은 D-20(2026-08-01)에서 바뀌었다.** 기록은 그대로 두되,
+현재 규칙은 D-20을 본다. NON_BINDING 제외는 여전히 유효하다.
 
 **미결**: 삭제된 발화를 근거로 가진 마음 유언 문단 처리(고아 표시 vs 연쇄
 삭제 제안) — M2 heart_will 설계 시 결정.
