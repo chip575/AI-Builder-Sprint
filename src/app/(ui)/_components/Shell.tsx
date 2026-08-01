@@ -13,6 +13,8 @@ export function Shell({
   children,
   footer,
   back,
+  headerBar,
+  bottomBar,
 }: {
   title: string;
   /** 이 화면이 구현하는 FR — 우상단 배지 */
@@ -22,9 +24,47 @@ export function Shell({
   /** 이전 화면으로 — 없으면 사용자는 홈으로 나가는 수밖에 없다.
    *  "나중에 생각할래요"는 그만두는 문이지 되돌아가는 문이 아니다 */
   back?: { href: string; label: string };
+  /** 조작을 헤더에 얹는 화면(/chat)용 2행 머리. 1행은 좌우 조작, 2행은 가운데 제목이다.
+   *  헤더가 따라붙는 이유: 본문에 두면 말이 쌓일수록 위로 밀려 닿을 수 없게 된다.
+   *  넘기지 않는 화면은 지금까지의 한 줄 머리 그대로다 */
+  headerBar?: { leading?: ReactNode; trailing?: ReactNode };
+  /** 화면 아래에 붙는 입력 바(/chat). 넘기면 레이아웃이 이렇게 바뀐다:
+   *  · 높이 기준이 dvh가 된다 — 100vh는 모바일에서 키보드가 올라와도 갱신되지 않아
+   *    입력창이 키보드 뒤로 숨는다
+   *  · 고정 "나중에 생각할래요"를 띄우지 않는다 (아래 여백 pb-32도 함께 빠진다)
+   *  ⚠ 그러므로 **바 안에 "나중에 생각할래요"를 반드시 넣어야 한다.**
+   *    전 화면 필수 항목이라 어느 화면에서도 사라지면 안 된다 (P4) */
+  bottomBar?: ReactNode;
 }) {
+  const heading = (
+    /* 제목은 서비스가 건네는 말이므로 명조. 전 화면 공통이고 화면별 예외는 두지 않는다.
+       ⚠ font-serif는 이 h1에만 건다 — header나 main에 걸면 Notice의 법적 고지·
+       ErrorNote·버튼·금액/해시까지 명조가 되고, 그건 P4(다크패턴 금지)에 걸린다.
+       경계: "서비스가 건네는 말"은 명조, "법적 사실과 조작 요소"는 고딕. */
+    <h1 className="font-serif text-xl font-semibold text-stone-900">{title}</h1>
+  );
+
+  const badges =
+    process.env.NEXT_PUBLIC_DEV_UI === "1" ? (
+      <div className="flex flex-wrap justify-end gap-1">
+        {fr.map((f) => (
+          <span
+            key={f}
+            className="rounded-full bg-stone-200 px-2 py-0.5 text-xs text-stone-600"
+          >
+            {f}
+          </span>
+        ))}
+      </div>
+    ) : null;
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 pb-32 pt-8 text-base">
+    <main
+      className={`mx-auto flex max-w-2xl flex-col px-5 pt-8 text-base ${
+        // 하단 바를 쓰는 화면은 dvh로 잰다 (키보드 대응). 나머지는 지금까지와 같다
+        bottomBar ? "min-h-dvh" : "min-h-screen pb-32"
+      }`}
+    >
       {back && (
         <Link
           href={back.href}
@@ -34,37 +74,52 @@ export function Shell({
         </Link>
       )}
 
-      <header className="mb-6 flex items-start justify-between gap-4">
-        {/* 제목은 서비스가 건네는 말이므로 명조. 전 화면 공통이고 화면별 예외는 두지 않는다.
-            ⚠ font-serif는 이 h1에만 건다 — header나 main에 걸면 Notice의 법적 고지·
-            ErrorNote·버튼·금액/해시까지 명조가 되고, 그건 P4(다크패턴 금지)에 걸린다.
-            경계: "서비스가 건네는 말"은 명조, "법적 사실과 조작 요소"는 고딕. */}
-        <h1 className="font-serif text-xl font-semibold text-stone-900">{title}</h1>
-        {process.env.NEXT_PUBLIC_DEV_UI === "1" && (
-          <div className="flex flex-wrap justify-end gap-1">
-            {fr.map((f) => (
-              <span
-                key={f}
-                className="rounded-full bg-stone-200 px-2 py-0.5 text-xs text-stone-600"
-              >
-                {f}
-              </span>
-            ))}
+      {headerBar ? (
+        // 2행 — 위는 좌우 조작, 아래는 가운데 제목. 배경을 깔아야 아래 글이 비쳐 보이지 않는다
+        <header className="sticky top-0 z-20 -mx-5 mb-6 bg-stone-50 px-5 py-3">
+          <div className="flex items-center justify-between gap-3">
+            {/* 왼쪽이 비어도 자리는 지킨다 — 없으면 오른쪽 조작이 가운데로 끌려온다 */}
+            {headerBar.leading ?? <span />}
+            <div className="flex items-center gap-2">
+              {badges}
+              {headerBar.trailing}
+            </div>
           </div>
-        )}
-      </header>
+          <div className="mt-1 text-center">{heading}</div>
+        </header>
+      ) : (
+        <header className="mb-6 flex items-start justify-between gap-4">
+          {heading}
+          {badges}
+        </header>
+      )}
 
       <div className="flex-1">{children}</div>
 
       {footer ? <div className="mt-8">{footer}</div> : null}
 
-      {/* P4 — 어떤 단계에서도 중단할 수 있다. 재촉 문구 금지 */}
-      <Link
-        href="/"
-        className="fixed bottom-6 right-6 min-h-11 rounded-full border border-stone-300 bg-white px-5 py-3 text-sm text-stone-600 shadow-sm transition hover:bg-stone-50"
-      >
-        나중에 생각할래요
-      </Link>
+      {bottomBar ? (
+        // 문서 흐름 안에서 아래에 붙인다 — fixed로 띄우면 모바일 키보드가 올라올 때
+        // 레이아웃 뷰포트가 그대로라 입력창이 키보드 뒤로 들어간다.
+        //
+        // z-50인 이유: sticky는 **그 자체로 stacking context를 만든다.** 그래서 바 안쪽 자식에
+        // z-index를 줘도 바깥의 오버레이(z-40) 위로 올라가지 못한다. 바에 직접 걸어야
+        // 곁칸이 열려도 "나중에 생각할래요"가 덮이지 않는다 (P4 — 그만두는 문은 막히지 않는다).
+        <div className="sticky bottom-0 z-50 -mx-5 mt-6 border-t border-stone-200 bg-stone-50 px-5 py-3">
+          {bottomBar}
+        </div>
+      ) : (
+        /* P4 — 어떤 단계에서도 중단할 수 있다. 재촉 문구 금지.
+           z-[60]인 이유: 화면이 오버레이(드로어 등)를 띄우면 이 링크가 그 아래 깔려
+           **그만두는 문이 막힌다.** 무엇이 위에 뜨든 이것만은 항상 누를 수 있어야 한다.
+           (하단 바를 쓰는 화면은 바 안에 같은 링크를 둔다) */
+        <Link
+          href="/"
+          className="fixed bottom-6 right-6 z-[60] min-h-11 rounded-full border border-stone-300 bg-white px-5 py-3 text-sm text-stone-600 shadow-sm transition hover:bg-stone-50"
+        >
+          나중에 생각할래요
+        </Link>
+      )}
     </main>
   );
 }
