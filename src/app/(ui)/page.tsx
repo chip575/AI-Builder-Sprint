@@ -5,10 +5,12 @@ import Link from "next/link";
 export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-8 px-6">
-      <h1 className="text-center text-3xl font-semibold leading-relaxed">
-        무엇을 남기고 싶으세요?
+      {/* 이 화면은 Shell을 쓰지 않으므로 제목 명조가 자동으로 오지 않는다 — 직접 건다.
+          서비스가 건네는 말(제목·부제)만 명조고, 아래 버튼·안내문은 고딕 그대로다 */}
+      <h1 className="text-center font-serif text-3xl font-semibold leading-relaxed">
+        무엇을 남기고 싶으신가요
       </h1>
-      <p className="text-center text-stone-500">
+      <p className="text-center font-serif text-stone-500">
         떠오르는 대로 이야기해 주세요. 정리는 저희가 돕겠습니다.
       </p>
       <Link

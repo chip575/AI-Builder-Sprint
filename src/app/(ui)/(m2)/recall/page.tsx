@@ -162,8 +162,11 @@ export default function RecallPage() {
           <p className="text-xs uppercase tracking-wide text-stone-400">
             {AXIS_LABEL.get(question.axis) ?? question.axis}
           </p>
-          {/* 한 번에 한 질문 — 여기에 질문이 둘 이상 렌더되면 설문지가 된다 */}
-          <h2 className="text-xl leading-relaxed text-stone-900">{question.text}</h2>
+          {/* 한 번에 한 질문 — 여기에 질문이 둘 이상 렌더되면 설문지가 된다.
+              질문문만 명조로 둔다. 아래 버튼·건너뛰기는 고딕 그대로다 */}
+          <h2 className="font-serif text-xl leading-relaxed text-stone-900">
+            {question.text}
+          </h2>
 
           <textarea
             value={input}
