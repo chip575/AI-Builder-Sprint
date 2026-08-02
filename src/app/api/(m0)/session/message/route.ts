@@ -144,7 +144,13 @@ export async function POST(req: Request) {
 
   // 다음 행동이 화면(버튼·확인)에 있으면 LLM을 부르지 않는다 (handoff.ts의 도돌이표 해부).
   // 최신 제안이 재확인 대기(PENDING_RECONFIRM)면 결정은 decide 버튼만 받는다.
-  const latestProposal = session.proposals.at(-1);
+  // ⚠ **이번 턴에 만든 제안은 제외한다** — 첫 직행 턴은 고지·인사(응답기)가 답해야 한다.
+  //   인메모리 스토어는 세션 객체를 참조로 공유해 방금 만든 제안이 session.proposals에
+  //   이미 들어 있다 (Supabase 스냅샷과 달리). 제외하지 않으면 스토어에 따라 첫 턴
+  //   응답이 갈라진다 (route.test가 잡았다, 2026-08-02).
+  const latestProposal = session.proposals
+    .filter((p) => p.id !== proposal?.id)
+    .at(-1);
   const handoff = guide
     ? null
     : handoffReply({
