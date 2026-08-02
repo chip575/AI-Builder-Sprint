@@ -20,12 +20,29 @@ import { buildTemplateFields, type TemplateKey } from "../template-fields";
 import { TEMPLATE_ROLES, resolveTemplateCode, toDataLabel } from "../template-labels";
 import type {
   DocumentDetail,
+  DocumentListFilter,
   SignerPort,
   SignRequestInput,
   SignRequestResult,
 } from "../port";
 
 export const MODUSIGN_BASE = "https://api.modusign.co.kr";
+
+/**
+ * 우리 DocStatus → 모두싸인 status (목록 filter용).
+ *
+ * mapModusignStatus의 역방향인데 **1:1이 아니다** — ON_GOING·MODIFYING·
+ * APPROVAL_PENDING·ON_PROCESSING이 전부 REQUESTED로 접힌다. 그래서 여기서는
+ * 각 우리 상태의 **대표값 하나**만 고른다. 정밀한 목록이 필요하면 filter를 쓰지 말고
+ * 전량을 받아 우리 매핑으로 거르는 편이 정확하다 (지금은 대표값으로 충분하다).
+ */
+const MODUSIGN_STATUS: Record<DocStatus, string> = {
+  DRAFT: "DRAFT",
+  REQUESTED: "ON_GOING",
+  COMPLETED: "COMPLETED",
+  REJECTED: "ABORTED",  // abort.type=REJECTION — 목록에서는 구분되지 않는다
+  CANCELED: "ABORTED",
+};
 
 /** metadatas 키 — 우리 draft 역참조 (02.3 §1 준비작업 3). key는 1~40자 제한 */
 const META_DRAFT_ID = "draftId";
@@ -216,6 +233,8 @@ export class ModusignSigner implements SignerPort {
       metadata: Object.fromEntries(
         (doc.metadatas ?? []).map((m) => [m.key, m.value ?? ""]),
       ),
+      // 델타 조회의 기준점 — 다음 동기화가 "이 시각 이후"를 묻는다
+      updatedAt: doc.updatedAt ?? null,
     };
   }
 
@@ -272,12 +291,34 @@ export class ModusignSigner implements SignerPort {
     }
   }
 
-  async listDocuments(filter?: { status?: DocStatus }): Promise<DocumentDetail[]> {
-    const res = await this.call<{ documents?: ModusignDocument[] }>("/documents", {
-      method: "GET",
-    });
-    const all = (res.documents ?? []).map((d) => this.toDetail(d));
-    return filter?.status ? all.filter((d) => d.status === filter.status) : all;
+  /**
+   * 목록 조회 — **서버에서 거른다.**
+   *
+   * 예전에는 전량을 받아 클라이언트에서 걸렀다. 문서가 늘수록 비용이 선형으로 늘고,
+   * 리컨실러는 draft 1건당 상세 조회를 1회씩 했다. filter 문법을 쓰면 "마지막 동기화
+   * 이후 바뀐 것"만 한 번에 온다 — N회가 1회가 된다.
+   *
+   * 지원 문법(2026-08-02 문서 확인): status eq '...' · contains(title, '...') ·
+   * createdAt/startedAt/updatedAt ge|le '...' · labelIds in (...) · and 결합.
+   * 조회는 서명 잔여를 소모하지 않는다.
+   */
+  async listDocuments(filter?: DocumentListFilter): Promise<DocumentDetail[]> {
+    const clauses: string[] = [];
+    if (filter?.status) clauses.push(`status eq '${MODUSIGN_STATUS[filter.status]}'`);
+    // ISO8601 그대로 넣는다. 타임존을 안 붙이면 모두싸인이 UTC로 읽는다 — toISOString()은 Z다
+    if (filter?.updatedSince) clauses.push(`updatedAt ge '${filter.updatedSince}'`);
+
+    const q = new URLSearchParams();
+    if (clauses.length > 0) q.set("filter", clauses.join(" and "));
+    // 상한 100 (문서 명시). 넘겨도 잘리므로 우리가 먼저 맞춘다
+    q.set("limit", String(Math.min(filter?.limit ?? 100, 100)));
+    q.set("orderBy", "updatedAt desc");
+
+    const res = await this.call<{ documents?: ModusignDocument[] }>(
+      `/documents?${q}`,
+      { method: "GET" },
+    );
+    return (res.documents ?? []).map((d) => this.toDetail(d));
   }
 
   async resendNotification(documentId: string): Promise<void> {

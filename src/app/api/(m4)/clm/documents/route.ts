@@ -9,6 +9,7 @@ import { DocStatus, DocType } from "@/lib/contracts";
 import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 import { DEV_USER_ID } from "@/lib/store/types";
 import { store } from "@/lib/store";
+import { syncExternalDelta } from "@/lib/signer/sync";
 
 function bad(code: string, message: string, nextAction: string, status: number) {
   return Response.json({ ok: false, error: { code, message, nextAction } }, { status });
@@ -24,6 +25,18 @@ export async function GET(req: Request) {
   if (!userId) return loginRequired();
 
   const q = new URL(req.url).searchParams;
+
+  // ?refresh=1 — 외부(모두싸인) 상태를 당겨와 맞춘 뒤 목록을 준다.
+  // 매 조회마다 부르지 않는다: 조회는 공짜지만 왕복 지연이 목록 체감을 좌우한다.
+  // 실패해도 목록은 준다 — 동기화 실패가 "서류가 없다"로 보이면 안 된다
+  if (q.get("refresh") === "1") {
+    const { lastSyncAt } = await store.getReconcileState();
+    const res = await syncExternalDelta(lastSyncAt).catch((err) => {
+      console.warn("[clm] 외부 동기화 실패 — 저장된 상태로 응답:", (err as Error).message);
+      return null;
+    });
+    if (res && res.corrected > 0) await store.recordReconcile(res.corrected);
+  }
   // 모르는 값은 **거부하지 않고 무시한다** — 필터 하나가 잘못됐다고 목록 전체가
   // 사라지면 사용자는 "서류가 없다"로 읽는다. 잘못된 부분집합보다 전체가 안전하다
   const docType = DocType.safeParse(q.get("docType"));

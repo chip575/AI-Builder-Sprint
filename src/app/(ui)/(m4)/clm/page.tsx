@@ -9,7 +9,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorNote, Notice, Shell } from "@/app/(ui)/_components/Shell";
 
 interface Row {
@@ -55,6 +55,8 @@ export default function ClmPage() {
   const [docType, setDocType] = useState("");
   const [status, setStatus] = useState("");
   const [from, setFrom] = useState("");
+  /** 외부 동기화는 화면당 1회 — 필터 변경마다 왕복하면 목록이 느려진다 */
+  const syncedRef = useRef(false);
 
   const load = useCallback(async () => {
     const q = new URLSearchParams();
@@ -62,6 +64,11 @@ export default function ClmPage() {
     if (status) q.set("status", status);
     if (from) q.set("from", new Date(from).toISOString());
 
+    // 화면에 들어올 때 한 번만 외부 상태를 당겨온다 — 필터를 바꿀 때마다 부르지 않는다
+    if (!syncedRef.current) {
+      syncedRef.current = true;
+      q.set("refresh", "1");
+    }
     const res = await fetch(`/api/clm/documents?${q}`);
     const body = await res.json();
     if (!body.ok) {
