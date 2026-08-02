@@ -47,19 +47,27 @@ describe("조립 결과 스냅샷", () => {
   it("자필유언 × 아무것도 모름", () => {
     expect(buildSystemPrompt({ ...base, branchType: "HANDWRITTEN_WILL" })).toMatchSnapshot();
   });
+
+  it("마음 편지 — 가지 표에 없는 서류를 명시로 넘긴 경우", () => {
+    expect(buildSystemPrompt({ ...base, docType: "HEART_LETTER" })).toMatchSnapshot();
+  });
 });
 
-describe("어떤 조합에도 무너지면 안 되는 것", () => {
-  const combos: PromptInput[] = [
-    base,
-    { ...base, nextAxisQuestion: "무엇을 남기고 싶으신가요?" },
-    { ...base, branchType: "DONATION_NOW", missingRequired: ["amount"] },
-    { ...base, branchType: "HERITAGE_SUPPORT" },
-    { ...base, branchType: "LEGACY_GIFT", knownFacts: [{ key: "amount", value: 5_000_000 }] },
-    { ...base, branchType: "HANDWRITTEN_WILL" },
-    { ...base, branchType: "ESTATE" },
-  ];
+/** 실제로 나올 수 있는 조합 — 검사마다 이 전부를 훑는다.
+ *  하나씩 골라 재면 "그 조합에서만 맞는" 검사가 된다 */
+const combos: PromptInput[] = [
+  base,
+  { ...base, nextAxisQuestion: "무엇을 남기고 싶으신가요?" },
+  { ...base, branchType: "DONATION_NOW", missingRequired: ["amount"] },
+  { ...base, branchType: "HERITAGE_SUPPORT" },
+  { ...base, branchType: "LEGACY_GIFT", knownFacts: [{ key: "amount", value: 5_000_000 }] },
+  { ...base, branchType: "HANDWRITTEN_WILL" },
+  { ...base, branchType: "ESTATE" },
+  { ...base, docType: null },
+  { ...base, docType: "HEART_LETTER" },
+];
 
+describe("어떤 조합에도 무너지면 안 되는 것", () => {
   it("법률 수치가 섞이지 않는다 (P3 · 절대규칙 2) — gate:check와 이중으로 건다", () => {
     for (const c of combos) {
       const p = buildSystemPrompt(c);
@@ -83,6 +91,55 @@ describe("어떤 조합에도 무너지면 안 되는 것", () => {
     const p = buildSystemPrompt({ ...base, branchType: "HANDWRITTEN_WILL" });
     expect(p).toContain("서명을 권하지 않는다");
     expect(p).toContain("자필");
+    // 가지 목표가 아니라 **서류 주의**로도 걸린다 — 흐름이 바뀌어도 따라오게
+    expect(p).toContain("서명 링크를 언급하지 않는다");
+  });
+});
+
+describe("서류별 주의 — 그 서류에만 붙는다", () => {
+  const noteOf = (docType: Parameters<typeof buildSystemPrompt>[0]["docType"]) =>
+    buildSystemPrompt({ ...base, docType });
+
+  it.each([
+    ["INTENT_AFFIRMATION", "'유언' 또는 '유언장'이라고 부르지 않는다"], // FR-551
+    ["CUSTODIAN_AGREEMENT", "유언집행자가 아니다"],
+    ["HEART_LETTER", "법적 효력이 있는 서류가 아니다"],
+    ["VOLUNTEER_PLEDGE", "금액을 묻지 않는다"],
+  ] as const)("%s → %s", (docType, phrase) => {
+    expect(noteOf(docType)).toContain(phrase);
+  });
+
+  it("다른 서류의 주의가 섞이지 않는다 — 교차 오염 검사", () => {
+    // 서류별 주의를 한 덩어리로 붙이면 기부 대화에 유언 주의가 따라온다.
+    // 그러면 모델이 "이건 서명이 안 됩니다"를 기부 약정서에 대고 말한다
+    const donation = noteOf("DONATION_PLEDGE");
+    expect(donation).not.toContain("서명 링크를 언급하지 않는다");
+    expect(donation).not.toContain("유언집행자");
+  });
+
+  it("가지에서 서류를 유도한다 — 넘기지 않아도 붙는다", () => {
+    // ESTATE → CUSTODIAN_AGREEMENT (lib/rules/branch-doc)
+    expect(buildSystemPrompt({ ...base, branchType: "ESTATE" })).toContain("유언집행자가 아니다");
+  });
+
+  it("명시한 서류가 유도값을 이긴다", () => {
+    const p = buildSystemPrompt({ ...base, branchType: "ESTATE", docType: "HEART_LETTER" });
+    expect(p).toContain("법적 효력이 있는 서류가 아니다");
+    expect(p).not.toContain("유언집행자");
+  });
+
+  it("서류가 없으면 주의도 없다 — 빈 제목만 남기지 않는다", () => {
+    expect(buildSystemPrompt({ ...base, docType: null })).not.toContain("이 서류에서 조심할 것");
+  });
+
+  it("보안 조항은 조건 없이 들어간다 — 가지도 서류도 없을 때까지 포함", () => {
+    // 조건이 붙으면 언젠가 그 조건이 거짓인 경로가 생기고, 그때 조용히 빠진다
+    for (const c of combos) {
+      const p = buildSystemPrompt(c);
+      expect(p, JSON.stringify(c)).toContain("절대 하지 않는 것");
+      expect(p, JSON.stringify(c)).toContain("계좌번호");
+      expect(p, JSON.stringify(c)).toContain("서명 링크");
+    }
   });
 
   it("가지가 있으면 그 가지의 목표가 들어간다 — 통과 케이스", () => {

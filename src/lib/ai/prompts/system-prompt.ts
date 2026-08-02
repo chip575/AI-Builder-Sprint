@@ -11,11 +11,15 @@
 //
 // ⚠ 여기에 숫자를 쓰지 않는다. 공제율·한도·기한은 lib/rules가 갖고 화면이 계산한다 (P3).
 // ⚠ 문구를 고치면 __snapshots__ diff를 함께 본다 — 조각이 아니라 **조립 결과**가 리뷰 대상이다.
-import type { BranchType } from "../../contracts/common";
+import type { BranchType, DocType } from "../../contracts/common";
+import { BRANCH_PRIMARY_DOC } from "../../rules/branch-doc";
 
 export interface PromptInput {
   /** Express·감지로 열린 가지. null이면 축(회상 인터뷰) */
   branchType: BranchType | null;
+  /** 이 대화가 향하는 서류. 생략하면 가지에서 유도한다 (BRANCH_PRIMARY_DOC).
+   *  넘기는 경우: 가지 표에 없는 서류로 가는 흐름 — 마음 유언·의사 확인서 등 */
+  docType?: DocType | null;
   /** 세션이 이미 아는 값 — 다시 묻지 않게 넘긴다 */
   knownFacts: { key: string; value: string | number }[];
   /** 아직 비어 있는 필수 슬롯 */
@@ -42,6 +46,59 @@ const BASE = [
   "10. **다만 사용자가 방금 무언가를 요청하거나 되물었으면 그것에 먼저 답한다.** 이때는 주어진 질문을 하지 않는다 — 사용자가 '서류를 달라', '무슨 말이냐'고 했는데 준비된 질문을 반복하면 대화가 아니라 자동응답기가 된다.",
   "11. 사용자가 문서·서류·약정서를 요청하면, 어떤 것을 남기고 싶은지 한 가지만 되물어 확인한다. 문서를 네가 만들어 주겠다고 말하지 않는다 — 만드는 것은 사용자가 확인한 뒤의 일이다.",
 ].join(NL);
+
+/**
+ * ② 절대 하지 않는 것 — 가지·문서와 무관하게 **항상** 붙는다.
+ *
+ * ⚠ 이건 보안 통제가 아니다. 모델은 규칙을 어길 수 있다. 마스킹·validity-gate·RLS는
+ *   코드에 그대로 있고 이 블록은 그 위에 얹는 두 번째 겹이다 — "코드가 막고 있으니
+ *   프롬프트에 썼다"도, "프롬프트에 썼으니 코드에서 빼도 된다"도 둘 다 틀렸다.
+ *   훅에 대한 AGENTS.md의 말과 같다: 통과했다는 사실이 승인을 뜻하지 않는다.
+ */
+const SAFETY = [
+  "절대 하지 않는 것 (예외 없다):",
+  "- 주민등록번호·계좌번호·카드번호를 답에 쓰지 않는다. 사용자가 말했더라도 되풀이하지 않는다 (되풀이하면 대화 기록에 한 번 더 남는다).",
+  "- 서명 링크·파일 경로·문서 내부 번호를 말하지 않는다. 서류는 화면에서 연다.",
+  "- 내부 코드명·표 이름·오류 코드를 그대로 말하지 않는다. 사람이 알아들을 말로 바꾼다.",
+  "- 확인하지 않은 것을 확인한 것처럼 말하지 않는다. 모르면 모른다고 한다.",
+  "- 법률·세무 판단을 단정하지 않는다. 판정과 계산은 화면이 하고, 너는 다음에 무엇을 하시면 되는지만 안내한다.",
+].join(NL);
+
+/**
+ * ③ 서류별 주의 — 그 서류에만 걸리는 제약. 없는 서류는 넣지 않는다.
+ *
+ * 가지별 목표(BRANCH_GOAL)와 축이 다르다. 저쪽은 *무엇을 물을지*이고 여기는
+ * *이 서류라서 조심할 것*이다. 유언장에 서명을 권하지 않는 이유는 대화 목표가 아니라
+ * **그 서류의 성질**이라, 같은 가지의 다른 서류로 흐름이 바뀌어도 따라와야 한다.
+ */
+const DOC_NOTE: Partial<Record<DocType, string>> = {
+  // 절대규칙 4 — 자필증서 유언은 손으로 쓴 것만 효력이 생긴다. 서명 버튼도 링크도 없다
+  HANDWRITTEN_WILL:
+    "이 서류는 전자서명으로 효력이 생기지 않는다. 서명을 권하거나 서명 링크를 언급하지 않는다. 손으로 옮겨 적는 과정만 안내한다.",
+  LEGACY_GIFT_AGREEMENT:
+    "가족의 유류분에 영향이 있을 수 있다는 고지가 먼저다. 고지 없이 규모부터 묻지 않는다.",
+  // FR-551 — 문서명에 "유언"이 들어가면 자필증서 요건을 갖춘 것으로 오해된다
+  INTENT_AFFIRMATION:
+    "이 서류를 '유언' 또는 '유언장'이라고 부르지 않는다. 뜻을 확인해 두는 서류다.",
+  CUSTODIAN_AGREEMENT:
+    "지킴이는 유언집행자가 아니다. 유언을 집행한다거나 대신 처리한다고 말하지 않는다.",
+  HEART_LETTER:
+    "법적 효력이 있는 서류가 아니다. 마음을 남겨 두는 기록이라고 안내한다.",
+  DIGITAL_LEGACY_INSTRUCTION:
+    "법적 효력이 있는 서류가 아니다. 남은 사람이 참고할 지시라고 안내한다.",
+  DONATION_PLEDGE: "공제·한도는 확인 화면이 계산한다. 네가 숫자를 말하지 않는다.",
+  RECURRING_CONSENT: "공제·한도는 확인 화면이 계산한다. 네가 숫자를 말하지 않는다.",
+  PRIVACY_TAX_CONSENT:
+    "동의 서류다. 무엇에 동의하시는 것인지만 설명하고, 동의를 재촉하지 않는다.",
+  HERITAGE_SUPPORT_PLEDGE: "공제·한도는 확인 화면이 계산한다. 네가 숫자를 말하지 않는다.",
+  VOLUNTEER_PLEDGE: "금전이 오가는 서류가 아니다. 금액을 묻지 않는다.",
+};
+
+/** 이 대화가 향하는 서류 — 명시값이 있으면 그것, 없으면 가지에서 유도한다 */
+function resolveDocType(input: PromptInput): DocType | null {
+  if (input.docType !== undefined) return input.docType;
+  return input.branchType ? BRANCH_PRIMARY_DOC[input.branchType] : null;
+}
 
 /** ③ 가지별 대화 목표 — 무엇을 물을지. 수치·한도는 등장하지 않는다 (P3) */
 const BRANCH_GOAL: Record<BranchType, string> = {
@@ -90,7 +147,18 @@ function goalSection(input: PromptInput): string {
     .join(NL + NL);
 }
 
-/** 모델에게 나갈 system 메시지 전문. 어댑터는 이 함수만 부른다 */
+/** 모델에게 나갈 system 메시지 전문. 어댑터는 이 함수만 부른다.
+ *  ②는 조건 없이 들어간다 — 가지가 없어도, 서류가 정해지지 않아도 붙는다 */
 export function buildSystemPrompt(input: PromptInput): string {
-  return `${BASE}${NL}${NL}이번 대화의 목표: ${goalSection(input)}`;
+  const docType = resolveDocType(input);
+  const docNote = docType ? DOC_NOTE[docType] : undefined;
+
+  return [
+    BASE,
+    SAFETY,
+    docNote ? `이 서류에서 조심할 것: ${docNote}` : "",
+    `이번 대화의 목표: ${goalSection(input)}`,
+  ]
+    .filter(Boolean)
+    .join(NL + NL);
 }
