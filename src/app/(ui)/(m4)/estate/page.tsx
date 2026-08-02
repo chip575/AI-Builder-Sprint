@@ -260,15 +260,23 @@ export default function EstatePage() {
           {assets.map((a) => (
             <div
               key={a.id}
-              className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4"
+              className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white p-4"
             >
-              <div>
+              <div className="min-w-0">
                 <p className="text-stone-800">{a.label}</p>
                 <p className="mt-1 text-sm text-stone-500">
                   {CATEGORY_LABEL[a.category] ?? a.category}
                   {won(a.estimatedValueKrw) ? ` · ${won(a.estimatedValueKrw)}` : ""}
                 </p>
               </div>
+              {/* 자산에서 약정으로 — "무엇을 남기는가"가 대화의 출발점이 된다.
+                  작성실이 이 자산을 첫 문장에 실어 유산 기부 흐름을 연다 */}
+              <Link
+                href={`/write?asset=${encodeURIComponent(a.label)}`}
+                className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-stone-300 px-3 text-sm text-stone-700 transition hover:bg-stone-100"
+              >
+                이 자산 남기기
+              </Link>
             </div>
           ))}
           {loaded && assets.length === 0 && (
