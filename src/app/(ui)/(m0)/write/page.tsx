@@ -25,7 +25,11 @@ interface Turn {
   text: string;
 }
 
-type SignableDoc = "LEGACY_GIFT_AGREEMENT" | "DONATION_PLEDGE";
+type SignableDoc =
+  | "LEGACY_GIFT_AGREEMENT"
+  | "DONATION_PLEDGE"
+  | "HERITAGE_SUPPORT_PLEDGE"
+  | "CUSTODIAN_AGREEMENT";
 
 /** 문서 선택 → 파이프라인 진입 발화. 카드 클릭이 곧 이 문장이다 (Express 직접 진입) */
 const DOC_ENTRY: Record<SignableDoc, { title: string; desc: string; utterance: string }> = {
@@ -42,7 +46,24 @@ const DOC_ENTRY: Record<SignableDoc, { title: string; desc: string; utterance: s
     desc: "지금 마음이 향하는 곳에 보태는 약정 — 지역과 금액을 정해 바로 체결합니다.",
     utterance: "고향에 기부하고 싶어요",
   },
+  HERITAGE_SUPPORT_PLEDGE: {
+    title: "문화유산 후원 약정서",
+    desc: "지키고 싶은 문화유산에 보태는 약정 — 후원 대상과 금액을 정해 체결합니다.",
+    utterance: "문화유산을 후원하고 싶어요",
+  },
+  CUSTODIAN_AGREEMENT: {
+    title: "자산 지킴이 약정서",
+    desc: "자산 목록을 맡기고, 때가 되면 뜻대로 전해지도록 협조를 약속받는 약정입니다.",
+    utterance: "재산을 정리하고 싶어요",
+  },
 };
+
+/** 선택 화면의 묶음 — 남기는 방식으로 나눈다. 트랙 강요가 아니라 문서 진열이다 */
+const DOC_GROUPS: { heading: string; docs: SignableDoc[] }[] = [
+  { heading: "지금 남기기", docs: ["DONATION_PLEDGE", "HERITAGE_SUPPORT_PLEDGE"] },
+  { heading: "사후에 남기기", docs: ["LEGACY_GIFT_AGREEMENT"] },
+  { heading: "정리와 맡김", docs: ["CUSTODIAN_AGREEMENT"] },
+];
 
 /** 세션 키 — 작성실 전용. 회상(/chat)·안내(/guide) 대화를 덮지 않는다 (보안 1조: id만) */
 const SESSION_KEY = "namgida.writeSessionId";
@@ -236,50 +257,86 @@ export default function WritePage() {
           대화로 함께 작성하고, 법이 인정하는 방식으로만 서명합니다.
         </p>
 
-        <div className="mt-6 space-y-4">
-          {(Object.keys(DOC_ENTRY) as SignableDoc[]).map((doc) => (
-            <button
-              key={doc}
-              type="button"
-              onClick={() => void pick(doc)}
-              className="block w-full rounded-2xl border border-stone-300 bg-white p-5 text-left transition hover:border-stone-500 hover:shadow-sm"
-            >
-              <span className="flex items-center justify-between">
-                <span className="font-serif text-lg font-semibold text-stone-900">
-                  {DOC_ENTRY[doc].title}
-                </span>
-                <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
-                  전자서명 가능
-                </span>
-              </span>
-              <span className="mt-2 block leading-relaxed text-stone-600">
-                {DOC_ENTRY[doc].desc}
-              </span>
-            </button>
-          ))}
+        <div className="mt-6 space-y-6">
+          {DOC_GROUPS.map((group) => (
+            <div key={group.heading} className="space-y-3">
+              <h2 className="text-sm font-medium text-stone-400">{group.heading}</h2>
+              {group.docs.map((doc) => (
+                <button
+                  key={doc}
+                  type="button"
+                  onClick={() => void pick(doc)}
+                  className="block w-full rounded-2xl border border-stone-300 bg-white p-5 text-left transition hover:border-stone-500 hover:shadow-sm"
+                >
+                  <span className="flex items-center justify-between">
+                    <span className="font-serif text-lg font-semibold text-stone-900">
+                      {DOC_ENTRY[doc].title}
+                    </span>
+                    <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+                      전자서명 가능
+                    </span>
+                  </span>
+                  <span className="mt-2 block leading-relaxed text-stone-600">
+                    {DOC_ENTRY[doc].desc}
+                  </span>
+                </button>
+              ))}
 
-          {/* 유언장 — 서명 버튼이 존재하지 않는다. 못 하는 것을 문 앞에서 말한다 (P2) */}
-          <div className="rounded-2xl border border-stone-200 bg-stone-100 p-5">
-            <div className="flex items-center justify-between">
-              <span className="font-serif text-lg font-semibold text-stone-700">유언장</span>
-              <span className="rounded bg-rose-100 px-2 py-0.5 text-xs text-rose-800">
-                전자서명으로는 효력이 없습니다
-              </span>
+              {group.heading === "사후에 남기기" && (
+                <>
+                  {/* 유언장 — 서명 버튼이 존재하지 않는다. 못 하는 것을 문 앞에서 말한다 (P2) */}
+                  <div className="rounded-2xl border border-stone-200 bg-stone-100 p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-serif text-lg font-semibold text-stone-700">
+                        유언장
+                      </span>
+                      <span className="rounded bg-rose-100 px-2 py-0.5 text-xs text-rose-800">
+                        전자서명으로는 효력이 없습니다
+                      </span>
+                    </div>
+                    <p className="mt-2 leading-relaxed text-stone-600">
+                      유언은 법이 정한 방식(자필증서 등)으로만 효력이 생깁니다. 대신
+                      자필로 옮겨 쓰실 수 있게 안내해 드립니다.
+                    </p>
+                    <p className="mt-2 text-xs text-stone-400">
+                      {will.map((s) => `${s.id} ${s.title}`).join(" · ")} (
+                      {will[0]!.verifiedAt} 확인)
+                    </p>
+                    <Link
+                      href="/will/handwriting"
+                      className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                    >
+                      자필 필사 가이드 보기
+                    </Link>
+                  </div>
+
+                  {/* 상속 — 못 만드는 것을 숨기지 않는다. 지금 가능한 길만 정직하게 안내 */}
+                  <div className="rounded-2xl border border-stone-200 bg-stone-100 p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-serif text-lg font-semibold text-stone-700">
+                        상속에 관하여
+                      </span>
+                      <span className="rounded bg-stone-200 px-2 py-0.5 text-xs text-stone-600">
+                        안내
+                      </span>
+                    </div>
+                    <p className="mt-2 leading-relaxed text-stone-600">
+                      유언이나 약정이 없으면 재산은 법이 정한 순위대로 상속됩니다.
+                      특정한 곳에 남기고 싶으시면 위의 유산 기부 약정으로, 유언은
+                      자필로 준비하실 수 있습니다. 상속인들 사이의 분할 협의 문서는
+                      등기 실무상 서면·인감이 필요해 여기서 만들지 않습니다.
+                    </p>
+                    <Link
+                      href="/guide"
+                      className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                    >
+                      상속이 궁금하면 물어보기
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
-            <p className="mt-2 leading-relaxed text-stone-600">
-              유언은 법이 정한 방식(자필증서 등)으로만 효력이 생깁니다. 대신 자필로
-              옮겨 쓰실 수 있게 안내해 드립니다.
-            </p>
-            <p className="mt-2 text-xs text-stone-400">
-              {will.map((s) => `${s.id} ${s.title}`).join(" · ")} ({will[0]!.verifiedAt} 확인)
-            </p>
-            <Link
-              href="/will/handwriting"
-              className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
-            >
-              자필 필사 가이드 보기
-            </Link>
-          </div>
+          ))}
 
           <Link
             href="/chat"
@@ -402,7 +459,11 @@ export default function WritePage() {
               <div className="flex flex-wrap gap-1.5 text-xs">
                 {(docType === "LEGACY_GIFT_AGREEMENT"
                   ? ([["받으실 곳", facts.orgName], ["금액", facts.amount]] as const)
-                  : ([["지역", facts.region], ["금액", facts.amount]] as const)
+                  : docType === "HERITAGE_SUPPORT_PLEDGE"
+                    ? ([["후원 대상", facts.orgName], ["금액", facts.amount]] as const)
+                    : docType === "CUSTODIAN_AGREEMENT"
+                      ? ([["지킴이", facts.orgName]] as const)
+                      : ([["지역", facts.region], ["금액", facts.amount]] as const)
                 ).map(([label, v]) => (
                   <span
                     key={label}
