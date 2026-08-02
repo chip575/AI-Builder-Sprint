@@ -10,6 +10,8 @@ import { responder } from "@/lib/ai/session/responder";
 import { computeCoverage, nextQuestion } from "@/lib/rules/question-bank";
 import { MockExtractor } from "@/lib/ai/extract/mock-extractor";
 import { detectExpress } from "@/lib/rules/express-detect";
+import { isHeavy } from "@/lib/rules/branch-weight";
+import { store } from "@/lib/store";
 import { track } from "@/lib/observability/track";
 import { getCurrentUserId } from "@/lib/auth/session";
 
@@ -77,18 +79,33 @@ export async function POST(req: Request) {
   // 슬롯을 묻던 대화가 갑자기 다른 주제를 꺼낸다 (작성실 흐름에서 드러남).
   const openBranch =
     [...session.proposals].reverse().find((p) => p.status === "OPENED")?.branchType ?? null;
-  const branchType =
-    detection.kind === "EXPRESS" ? detection.branchType : openBranch;
 
-  const proposal = branchType
+  // 이번 발화가 새로 연 가지 — 이미 열린 가지를 이어가는 턴에는 null이다.
+  // (여기서 openBranch까지 묶으면 턴마다 제안 행이 하나씩 쌓인다)
+  const expressType = detection.kind === "EXPRESS" ? detection.branchType : null;
+
+  const proposal = expressType
     ? await createProposal({
         sessionId: session.id,
         userId: session.userId,
-        branchType,
+        branchType: expressType,
         origin: "EXPRESS",
         sourceUtteranceId: utterance.id,
       })
     : null;
+
+  // **직행은 그 자체가 여는 행위다 — 상태를 남겨야 다음 턴이 이 대화를 알아본다.**
+  // 남기지 않으면 제안이 PROPOSED로 머물고 openBranch가 영원히 null이라,
+  // 금액을 물어놓고 답하면 회상 질문으로 새어 나간다 (실측 2026-08-02).
+  // 무거운 가지는 열지 않는다 — 숙려 화면을 거친다 (FR-115B).
+  if (proposal) {
+    await store.decideProposal(
+      proposal.id,
+      isHeavy(proposal.branchType) ? "PENDING_RECONFIRM" : "OPENED",
+    );
+  }
+
+  const branchType = expressType ?? openBranch;
 
   // ── 응답기에 넘길 세션 지식 ──
   // 방금 발화까지 포함해 **결정론적으로** 슬롯을 훑는다. LLM 호출이 아니라
@@ -127,7 +144,13 @@ export async function POST(req: Request) {
 
   // 다음 행동이 화면(버튼·확인)에 있으면 LLM을 부르지 않는다 (handoff.ts의 도돌이표 해부).
   // 최신 제안이 재확인 대기(PENDING_RECONFIRM)면 결정은 decide 버튼만 받는다.
-  const latestProposal = session.proposals.at(-1);
+  // ⚠ **이번 턴에 만든 제안은 제외한다** — 첫 직행 턴은 고지·인사(응답기)가 답해야 한다.
+  //   인메모리 스토어는 세션 객체를 참조로 공유해 방금 만든 제안이 session.proposals에
+  //   이미 들어 있다 (Supabase 스냅샷과 달리). 제외하지 않으면 스토어에 따라 첫 턴
+  //   응답이 갈라진다 (route.test가 잡았다, 2026-08-02).
+  const latestProposal = session.proposals
+    .filter((p) => p.id !== proposal?.id)
+    .at(-1);
   const handoff = guide
     ? null
     : handoffReply({

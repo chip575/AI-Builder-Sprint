@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
 import { STATUTES } from "@/lib/rules/validity-gate";
@@ -64,7 +64,20 @@ const DOC_GROUPS: { heading: string; docs: SignableDoc[] }[] = [
 const SESSION_KEY = "namgida.writeSessionId";
 const DOC_KEY = "namgida.writeDocType";
 
+/**
+ * useSearchParams는 정적 프리렌더에서 Suspense 경계를 요구한다 — 없으면 dev는 멀쩡한데
+ * `next build`가 /write에서 죽는다 (Vercel 배포 실패로 발견, 2026-08-02).
+ * 그래서 본체를 감싸는 껍데기가 기본 내보내기다.
+ */
 export default function WritePage() {
+  return (
+    <Suspense fallback={null}>
+      <WriteWorkspace />
+    </Suspense>
+  );
+}
+
+function WriteWorkspace() {
   const router = useRouter();
   /** 내 유산에서 넘어온 자산 — "무엇을 남기는가"가 대화의 첫 문장에 실린다 */
   const assetParam = useSearchParams().get("asset");
