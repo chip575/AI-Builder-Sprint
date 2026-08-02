@@ -22,6 +22,8 @@ export function logModes(): void {
     console.warn("[mode] ⚠ UPSTAGE=real — 실 호출이 과금됩니다 (크레딧 소진 후에도 계속)");
   }
   if (m.modusign === "real") {
-    console.warn("[mode] ⚠ MODUSIGN=real — real 어댑터 미구현. 서명 요청은 실패합니다");
+    console.warn(
+      "[mode] ⚠ MODUSIGN=real — 서명 요청이 실제로 나가고 잔여를 소모합니다 (조회는 무료)",
+    );
   }
 }
