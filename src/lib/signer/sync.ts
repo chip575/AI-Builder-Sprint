@@ -12,6 +12,7 @@
 import { signer } from ".";
 import { canTransition } from "./state-machine";
 import { store } from "../store";
+import { ensureEvidence } from "@/app/api/(m0)/webhooks/modusign/outbox";
 
 /** metadatas에 심어 둔 역참조 키 (02.3 §1) */
 const META_DRAFT_ID = "draftId";
@@ -54,6 +55,14 @@ export async function syncExternalDelta(since?: string | null): Promise<SyncResu
     if (doc.status !== draft.status && canTransition(draft.status, doc.status)) {
       await store.syncDraftStatus(draft.draftId, doc.status, doc.rejectReason);
       corrected += 1;
+    }
+
+    // 완료면 증빙이 있어야 한다 (FR-505). 상태만 맞추고 증빙을 빼면 **COMPLETED인데
+    // 증빙이 없는 상태**가 남는데, 그건 리컨실러가 지키려던 바로 그 불변식이다.
+    // 실제로 이 누락으로 실서명 완료 문서가 증빙 없이 남았다 (2026-08-02 실측).
+    // ensureEvidence는 멱등이다 — 이미 있으면 아무 일도 하지 않는다
+    if (doc.status === "COMPLETED" && draft.modusignDocumentId) {
+      await ensureEvidence(draft.draftId, draft.modusignDocumentId, doc);
     }
   }
 
