@@ -14,6 +14,7 @@ export * from "./documents";
 export * from "./sign";
 export * from "./webhook";
 export * from "./estate";
+export * from "./recipient";
 export * from "./evidence";
 export * from "./obligations";
 export * from "./reconcile";
