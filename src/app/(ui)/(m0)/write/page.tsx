@@ -28,8 +28,7 @@ interface Turn {
 type SignableDoc =
   | "LEGACY_GIFT_AGREEMENT"
   | "DONATION_PLEDGE"
-  | "HERITAGE_SUPPORT_PLEDGE"
-  | "CUSTODIAN_AGREEMENT";
+  | "HERITAGE_SUPPORT_PLEDGE";
 
 /** 문서 선택 → 파이프라인 진입 발화. 카드 클릭이 곧 이 문장이다 (Express 직접 진입) */
 const DOC_ENTRY: Record<SignableDoc, { title: string; desc: string; utterance: string }> = {
@@ -51,18 +50,14 @@ const DOC_ENTRY: Record<SignableDoc, { title: string; desc: string; utterance: s
     desc: "지키고 싶은 문화유산에 보태는 약정 — 후원 대상과 금액을 정해 체결합니다.",
     utterance: "문화유산을 후원하고 싶어요",
   },
-  CUSTODIAN_AGREEMENT: {
-    title: "자산 지킴이 약정서",
-    desc: "자산 목록을 맡기고, 때가 되면 뜻대로 전해지도록 협조를 약속받는 약정입니다.",
-    utterance: "재산을 정리하고 싶어요",
-  },
 };
 
-/** 선택 화면의 묶음 — 남기는 방식으로 나눈다. 트랙 강요가 아니라 문서 진열이다 */
+/** 선택 화면의 묶음 — 남기는 방식으로 나눈다. 트랙 강요가 아니라 문서 진열이다.
+ *  자산 지킴이 약정(CUSTODIAN)은 진열에서 뺐다(2026-08-02 결정) — 배선은 남아 있어
+ *  자산 정리 흐름(M4)이 자라면 그쪽에서 다시 건다 */
 const DOC_GROUPS: { heading: string; docs: SignableDoc[] }[] = [
   { heading: "지금 남기기", docs: ["DONATION_PLEDGE", "HERITAGE_SUPPORT_PLEDGE"] },
   { heading: "사후에 남기기", docs: ["LEGACY_GIFT_AGREEMENT"] },
-  { heading: "정리와 맡김", docs: ["CUSTODIAN_AGREEMENT"] },
 ];
 
 /** 세션 키 — 작성실 전용. 회상(/chat)·안내(/guide) 대화를 덮지 않는다 (보안 1조: id만) */
@@ -461,9 +456,7 @@ export default function WritePage() {
                   ? ([["받으실 곳", facts.orgName], ["금액", facts.amount]] as const)
                   : docType === "HERITAGE_SUPPORT_PLEDGE"
                     ? ([["후원 대상", facts.orgName], ["금액", facts.amount]] as const)
-                    : docType === "CUSTODIAN_AGREEMENT"
-                      ? ([["지킴이", facts.orgName]] as const)
-                      : ([["지역", facts.region], ["금액", facts.amount]] as const)
+                    : ([["지역", facts.region], ["금액", facts.amount]] as const)
                 ).map(([label, v]) => (
                   <span
                     key={label}
