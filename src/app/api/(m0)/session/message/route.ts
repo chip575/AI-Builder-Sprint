@@ -2,7 +2,7 @@
 // 응답: SSE. token 이벤트로 본문을 흘리고, 마지막 meta 이벤트 하나로
 // SessionMessageRes를 보낸다. 프론트 라우팅 판단은 meta에서만 한다.
 import { SessionMessageReq, SessionMessageRes } from "@/lib/contracts";
-import { addUtterance, getOrCreateSession } from "@/lib/ai/session/store";
+import { addUtterance, getOrCreateSession, saveFacts } from "@/lib/ai/session/store";
 import { createProposal, proposeBranches } from "@/lib/ai/branch/propose";
 import { detectGuide } from "@/lib/ai/session/guide";
 import { handoffReply } from "@/lib/ai/session/handoff";
@@ -101,6 +101,17 @@ export async function POST(req: Request) {
     utterances: allUtterances,
   });
   const knownFacts = scan.facts.map((f) => ({ key: f.key, value: f.value as string | number }));
+
+  // 훑은 값은 **바로 저장한다** — 응답기는 되읽는데 화면(약정서 미리보기)은 비어 있던
+  // 어긋남의 원인이 여기였다: 값이 추출(POST /extract) 전까지 어디에도 안 남았다.
+  // saveFacts는 확정된 값을 덮지 않고(P1, StorePort 보장), 이후 정식 추출이 같은 키를
+  // 갱신하므로 품질도 수렴한다. 계약 밖 채널이 아니라 기존 facts 저장소를 쓴다 (규칙 1).
+  if (scan.facts.length > 0) {
+    await saveFacts(session.id, scan.facts).catch((err) =>
+      // 미리보기 편의가 대화를 죽이면 안 된다 — 실패는 기록만 남긴다
+      console.warn("[session] 훑은 값 저장 실패:", (err as Error).message),
+    );
+  }
 
   // 축 세션이면 질문은행이 다음 질문을 고른다 — 가지 세션은 슬롯을 모으지 회상하지 않는다
   const nextAxisQuestion = branchType

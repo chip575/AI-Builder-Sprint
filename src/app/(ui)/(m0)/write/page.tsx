@@ -106,6 +106,16 @@ export default function WritePage() {
       setSessionId(savedSession);
       setDocType(savedDoc);
       void refreshFacts(savedSession);
+      // 대화 원문 복원은 세션 조회 계약이 없어 아직 못 한다(브라우저 저장은 보안 1조 금지,
+      // 조회 API 신설은 PM 계약 몫). 빈 화면 대신 이어쓰기라는 사실과 갈 곳을 말해 준다
+      setTurns([
+        {
+          role: "assistant",
+          text:
+            "지난 작성을 이어갑니다. 지금까지 정리된 값은 아래 현황과 약정서에서 " +
+            "보실 수 있어요. 이어서 말씀해 주세요.",
+        },
+      ]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 1회 진입 판정
   }, []);
@@ -156,6 +166,9 @@ export default function WritePage() {
             setSessionId(m.sessionId);
             localStorage.setItem(SESSION_KEY, m.sessionId);
             if (m.expressBranch) expressProposalId = m.expressBranch.proposalId;
+            // 말할 때마다 약정서가 따라온다 — 서버가 턴마다 훑어 저장한 값을 읽는다.
+            // 이게 없으면 "기부처와 돈을 말했는데 약정서가 비어 있다"가 된다 (2026-08-02)
+            void refreshFacts(m.sessionId);
           },
         },
       );
