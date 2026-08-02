@@ -58,6 +58,8 @@ export class SolarResponder implements ResponderPort {
         reasoning_effort: "minimal",
         stream: true,
         messages: [
+          // RespondInput이 PromptInput을 그대로 포함한다 — 어댑터가 값을 고르지 않는다.
+          // 고르기 시작하면 mock과 real이 다른 것을 넘기고, 그게 곧 다른 서비스가 된다
           { role: "system", content: buildSystemPrompt(input) },
           ...input.utterances.map((u) => ({ role: "user" as const, content: u.text })),
         ],

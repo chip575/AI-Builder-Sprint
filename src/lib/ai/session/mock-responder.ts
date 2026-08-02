@@ -59,7 +59,18 @@ function readback(known: RespondInput["knownFacts"]): string {
  * ⚠ `missingRequired`를 무시하면 사용자가 방금 말한 것을 다시 묻게 된다.
  */
 export function mockReply(input: RespondInput): string {
-  const { branchType, knownFacts, missingRequired, nextAxisQuestion } = input;
+  const { branchType, knownFacts, missingRequired, nextAxisQuestion, assetLine } = input;
+
+  // 재산 문장은 **유산 계열에만** 붙인다.
+  //
+  // real은 프롬프트로 재산을 늘 받아 두고 "물었을 때만 꺼낸다"를 판단하는데, mock은
+  // 판단하지 않는다. 그래서 기부 가지에 붙이면 묻지도 않은 총액을 매 턴 들이대게 되고,
+  // 그건 금액 제안이다 (system-prompt의 assetSection이 막으려는 바로 그것).
+  // 유산·자산 정리는 목록이 대화의 전제라, 늘 보여도 방해가 아니라 근거다.
+  const assetNote =
+    assetLine && (branchType === "LEGACY_GIFT" || branchType === "ESTATE")
+      ? `${assetLine} `
+      : "";
 
   // ── 축(회상 인터뷰) — 질문은행이 다음 질문을 고른다 ──
   if (!branchType) {
@@ -69,6 +80,8 @@ export function mockReply(input: RespondInput): string {
   }
 
   // ── 무거운 가지 — 고지가 먼저, 슬롯은 그다음 ──
+  // 고지가 먼저다 — 재산 문장도 그 뒤로 밀린다. 무게 있는 결정 앞에서 총액을
+  // 먼저 보여주면, 고지를 읽기 전에 규모부터 눈에 들어온다
   const notice = HEAVY_NOTICE[branchType];
   if (notice && knownFacts.length === 0) {
     return `${BRANCH_GREETING[branchType]} ${notice}`;
@@ -79,11 +92,11 @@ export function mockReply(input: RespondInput): string {
   const greeting = knownFacts.length === 0 ? `${BRANCH_GREETING[branchType]} ` : "";
   if (next) {
     const question = SLOT_QUESTION[next] ?? "조금만 더 말씀해 주시겠어요?";
-    return `${greeting}${readback(knownFacts)}${question}`;
+    return `${greeting}${assetNote}${readback(knownFacts)}${question}`;
   }
 
   // 필요한 것이 다 모였다 — 다음 화면으로 넘어갈 때다
-  return `${readback(knownFacts)}필요한 내용이 모였습니다. 확인 화면에서 함께 살펴보시겠어요? 예상 세액공제도 거기서 계산해 보여 드립니다.`;
+  return `${assetNote}${readback(knownFacts)}필요한 내용이 모였습니다. 확인 화면에서 함께 살펴보시겠어요? 예상 세액공제도 거기서 계산해 보여 드립니다.`;
 }
 
 /** SSE token 이벤트로 흘릴 조각 — 어절 단위 분할 (결정론적) */

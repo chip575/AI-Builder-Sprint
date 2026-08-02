@@ -16,6 +16,11 @@ export interface RespondInput {
   /** 축 세션에서 다음에 던질 회상 질문 (lib/rules/question-bank).
    *  가지 세션이면 null — 가지는 슬롯을 모으지 회상을 하지 않는다 */
   nextAxisQuestion: string | null;
+  /** 코드가 만든 재산 사실 문장 (lib/ai/prompts/asset-readback).
+   *  **감지하지 않고 매 턴 넣는다** — 정규식으로 "재산을 물었나"를 가리면 재산어가
+   *  없는 말("이거 애들한테 어떻게 하면 좋을까요")을 놓치고, 그때 모델은 아무것도
+   *  모르는 채로 답한다. 조회 실패면 null: 못 읽은 것과 없는 것은 다르다 */
+  assetLine: string | null;
 }
 
 export interface ResponderPort {

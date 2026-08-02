@@ -6,6 +6,8 @@ import { addUtterance, getOrCreateSession, saveFacts } from "@/lib/ai/session/st
 import { createProposal, proposeBranches } from "@/lib/ai/branch/propose";
 import { detectGuide } from "@/lib/ai/session/guide";
 import { handoffReply } from "@/lib/ai/session/handoff";
+import { assetReadback } from "@/lib/ai/prompts/asset-readback";
+import { summarize } from "@/app/api/(m4)/estate/inventory";
 import { responder } from "@/lib/ai/session/responder";
 import { computeCoverage, nextQuestion } from "@/lib/rules/question-bank";
 import { MockExtractor } from "@/lib/ai/extract/mock-extractor";
@@ -63,6 +65,21 @@ export async function POST(req: Request) {
   // 로그인하지 않았으면 발화를 저장하지 않는다 — 익명 신원이 없으므로 소유자를 정할 수 없다
   const userId = await getCurrentUserId(req);
   if (!userId) return loginRequired();
+  // 재산은 **매 턴 읽는다.** 발화를 정규식으로 걸러 조회할지 정하면, 재산어가 없는 말
+  // ("이거 애들한테 어떻게 하면 좋을까요")을 놓치고 그때 모델은 아무것도 모르는 채로 답한다.
+  // 여기서 먼저 띄우고 응답기에 넘기기 직전에 거둔다 — 첫 토큰 2초(NFR-702)에 왕복을 더하지 않게.
+  // 대화는 재산을 **읽기만 한다.** 등록은 화면(POST /estate/assets)이 받는다: 회상 인터뷰는
+  // 이야기를 끌어내려고 넓게 묻는데 자산 목록은 정확해야 해서, 한 통로로 합치면
+  // "아버지가 땅을 좀 주셨는데"가 부동산 1건이 된다.
+  const assetsPending = store
+    .listAssets(userId)
+    .then(summarize)
+    .catch((err) => {
+      // 조회 실패를 "자산 없음"으로 바꾸지 않는다 — 없다고 말하면 거짓이 된다 (보안 7조)
+      console.warn("[session] 자산 조회 실패:", (err as Error).message);
+      return null;
+    });
+
   const session = await getOrCreateSession(parsed.data.sessionId, userId);
   const isFirstUtterance = session.utterances.length === 0;
   const utterance = await addUtterance(session.id, parsed.data.text);
@@ -215,6 +232,7 @@ export async function POST(req: Request) {
             knownFacts,
             missingRequired: scan.missingRequired,
             nextAxisQuestion,
+            assetLine: assetReadback(await assetsPending),
           })) {
             controller.enqueue(sse("token", chunk));
             if (!firstTokenSent) {

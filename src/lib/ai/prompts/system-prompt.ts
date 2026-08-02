@@ -26,6 +26,9 @@ export interface PromptInput {
   missingRequired: string[];
   /** 축 세션에서 다음에 던질 회상 질문 (lib/rules/question-bank). 가지면 null */
   nextAxisQuestion: string | null;
+  /** 코드가 만든 재산 사실 문장 (asset-readback). 조회에 실패했으면 null —
+   *  **못 읽은 것과 없는 것은 다르다.** 0건일 때도 문장이 온다 */
+  assetLine?: string | null;
 }
 
 const NL = "\n";
@@ -94,6 +97,37 @@ const DOC_NOTE: Partial<Record<DocType, string>> = {
   VOLUNTEER_PLEDGE: "금전이 오가는 서류가 아니다. 금액을 묻지 않는다.",
 };
 
+/**
+ * ④ 재산 — **가지마다 시키는 일이 반대다.**
+ *
+ * 기부에서 재산 총액을 먼저 꺼내면 그게 곧 금액 제안이다. 규칙 2("금액을 네가 먼저
+ * 제안하지 않는다")를 어기지 않은 척하면서 어긴다 — 숫자를 제안하진 않았지만 기준점을
+ * 깔았고, 사용자는 그 숫자에 비례해 답한다. 게다가 기부에는 세액공제가 붙어서, 총액과
+ * 공제가 한 대화에 있으면 "얼마까지 내면 이득인가"로 읽힌다.
+ *
+ * 유산은 정반대다. 무엇이 있는지 모르면 누구에게 무엇을 남길지 정할 수가 없다.
+ * 다만 목록은 우리가 확인한 것까지다 — 지목한 물건이 상속개시 당시 상속재산에 없으면
+ * 그 부분은 효력을 잃는 게 원칙이라, 모델이 목록을 "전부"로 취급하면 안 된다.
+ *
+ * 문장 자체는 여기서 만들지 않는다 (asset-readback). 목록을 넘겨 요약시키면 더한다.
+ */
+function assetSection(input: PromptInput): string {
+  if (!input.assetLine) return "";
+
+  const lead =
+    input.branchType === "DONATION_NOW" || input.branchType === "HERITAGE_SUPPORT"
+      ? "아래는 우리가 확인한 재산이다. **사용자가 직접 묻기 전에는 꺼내지 않는다.** 재산 규모를 근거로 기부 금액을 권하거나 비교하지 않는다."
+      : input.branchType === "HANDWRITTEN_WILL"
+        ? "아래는 우리가 확인한 재산이다. 사용자가 물으면 그대로 알려 드린다. 무엇을 남길지는 사용자가 정한다 — 네가 목록에서 골라 주지 않는다."
+        : "아래는 우리가 확인한 재산이다. 무엇을 누구에게 남길지 정리할 때 이것을 근거로 삼는다. **목록에 없는 것을 있는 것처럼 말하지 않는다.**";
+
+  return [
+    lead,
+    "숫자를 바꾸거나 더하거나 빼지 않는다. 아래 문장에 없는 금액은 너도 말하지 않는다. 이것이 전 재산이라고 말하지 않는다 — 사용자가 더 가지고 계실 수 있다.",
+    `"${input.assetLine}"`,
+  ].join(NL + NL);
+}
+
 /** 이 대화가 향하는 서류 — 명시값이 있으면 그것, 없으면 가지에서 유도한다 */
 function resolveDocType(input: PromptInput): DocType | null {
   if (input.docType !== undefined) return input.docType;
@@ -157,6 +191,7 @@ export function buildSystemPrompt(input: PromptInput): string {
     BASE,
     SAFETY,
     docNote ? `이 서류에서 조심할 것: ${docNote}` : "",
+    assetSection(input),
     `이번 대화의 목표: ${goalSection(input)}`,
   ]
     .filter(Boolean)

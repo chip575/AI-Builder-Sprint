@@ -8,6 +8,10 @@
 import { describe, expect, it } from "vitest";
 import { buildSystemPrompt, type PromptInput } from "./system-prompt";
 
+/** asset-readback이 만드는 모양. 여기서 값을 새로 만들지 않는다 —
+ *  문장 규칙은 저쪽 검사가 본다 */
+const ASSET_LINE = "저희가 확인한 자산은 금융 1건 45,000,000원입니다.";
+
 const base: PromptInput = {
   branchType: null,
   knownFacts: [],
@@ -50,6 +54,23 @@ describe("조립 결과 스냅샷", () => {
 
   it("마음 편지 — 가지 표에 없는 서류를 명시로 넘긴 경우", () => {
     expect(buildSystemPrompt({ ...base, docType: "HEART_LETTER" })).toMatchSnapshot();
+  });
+
+  it("유산 × 재산 있음 — 재산 절이 붙은 전문", () => {
+    expect(
+      buildSystemPrompt({ ...base, branchType: "LEGACY_GIFT", assetLine: ASSET_LINE }),
+    ).toMatchSnapshot();
+  });
+
+  it("기부 × 재산 있음 — 같은 재산에 반대 지시가 붙는다", () => {
+    expect(
+      buildSystemPrompt({
+        ...base,
+        branchType: "DONATION_NOW",
+        missingRequired: ["amount"],
+        assetLine: ASSET_LINE,
+      }),
+    ).toMatchSnapshot();
   });
 });
 
@@ -130,6 +151,58 @@ describe("서류별 주의 — 그 서류에만 붙는다", () => {
 
   it("서류가 없으면 주의도 없다 — 빈 제목만 남기지 않는다", () => {
     expect(buildSystemPrompt({ ...base, docType: null })).not.toContain("이 서류에서 조심할 것");
+  });
+});
+
+describe("재산 — 가지마다 시키는 일이 반대다", () => {
+  const withAssets = (branchType: PromptInput["branchType"]) =>
+    buildSystemPrompt({ ...base, branchType, assetLine: ASSET_LINE });
+
+  it("기부 → 먼저 꺼내지 말라고 시킨다. 총액이 곧 금액 제안이 된다", () => {
+    for (const b of ["DONATION_NOW", "HERITAGE_SUPPORT"] as const) {
+      const p = withAssets(b);
+      expect(p, b).toContain("직접 묻기 전에는 꺼내지 않는다");
+      expect(p, b).toContain("금액을 권하거나 비교하지 않는다");
+      // 유산 쪽 지시가 새어 들어오면 안 된다
+      expect(p, b).not.toContain("근거로 삼는다");
+    }
+  });
+
+  it("유산 → 근거로 삼되 목록을 전부로 취급하지 말라고 시킨다", () => {
+    for (const b of ["LEGACY_GIFT", "ESTATE"] as const) {
+      const p = withAssets(b);
+      expect(p, b).toContain("근거로 삼는다");
+      expect(p, b).toContain("목록에 없는 것을 있는 것처럼 말하지 않는다");
+      expect(p, b).not.toContain("직접 묻기 전에는 꺼내지 않는다");
+    }
+  });
+
+  it("자필유언 → 알려는 주되 대신 골라 주지 않는다", () => {
+    const p = withAssets("HANDWRITTEN_WILL");
+    expect(p).toContain("네가 목록에서 골라 주지 않는다");
+  });
+
+  it("어느 가지든 더하지 말라·전 재산이라 하지 말라가 붙는다", () => {
+    for (const b of [null, "DONATION_NOW", "LEGACY_GIFT", "HANDWRITTEN_WILL"] as const) {
+      const p = withAssets(b);
+      expect(p, String(b)).toContain("숫자를 바꾸거나 더하거나 빼지 않는다");
+      expect(p, String(b)).toContain("전 재산이라고 말하지 않는다");
+      expect(p, String(b)).toContain(ASSET_LINE); // 문장은 그대로 실린다
+    }
+  });
+
+  it("사용자 금액은 들어가도 된다 — 그건 법률 수치가 아니다 (P3 경계)", () => {
+    // 절대규칙 2가 막는 것은 **공제율·한도·기한**이다. 사용자가 자기 예금이 얼마인지는
+    // 그 사람의 사실이고, lib/rules가 소유하는 값이 아니다. 이 구분이 흐려지면
+    // "숫자가 보이니 지우자"가 되어 재산 문장 자체가 사라진다
+    expect(withAssets("LEGACY_GIFT")).toContain("45,000,000원");
+  });
+
+  it("재산 문장이 없으면 그 절이 통째로 빠진다 — 빈 지시만 남기지 않는다", () => {
+    // 조회 실패(null)일 때 "아래는 우리가 확인한 재산이다"만 남고 문장이 없으면,
+    // 모델은 없는 목록을 지어낸다
+    const p = buildSystemPrompt({ ...base, branchType: "LEGACY_GIFT", assetLine: null });
+    expect(p).not.toContain("아래는 우리가 확인한 재산이다");
   });
 
   it("보안 조항은 조건 없이 들어간다 — 가지도 서류도 없을 때까지 포함", () => {
