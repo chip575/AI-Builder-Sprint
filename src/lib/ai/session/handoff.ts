@@ -8,6 +8,7 @@
 // 규칙: 다음 행동이 대화가 아니라 **버튼/화면**에 있을 때는 LLM을 부르지 않는다.
 // 코드가 그 문을 가리키는 문장을 내고 끝낸다. LLM은 아직 물을 것이 남았을 때만 말한다.
 import type { BranchType } from "../../contracts/common";
+import { eunNeun } from "../../korean";
 
 export interface HandoffInput {
   branchType: BranchType | null;
@@ -30,7 +31,8 @@ function readback(facts: HandoffInput["knownFacts"]): string {
         f.key === "amount" && typeof f.value === "number"
           ? `${f.value.toLocaleString("ko-KR")}원`
           : String(f.value);
-      return `${FACT_LABEL[f.key] ?? f.key}은(는) ${v}`;
+      // 조사는 앞말 받침에 따라 고른다 — "은(는)"이 그대로 나가면 서식 편지가 된다
+      return `${eunNeun(FACT_LABEL[f.key] ?? f.key)} ${v}`;
     })
     .join(", ");
 }

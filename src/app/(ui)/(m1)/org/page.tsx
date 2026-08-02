@@ -108,7 +108,7 @@ export default function OrgOverviewPage() {
         <section className="rounded-xl border border-stone-300 bg-white p-4">
           <p className="text-sm text-stone-500">갱신이 다가오는 약속</p>
           {renewal === null ? (
-            <p className="mt-2 text-sm text-stone-400">불러오는 중…</p>
+            <p className="mt-2 text-sm text-stone-500">불러오는 중…</p>
           ) : renewal.length === 0 ? (
             <p className="mt-2 text-sm text-stone-500">아직 갱신이 도래한 약속이 없습니다.</p>
           ) : (

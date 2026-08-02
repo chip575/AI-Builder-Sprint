@@ -1,6 +1,7 @@
 // 어댑터 선택 (ADR-4) — MODUSIGN_MODE=mock이면 키 없이 전 흐름이 돈다 (NFR-707)
-// realSigner는 M-SIGN에서 구현된다. 그 전까지 real 모드는 명시적으로 실패한다 —
-// 조용히 mock으로 폴백하면 "실 서명이 됐다"는 착각을 만든다 (보안 7조: 조용히 넘기지 않는다).
+// realSigner(ModusignSigner)는 구현돼 있다 — 2026-08-02 실서명 왕복 1건 성공.
+// 키가 없으면 조용히 mock으로 폴백하지 않고 호출 시점에 명시적으로 실패한다
+// (보안 7조: 조용히 넘기지 않는다). "실 서명이 됐다"는 착각을 만들지 않기 위해서다.
 import { MockSigner } from "./mock/mock-signer";
 import { ModusignSigner } from "./real/modusign";
 import type { SignerPort } from "./port";

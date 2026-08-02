@@ -20,12 +20,29 @@ import { buildTemplateFields, type TemplateKey } from "../template-fields";
 import { TEMPLATE_ROLES, resolveTemplateCode, toDataLabel } from "../template-labels";
 import type {
   DocumentDetail,
+  DocumentListFilter,
   SignerPort,
   SignRequestInput,
   SignRequestResult,
 } from "../port";
 
 export const MODUSIGN_BASE = "https://api.modusign.co.kr";
+
+/**
+ * 우리 DocStatus → 모두싸인 status (목록 filter용).
+ *
+ * mapModusignStatus의 역방향인데 **1:1이 아니다** — ON_GOING·MODIFYING·
+ * APPROVAL_PENDING·ON_PROCESSING이 전부 REQUESTED로 접힌다. 그래서 여기서는
+ * 각 우리 상태의 **대표값 하나**만 고른다. 정밀한 목록이 필요하면 filter를 쓰지 말고
+ * 전량을 받아 우리 매핑으로 거르는 편이 정확하다 (지금은 대표값으로 충분하다).
+ */
+const MODUSIGN_STATUS: Record<DocStatus, string> = {
+  DRAFT: "DRAFT",
+  REQUESTED: "ON_GOING",
+  COMPLETED: "COMPLETED",
+  REJECTED: "ABORTED",  // abort.type=REJECTION — 목록에서는 구분되지 않는다
+  CANCELED: "ABORTED",
+};
 
 /** metadatas 키 — 우리 draft 역참조 (02.3 §1 준비작업 3). key는 1~40자 제한 */
 const META_DRAFT_ID = "draftId";
@@ -83,8 +100,11 @@ function buildRequesterInputs(
   templateKey: string,
   fields: Record<string, unknown> | undefined,
 ): { dataLabel: string; value: string }[] {
-  if (!fields) return [];
+  // fields를 안 넘겼다고 조용히 빈 배열을 돌려주지 않는다. 그러면 검증층 전체가
+  // 우회되고 **빈칸이 인쇄된 계약서**가 서명된다 — 이 파일이 막으려던 바로 그 결과다.
+  // 빈 객체로 검증을 태우면 어느 칸이 비었는지가 오류로 나온다 (실측 2026-08-02)
   const key = assertKnown(templateKey);
+  fields ??= {};
   const built = buildTemplateFields(key, fields);
   if (!built.ok) {
     // 서면에 인쇄될 값이다 — 경고가 아니라 거부다 (template-fields 주석 참조)
@@ -216,17 +236,22 @@ export class ModusignSigner implements SignerPort {
       metadata: Object.fromEntries(
         (doc.metadatas ?? []).map((m) => [m.key, m.value ?? ""]),
       ),
+      // 델타 조회의 기준점 — 다음 동기화가 "이 시각 이후"를 묻는다
+      updatedAt: doc.updatedAt ?? null,
     };
   }
 
   async requestWithTemplate(input: SignRequestInput): Promise<SignRequestResult> {
-    // 값 검증(칸 넘침·서식별 금칙)을 먼저 통과시킨다 — 서명된 뒤에는 고칠 수 없다
+    // 설정 오류가 값 오류보다 먼저다 — 보낼 곳이 없는데 값을 나무라면
+    // "무엇을 고쳐야 하는가"가 뒤집혀 보인다 (템플릿 미등록은 .env 문제다)
+    const templateId = this.templateIdFor(assertKnown(input.templateKey));
+    // 값 검증(칸 넘침·서식별 금칙)은 그다음 — 서명된 뒤에는 고칠 수 없다
     const mappings = buildRequesterInputs(input.templateKey, input.fields);
 
     const doc = await this.call<ModusignDocument>("/documents/request-with-template", {
       method: "POST",
       body: {
-        templateId: this.templateIdFor(assertKnown(input.templateKey)),
+        templateId,
         document: {
           title: `남기다 · ${input.templateKey}`,
           participantMappings: [
@@ -272,12 +297,34 @@ export class ModusignSigner implements SignerPort {
     }
   }
 
-  async listDocuments(filter?: { status?: DocStatus }): Promise<DocumentDetail[]> {
-    const res = await this.call<{ documents?: ModusignDocument[] }>("/documents", {
-      method: "GET",
-    });
-    const all = (res.documents ?? []).map((d) => this.toDetail(d));
-    return filter?.status ? all.filter((d) => d.status === filter.status) : all;
+  /**
+   * 목록 조회 — **서버에서 거른다.**
+   *
+   * 예전에는 전량을 받아 클라이언트에서 걸렀다. 문서가 늘수록 비용이 선형으로 늘고,
+   * 리컨실러는 draft 1건당 상세 조회를 1회씩 했다. filter 문법을 쓰면 "마지막 동기화
+   * 이후 바뀐 것"만 한 번에 온다 — N회가 1회가 된다.
+   *
+   * 지원 문법(2026-08-02 문서 확인): status eq '...' · contains(title, '...') ·
+   * createdAt/startedAt/updatedAt ge|le '...' · labelIds in (...) · and 결합.
+   * 조회는 서명 잔여를 소모하지 않는다.
+   */
+  async listDocuments(filter?: DocumentListFilter): Promise<DocumentDetail[]> {
+    const clauses: string[] = [];
+    if (filter?.status) clauses.push(`status eq '${MODUSIGN_STATUS[filter.status]}'`);
+    // ISO8601 그대로 넣는다. 타임존을 안 붙이면 모두싸인이 UTC로 읽는다 — toISOString()은 Z다
+    if (filter?.updatedSince) clauses.push(`updatedAt ge '${filter.updatedSince}'`);
+
+    const q = new URLSearchParams();
+    if (clauses.length > 0) q.set("filter", clauses.join(" and "));
+    // 상한 100 (문서 명시). 넘겨도 잘리므로 우리가 먼저 맞춘다
+    q.set("limit", String(Math.min(filter?.limit ?? 100, 100)));
+    q.set("orderBy", "updatedAt desc");
+
+    const res = await this.call<{ documents?: ModusignDocument[] }>(
+      `/documents?${q}`,
+      { method: "GET" },
+    );
+    return (res.documents ?? []).map((d) => this.toDetail(d));
   }
 
   async resendNotification(documentId: string): Promise<void> {

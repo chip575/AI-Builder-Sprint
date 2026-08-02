@@ -43,6 +43,55 @@ const fail = (m) => {
   }
 }
 
+// ── 로그인 ──
+// 인증이 켜진 환경(Supabase 키 있음)에서는 비로그인에 신원이 없다 — 첫 요청부터 401이다.
+// 키 없는 채점 경로에서는 /api/auth/*가 503 AUTH_DISABLED를 주고 그대로 진행한다 (NFR-707).
+//
+// ⚠ 비밀번호를 스크립트에 적지 않는다 (보안 6조). .env의 E2E_EMAIL·E2E_PASSWORD를 읽는다.
+let COOKIE = "";
+const rawFetch = globalThis.fetch;
+globalThis.fetch = (url, init = {}) =>
+  COOKIE
+    ? rawFetch(url, { ...init, headers: { ...(init.headers ?? {}), cookie: COOKIE } })
+    : rawFetch(url, init);
+
+{
+  const { readFileSync } = await import("node:fs");
+  const read = (k) => {
+    for (const file of [".env.local", ".env"]) {
+      try {
+        const v = readFileSync(file, "utf-8")
+          .match(new RegExp(`^[ \t]*${k}[ \t]*=[ \t]*([^\r\n]*)`, "m"))?.[1]
+          ?.trim();
+        if (v) return v;
+      } catch {
+        /* 파일이 없을 수 있다 */
+      }
+    }
+    return undefined;
+  };
+  const email = process.env.E2E_EMAIL ?? read("E2E_EMAIL");
+  const password = process.env.E2E_PASSWORD ?? read("E2E_PASSWORD");
+
+  if (email && password) {
+    const res = await rawFetch(base + "/api/auth/login", j({ email, password }));
+    if (res.status === 200) {
+      COOKIE = (res.headers.getSetCookie?.() ?? [])
+        .map((c) => c.split(";")[0])
+        .join("; ");
+      console.log("0. LOGIN ok");
+    } else if (res.status === 503) {
+      console.log("0. LOGIN 생략 — 인증 비활성 환경 (NFR-707)");
+    } else {
+      fail(`로그인 실패 ${res.status} — E2E_EMAIL·E2E_PASSWORD를 확인하세요`);
+    }
+  } else {
+    // 자격이 없으면 그냥 진행한다. 인증이 켜진 서버라면 아래 첫 단계에서 401로 막히고,
+    // 그때 무엇을 해야 하는지 이 메시지가 알려준다
+    console.log("0. LOGIN 생략 — .env에 E2E_EMAIL·E2E_PASSWORD가 없습니다");
+  }
+}
+
 // 1. 대화 시작 (Express)
 let res = await fetch(base + "/api/session/message", j({ text: "부산에 기부하고 싶어요" }));
 if (res.status !== 200) fail("session " + res.status);

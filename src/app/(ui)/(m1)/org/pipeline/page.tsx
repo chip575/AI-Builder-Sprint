@@ -65,7 +65,7 @@ export default function PipelineStatsPage() {
                   <td className="p-3">{STAGE_LABEL[s.stage] ?? s.stage}</td>
                   <td className="p-3 text-right">{s.success}</td>
                   <td
-                    className={`p-3 text-right ${s.fail > 0 ? "text-rose-700" : "text-stone-400"}`}
+                    className={`p-3 text-right ${s.fail > 0 ? "text-rose-700" : "text-stone-500"}`}
                   >
                     {s.fail}
                   </td>

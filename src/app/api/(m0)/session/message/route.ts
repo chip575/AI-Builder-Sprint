@@ -13,7 +13,7 @@ import { detectExpress } from "@/lib/rules/express-detect";
 import { isHeavy } from "@/lib/rules/branch-weight";
 import { store } from "@/lib/store";
 import { track } from "@/lib/observability/track";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 
 const encoder = new TextEncoder();
 
@@ -60,7 +60,10 @@ export async function POST(req: Request) {
   }
 
   // 소유자는 쿠키가 결정한다 — 클라이언트가 userId를 보내지 않는다 (02.4 §0)
-  const session = await getOrCreateSession(parsed.data.sessionId, await getCurrentUserId(req));
+  // 로그인하지 않았으면 발화를 저장하지 않는다 — 익명 신원이 없으므로 소유자를 정할 수 없다
+  const userId = await getCurrentUserId(req);
+  if (!userId) return loginRequired();
+  const session = await getOrCreateSession(parsed.data.sessionId, userId);
   const isFirstUtterance = session.utterances.length === 0;
   const utterance = await addUtterance(session.id, parsed.data.text);
 

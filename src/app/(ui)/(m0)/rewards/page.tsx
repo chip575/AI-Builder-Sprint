@@ -109,7 +109,7 @@ function RewardPicker() {
                 disabled={wouldExceed}
                 className={`min-h-11 w-full rounded-xl border p-4 text-left transition ${
                   isPicked
-                    ? "border-stone-900 bg-stone-900 text-stone-50"
+                    ? "border-ink bg-ink text-stone-50"
                     : wouldExceed
                       ? "cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400"
                       : "border-stone-300 bg-white hover:border-stone-500"

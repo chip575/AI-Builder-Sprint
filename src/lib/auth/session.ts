@@ -36,16 +36,56 @@ function readCookie(req: Request, name: string): string | null {
 }
 
 /**
- * 요청의 사용자 id. 인증 비활성이거나 세션이 없으면 DEV_USER_ID.
- * 소유 필터(D-18)는 이 값을 기준으로 라우트가 명시적으로 건다.
+ * 요청의 사용자 id. **로그인하지 않았으면 null이다.**
+ *
+ * 예전에는 로그인 안 한 사람에게도 DEV_USER_ID를 돌려줬다. 그러면
+ * "인증이 불가능한 환경"(키 없는 채점 경로)과 "인증은 되는데 로그인 안 한 사람"이
+ * **같은 신원**이 되어, 익명 사용자끼리 서로의 자료가 보인다. 목록 화면을 켜는 순간
+ * 그건 명세 유출이다 (2026-08-02).
+ *
+ * 반환 타입이 null을 포함하므로 호출부가 그 경우를 무시할 수 없다 — 타입이 강제한다.
+ * 인증 비활성(키 없음)은 여전히 DEV_USER_ID 단일 사용자로 통과한다 (NFR-707).
  */
-export async function getCurrentUserId(req: Request): Promise<string> {
+export async function getCurrentUserId(req: Request): Promise<string | null> {
   if (!authEnabled()) return DEV_USER_ID;
   const token = readCookie(req, AUTH_COOKIE);
-  if (!token) return DEV_USER_ID;
+  if (!token) return null;
   const { data, error } = await authClient().auth.getUser(token);
-  if (error || !data.user) return DEV_USER_ID;
+  if (error || !data.user) return null;
   return data.user.id;
+}
+
+/**
+ * 로그인 사용자의 신원 정보. 서명 요청처럼 **이름·연락처가 서면에 인쇄되는** 경로가
+ * 쓴다. id만으로는 계약서를 채울 수 없다.
+ * 인증 비활성 환경에서는 null — 그 경로는 mock이라 서면이 없다.
+ */
+export async function getCurrentUser(
+  req: Request,
+): Promise<{ id: string; email: string; name: string | null } | null> {
+  if (!authEnabled()) return null;
+  const token = readCookie(req, AUTH_COOKIE);
+  if (!token) return null;
+  const { data, error } = await authClient().auth.getUser(token);
+  if (error || !data.user?.email) return null;
+  const meta = data.user.user_metadata as Record<string, unknown> | undefined;
+  const name = typeof meta?.name === "string" ? meta.name : null;
+  return { id: data.user.id, email: data.user.email, name };
+}
+
+/** 로그인이 필요할 때의 공통 응답 — 라우트마다 문구가 갈리지 않게 한 곳에 둔다 */
+export function loginRequired(): Response {
+  return Response.json(
+    {
+      ok: false,
+      error: {
+        code: "LOGIN_REQUIRED",
+        message: "남기신 내용을 보시려면 로그인이 필요합니다.",
+        nextAction: "로그인 후 다시 시도해 주세요.",
+      },
+    },
+    { status: 401 },
+  );
 }
 
 /** 로그인 응답에 붙일 쿠키 — httpOnly, 클라이언트 스크립트가 읽지 못한다 (NFR-714) */

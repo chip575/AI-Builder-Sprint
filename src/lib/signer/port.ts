@@ -27,13 +27,24 @@ export interface DocumentDetail {
   completedAt: string | null;
   rejectReason: string | null;
   metadata: Record<string, string>;
+  /** 외부 기준 마지막 갱신 시각 (ISO). 델타 조회의 기준점이다 — 없으면 null */
+  updatedAt?: string | null;
+}
+
+/** 목록 조회 조건. 모두싸인 filter 문법으로 번역되는 것은 어댑터의 일이다 */
+export interface DocumentListFilter {
+  status?: DocStatus;
+  /** 이 시각 이후 갱신된 것만 (ISO). 리컨실러의 N회 조회를 1회로 줄인다 */
+  updatedSince?: string | null;
+  /** 한 번에 가져올 최대 건수 (모두싸인 상한 100) */
+  limit?: number;
 }
 
 export interface SignerPort {
   requestWithTemplate(input: SignRequestInput): Promise<SignRequestResult>;
   createEmbeddedDraft(input: SignRequestInput): Promise<Required<SignRequestResult>>;
   getDocument(documentId: string): Promise<DocumentDetail | null>;
-  listDocuments(filter?: { status?: DocStatus }): Promise<DocumentDetail[]>;
+  listDocuments(filter?: DocumentListFilter): Promise<DocumentDetail[]>;
   resendNotification(documentId: string): Promise<void>;
   cancel(documentId: string, reason: string): Promise<void>;
 }

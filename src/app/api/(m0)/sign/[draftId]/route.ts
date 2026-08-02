@@ -6,6 +6,8 @@ import { signer } from "@/lib/signer";
 import { track } from "@/lib/observability/track";
 import { logGateVerdict } from "@/lib/observability/gate-log";
 import { getDraft, markDraftRequested } from "../../documents/store";
+import { getCurrentUser } from "@/lib/auth/session";
+import { getSession } from "@/lib/ai/session/store";
 
 export async function POST(
   req: Request,
@@ -77,11 +79,35 @@ export async function POST(
   }
 
   // 서명 요청 — 실패 시 draft는 DRAFT 그대로다. 부분 상태로 남지 않는다 (FR-501)
+  // 서명자는 **로그인한 사람**이다. 예전에는 "김가상"/"fake@example.com"이 하드코딩돼
+  // 있었다(M-AUTH 연결 전 임시). 인증이 붙은 뒤에도 남아 있어서, real 모드에서는
+  // 서명 요청이 존재하지 않는 주소로 나갔다 (2026-08-02 실측).
+  const user = await getCurrentUser(req);
+  const signerEmail = user?.email ?? "fake@example.com"; // 인증 비활성(mock) 경로
+  const signerName = user?.name ?? user?.email?.split("@")[0] ?? "김가상";
+
+  // 서면에 인쇄될 값 — 대화에서 확정된 fact로 채운다.
+  // 채우지 못한 필수 칸은 어댑터의 검증이 잡아 **거부**한다. 빈칸으로 서명되는 것보다
+  // 요청이 실패하는 편이 낫다 (template-fields 주석 참조)
+  const session = await getSession(draft.intentId);
+  const fact = (key: string) =>
+    session?.facts.find((f) => f.key === key && f.confirmed)?.value;
+  const fields: Record<string, unknown> = {
+    donor_name: signerName,
+    donor_contact: signerEmail,
+    // ⚠ region으로 대체하지 않는다 — "부산"을 기관 명칭 칸에 인쇄하면 계약서가
+    //   존재하지 않는 기관을 가리킨다. 없으면 비운 채로 검증에 걸리게 둔다
+    org_name: fact("orgName"),
+    amount_krw: fact("amount"),
+    donation_date: new Date().toISOString().slice(0, 10),
+  };
+
   const input = {
     templateKey: draft.docType,
     draftId: draft.draftId,
-    signerName: "김가상", // M-AUTH 연결 전 임시 — 시드는 전량 가상 인물 (보안 4조)
-    signerEmail: "fake@example.com",
+    signerName,
+    signerEmail,
+    fields,
   };
   let result;
   try {
