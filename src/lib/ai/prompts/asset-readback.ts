@@ -10,6 +10,7 @@
 // ⚠ 프롬프트로 나가는 값은 **카테고리·건수·금액**뿐이다. 자산명·기관명·계좌는
 //   넘기지 않는다 (보안 2조). InventorySummary가 이미 그만큼만 담고 있다.
 import type { InventorySummary } from "../../contracts";
+import { ownedRollup } from "../../estate/rollup";
 
 /** 화면(/estate)의 표와 같은 말을 쓴다 — 대화와 화면이 다른 이름을 쓰면 같은 것인 줄 모른다 */
 export const CATEGORY_LABEL: Record<string, string> = {
@@ -47,10 +48,9 @@ export function assetReadback(summary: InventorySummary | null): string | null {
     return `저희가 확인한 자산이 없습니다. ${LIMIT_NOTE}`;
   }
 
-  // 채무는 자산과 **더하지 않는다.** 상속은 채무도 승계하지만 그건 빼는 쪽이고,
-  // 한 줄에 섞어 합계를 내면 "재산 3억"이 실제와 반대 방향으로 틀린다
-  const owned = summary.byCategory.filter((c) => c.category !== "DEBT");
-  const debt = summary.byCategory.find((c) => c.category === "DEBT");
+  // 채무 분리·합계 규칙은 lib/estate/rollup이 갖는다 — 화면(AssetStatus)과 **같은 함수**다.
+  // 각자 계산하면 사용자가 같은 재산에 대해 두 개의 합계를 듣게 된다
+  const { owned, debt, total } = ownedRollup(summary);
 
   const lines: string[] = [];
 
@@ -65,9 +65,6 @@ export function assetReadback(summary: InventorySummary | null): string | null {
         ? `${label} ${c.count}건(금액 미기재)`
         : `${label} ${c.count}건 ${won(c.estimatedTotalKrw)}`;
     });
-
-    const allKnown = owned.every((c) => c.estimatedTotalKrw != null);
-    const total = allKnown ? owned.reduce((s, c) => s + (c.estimatedTotalKrw ?? 0), 0) : null;
 
     lines.push(
       `저희가 확인한 자산은 ${parts.join(", ")}입니다.` +
