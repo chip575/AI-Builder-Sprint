@@ -36,7 +36,11 @@ describe("S-RECALL — 수락 기준", () => {
     }
   });
 
-  it("커버리지는 서버 meta를 쓴다 — 화면이 세지 않는다", () => {
-    expect(page).toContain("meta.axisCoverage");
+  it("커버리지를 화면이 세지 않는다 — 안 쓰기로 한 결정도 소스에 남는다", () => {
+    // 개편(6fb711a)으로 화면은 커버리지를 표시하지 않는다. "화면이 자체 계산하지
+    // 않는다"는 원 의도는 그대로 지키고, 결정의 흔적(주석)이 지워지면 여기서 잡혀
+    // 다시 논의하게 한다. 표시를 되살릴 때는 서버 meta 값을 그대로 써야 한다.
+    expect(page).toContain("화면은 쓰지 않는다");
+    expect(page).not.toMatch(/axisCoverage\s*\.\s*(map|reduce|filter)/);
   });
 });
