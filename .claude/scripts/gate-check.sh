@@ -76,6 +76,28 @@ echo "── 7. 폐기 용어 ──"
 HIT=$(grep -rnE "\b(Track|why_record)\b|트랙 [ABC]|갈래 후보|민감도 등급" --include='*.ts' --include='*.tsx' src/ 2>/dev/null)
 [ -n "$HIT" ] && { red "폐기 용어 사용 (decisions.md D-01)"; echo "$HIT" | head -5; } || grn "용어 정상"
 
+echo "── 8.5. 법령 근거 신선도 ──"
+# 조문은 바뀐다. §1112 형제자매 유류분이 위헌으로 죽은 것을 6개월 뒤에야 알았다
+# (2026-08-03) — 그때 증상은 에러가 아니라 **조용히 틀린 안내**였다.
+# verifiedAt이 오래된 항목을 경고한다. 실패로 만들지 않는 이유: 확인이 늦었다고
+# 배포를 막을 일은 아니고, 보이는 것이 목적이다.
+STALE_DAYS=180
+NOW=$(date +%s)
+FOUND=0
+while IFS= read -r line; do
+  d=$(printf '%s' "$line" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
+  [ -z "$d" ] && continue
+  ts=$(date -d "$d" +%s 2>/dev/null) || continue
+  age=$(( (NOW - ts) / 86400 ))
+  if [ "$age" -gt "$STALE_DAYS" ]; then
+    printf '  [33m! %s일 경과: %s[0m
+' "$age" "$(printf '%s' "$line" | cut -c1-90)"
+    FOUND=1
+  fi
+done < <(grep -rn 'verifiedAt' --include='*.ts' src/lib/rules src/lib/referral 2>/dev/null | grep -v '\.test\.')
+[ "$FOUND" -eq 1 ] && printf '[33m! 법령 근거 재확인 필요 (경고)[0m
+' || grn "법령 근거 신선도"
+
 echo "── 8. 아카이브 참조 ──"
 # 코드만 본다. 문서가 아카이브를 "언급"하는 정상 문장은 위반이 아니다.
 HIT=$(grep -rn '_archive' --include='*.ts' --include='*.tsx' src/ 2>/dev/null)

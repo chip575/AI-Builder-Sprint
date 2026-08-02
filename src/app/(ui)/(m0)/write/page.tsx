@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
+import { AssetPeek } from "@/app/(ui)/_components/AssetPeek";
 import { STATUTES } from "@/lib/rules/validity-gate";
 import { DocPreview, type PreviewFacts } from "./DocPreview";
 
@@ -293,6 +294,11 @@ function WriteWorkspace() {
     const will = [STATUTES.CIVIL_1060, STATUTES.CIVIL_1066];
     return (
       <Shell title="어떤 서류를 남길까요" fr={["FR-115B", "FR-104"]}>
+        {/* 무엇을 남길지 고르는 자리다 — 가진 것을 모르면 고를 수가 없다.
+            접혀 있고 누른 사람에게만 보인다 (P4) */}
+        <div className="mb-4">
+          <AssetPeek />
+        </div>
         <p className="text-stone-500">
           대화로 함께 작성하고, 법이 인정하는 방식으로만 서명합니다.
         </p>

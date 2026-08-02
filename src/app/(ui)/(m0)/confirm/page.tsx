@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import type { FactSheetRes } from "@/lib/contracts";
 import { ErrorNote, Notice, PrimaryButton, Shell } from "@/app/(ui)/_components/Shell";
+import { AssetPeek } from "@/app/(ui)/_components/AssetPeek";
 
 const LABEL: Record<string, string> = {
   region: "기부하실 지역",
@@ -136,6 +137,12 @@ function FactSheet() {
 
       {/* 버튼을 조용히 죽이지 않는다 — 회색 버튼만 남으면 무엇을 해야 하는지 알 수 없다.
           누르면 무엇이 모자란지, 어디로 가야 하는지 알려준다 (NFR-705) */}
+      {/* 문서를 만들기 직전이다 — 무엇을 남길지 정하는 자리라 재산을 볼 수 있어야 한다.
+          접혀 있고, 누른 사람에게만 보인다 (P4) */}
+      <div className="mb-4">
+        <AssetPeek label="내 자산 확인하기" />
+      </div>
+
       <PrimaryButton
         onClick={() => {
           if (sheet.missingRequired.length > 0) {

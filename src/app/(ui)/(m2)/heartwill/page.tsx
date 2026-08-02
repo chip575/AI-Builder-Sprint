@@ -13,6 +13,7 @@ import { Notice, Shell } from "@/app/(ui)/_components/Shell";
 import { store } from "@/lib/store";
 import { addOwnSentence, draftFromRecall } from "./actions";
 import { ParagraphApproval } from "./ParagraphApproval";
+import { SaveAsDocument } from "./SaveAsDocument";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +130,9 @@ export default async function HeartWillPage({
               }))}
             />
           </section>
+
+          {/* ── 서류로 남기기 ──────────────────────────────── */}
+          <SaveAsDocument sessionId={session.id} bodyCount={body.length} />
 
           {/* ── 문장 만들기 ────────────────────────────────── */}
           <section className="space-y-6 border-t border-stone-200 pt-8">

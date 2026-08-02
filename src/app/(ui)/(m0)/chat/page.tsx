@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
+import { AssetPeek } from "@/app/(ui)/_components/AssetPeek";
 import { suggestionTexts } from "@/lib/ai/session/suggested";
 
 interface Turn {
@@ -219,6 +220,12 @@ export default function ChatPage() {
             >
               나중에 생각할래요
             </Link>
+          </div>
+
+          {/* 자산 확인 — 유산·기부를 정리하는 중에 "내가 뭘 가지고 있더라"를
+              여기서 본다. 나가면 쓰던 내용이 사라지므로 화면 안에서 편다 */}
+          <div className="mb-2">
+            <AssetPeek />
           </div>
 
           {/* 추천 질문 — 목록은 안내층(lib/ai/session/suggested)에서 온다.
