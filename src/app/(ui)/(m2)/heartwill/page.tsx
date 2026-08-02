@@ -48,7 +48,9 @@ export default async function HeartWillPage({
   const pending = (head?.paragraphs ?? []).filter((p) => p.acceptedAt === null);
 
   return (
-    <Shell title="마음 유언" fr={["FR-111"]} back={{ href: "/chat", label: "대화로" }}>
+    // 돌아갈 곳은 "내 유산"이다 — 마음 이야기로 들어오는 문이 거기에 있다 (2026-08-02 개편).
+    // /chat은 이제 챗봇·유산기부 전용이라 여기서 되돌아갈 자리가 아니다
+    <Shell title="마음 유언" fr={["FR-111"]} back={{ href: "/estate", label: "이전으로" }}>
       {/* 최상단·항상·인쇄물에도 — 이 문서가 무엇이 아닌지부터 말한다 */}
       <div className="mb-6">
         <Notice>
