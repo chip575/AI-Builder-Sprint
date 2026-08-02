@@ -57,7 +57,11 @@ export function DocPreview({
   docType,
   facts,
 }: {
-  docType: "LEGACY_GIFT_AGREEMENT" | "DONATION_PLEDGE";
+  docType:
+    | "LEGACY_GIFT_AGREEMENT"
+    | "DONATION_PLEDGE"
+    | "HERITAGE_SUPPORT_PLEDGE"
+    | "CUSTODIAN_AGREEMENT";
   facts: PreviewFacts;
 }) {
   const s562 = STATUTES.CIVIL_562;
@@ -69,7 +73,60 @@ export function DocPreview({
         미리보기 — 확정하시기 전까지 아무것도 정해지지 않습니다
       </p>
 
-      {docType === "LEGACY_GIFT_AGREEMENT" ? (
+      {docType === "HERITAGE_SUPPORT_PLEDGE" ? (
+        <div className="space-y-5">
+          <h2 className="text-center font-serif text-2xl font-semibold tracking-widest text-stone-900">
+            문화유산 후원 약정서
+          </h2>
+          <p className="leading-relaxed text-stone-700">
+            후원자(이하 “후원자”)와 기관(이하 “기관”)은 문화유산의 보존을 위하여
+            다음과 같이 약정을 체결한다.
+          </p>
+          <Article no={1} title="후원 대상">
+            후원자는 <Slot value={facts.orgName} hint="후원할 곳" /> 이(가) 지키는
+            문화유산의 보존을 후원한다.
+          </Article>
+          <Article no={2} title="후원 금액">
+            후원자는 금 <Slot value={won(facts.amount)} hint="금액" /> 을 후원한다.
+          </Article>
+          <Article no={3} title="용도">
+            후원금은 문화유산의 보존·관리 목적 외에 사용하지 아니한다.
+          </Article>
+          <Article no={4} title="철회">
+            후원자는 체결 전 언제든지 약정을 중단할 수 있다.
+          </Article>
+          <SignatureBlock partyLabel="후원자" />
+        </div>
+      ) : docType === "CUSTODIAN_AGREEMENT" ? (
+        <div className="space-y-5">
+          <h2 className="text-center font-serif text-2xl font-semibold tracking-widest text-stone-900">
+            자산 지킴이 약정서
+          </h2>
+          <p className="leading-relaxed text-stone-700">
+            본인(이하 “본인”)과 지킴이(이하 “지킴이”)는 본인이 정리한 자산 목록의
+            보관과 전달에 관하여 다음과 같이 약정한다.
+          </p>
+          <Article no={1} title="지킴이">
+            지킴이: <Slot value={facts.orgName} hint="맡길 사람·기관" />
+          </Article>
+          <Article no={2} title="맡기는 일">
+            지킴이는 본인이 정리한 자산 목록을 보관하고, 본인이 정한 때가 오면
+            그 목록이 뜻대로 전해지도록 협조한다.
+          </Article>
+          {/* Custodian ≠ 유언집행자 — 이 고지는 본문 필수다 (00.2 §7.1 · 게이트 주석) */}
+          <Article no={3} title="지킴이의 지위">
+            지킴이는 법률상 유언집행자가 아니며, 이 약정은 유언의 효력을 만들지
+            아니한다. 재산의 처분 권한은 지킴이에게 없다.
+          </Article>
+          <Article no={4} title="열람의 범위">
+            지킴이는 본인이 허락한 범위의 목록만 열람할 수 있다.
+          </Article>
+          <Article no={5} title="변경과 철회">
+            본인은 언제든지 이 약정을 변경하거나 철회할 수 있다.
+          </Article>
+          <SignatureBlock partyLabel="본인" />
+        </div>
+      ) : docType === "LEGACY_GIFT_AGREEMENT" ? (
         <div className="space-y-5">
           <h2 className="text-center font-serif text-2xl font-semibold tracking-widest text-stone-900">
             유산 기부 약정서
