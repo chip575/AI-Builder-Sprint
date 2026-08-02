@@ -15,7 +15,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
-import { NavSidebarPanel, NavSidebarToggle } from "@/app/(ui)/_components/NavSidebar";
 
 interface Obligation {
   id: string;
@@ -89,7 +88,6 @@ export default function EstatePage() {
   const [assetLabel, setAssetLabel] = useState("");
   const [assetCategory, setAssetCategory] = useState("FINANCIAL");
   const [assetValue, setAssetValue] = useState("");
-  const [navOpen, setNavOpen] = useState(false);
 
   const load = useCallback(async () => {
     const [ob, inv] = await Promise.all([
@@ -169,7 +167,6 @@ export default function EstatePage() {
       title="내 유산"
       fr={["FR-402", "FR-508"]}
       headerBar={{
-        leading: <NavSidebarToggle open={navOpen} onToggle={() => setNavOpen((v) => !v)} />,
         // 이 화면의 다음 걸음은 "새 약정"이다 — 서랍을 열지 않아도 닿게 둔다
         trailing: (
           <Link
@@ -192,16 +189,15 @@ export default function EstatePage() {
           </Link>
         </div>
       }
+      // 헤더에 이미 있는 "새 약정 준비하기"는 곁칸에서 뺀다 — /clm에는 그대로 남는다
+      navHideHrefs={["/write"]}
     >
-      {/* 헤더에 이미 있는 "새 약정 준비하기"는 서랍에서 뺀다 — /clm에는 그대로 남는다 */}
-      <NavSidebarPanel
-        open={navOpen}
-        onClose={() => setNavOpen(false)}
-        hideHrefs={["/write"]}
-      />
       <div className="space-y-8">
+        {/* 두 문장을 각 줄에 둔다 — 대시로 이으면 좁은 화면에서 한 줄이 너무 길어진다 */}
         <p className="text-stone-500">
-          남기신 것들이 시간이 지나도 관리됩니다 — 체결은 끝이 아니라 시작입니다.
+          남기신 것들이 시간이 지나도 관리됩니다.
+          <br />
+          체결은 끝이 아니라 시작입니다.
         </p>
 
         {/* ── 남기신 마음 (FR-111 · FR-301) ──
@@ -252,7 +248,7 @@ export default function EstatePage() {
               amber는 Notice(법적 고지), rose는 ErrorNote가 이미 쓰고 있어 신호가 겹친다 —
               sky로 두면 흰 카드(아직 안 된 것)와도, 경고·오류와도 구분된다 */}
           {due.map((o) => (
-            <div key={o.id} className="rounded-xl border border-sky-300 bg-sky-50 p-4">
+            <div key={o.id} className="rounded-xl border border-sky-200 bg-sky-50 p-4">
               <p className="text-stone-800">{KIND_LABEL[o.kind]}</p>
               <p className="mt-1 text-sm text-stone-600">
                 {dateOf(o.dueAt)} 예정이었고, 이제 여쭐 때가 되었습니다.

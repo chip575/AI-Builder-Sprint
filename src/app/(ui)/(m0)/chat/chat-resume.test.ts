@@ -7,8 +7,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const page = readFileSync("src/app/(ui)/(m0)/chat/page.tsx", "utf-8");
-// 사이드바 개편(a436c4e)으로 안내 문구가 곁칸 컴포넌트로 이사했다 — 함께 검사한다
-const sidebar = readFileSync("src/app/(ui)/_components/ChatSidebar.tsx", "utf-8");
+// 곁칸을 이동용(NavSidebar)으로 통일하면서 대화 맥락은 다시 본문으로 돌아왔다.
+// 문장은 한 줄로 줄었지만 "세어주되 분모는 없다"는 규칙은 그대로다.
 
 describe("S2 — 다시 들어와도 이어진다", () => {
   it("세션 id를 브라우저에 남기고 마운트 때 되살린다", () => {
@@ -34,8 +34,10 @@ describe("S2 — 저장되고 있다는 것이 보인다", () => {
   it("서버가 준 커버리지를 그대로 쓴다 — 화면이 세지 않는다", () => {
     // 화면이 자체 계산하면 서버가 아는 것과 갈라진다 (confirmedAt과 같은 원칙)
     expect(page).toContain("m.axisCoverage");
-    // 안내 문구는 개편으로 곁칸(ChatSidebar)에 산다 — 위치는 옮겨도 문장은 지킨다
-    expect(sidebar).toContain("가지 이야기가 정리되어 있습니다");
+    // 안내 문구는 본문 한 줄 요약으로 돌아왔다 — 위치는 옮겨도 세어주는 일은 지킨다
+    expect(page).toContain("가지가 정리되어 있어요");
+    // 분모·총량은 붙이지 않는다 (P4 · FR-111)
+    expect(page).not.toMatch(/전체\s*\{/);
   });
 
   it("브라우저에 남기는 것은 식별자뿐이다 — 내용은 서버에 있다 (보안 1조)", () => {

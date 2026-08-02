@@ -10,7 +10,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Notice, PrimaryButton, Shell } from "@/app/(ui)/_components/Shell";
-import { NavSidebarPanel, NavSidebarToggle } from "@/app/(ui)/_components/NavSidebar";
 
 interface Profile {
   email: string;
@@ -27,7 +26,6 @@ export default function MyPage() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
-  const [navOpen, setNavOpen] = useState(false);
 
   const load = useCallback(async () => {
     const body = await fetch("/api/me").then((r) => r.json());
@@ -60,14 +58,17 @@ export default function MyPage() {
   const emailLocal = profile?.email.split("@")[0] ?? "";
 
   return (
+    // 여기로 오는 문이 둘이라(곁칸 · /doc의 "보내는 사람 정보 확인하기") 한 곳을 가리키는
+    // back은 한쪽에만 맞다. 관리의 집인 /estate를 기본으로 두고, 서명하던 문서로 정확히
+    // 돌아가는 길은 곁칸의 "← 이전 화면으로"(router.back)가 맡는다
     <Shell
       title="내 정보"
       fr={["FR-501"]}
+      back={{ href: "/estate", label: "내 유산으로" }}
       headerBar={{
-        leading: <NavSidebarToggle open={navOpen} onToggle={() => setNavOpen((v) => !v)} />,
+
       }}
     >
-      <NavSidebarPanel open={navOpen} onClose={() => setNavOpen(false)} />
 
       <div className="space-y-5">
         <p className="text-stone-500">
