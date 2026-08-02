@@ -102,8 +102,18 @@ const RULES: Record<DocType, RevocationRule> = {
   },
 };
 
+/** 모르는 서류가 와도 화면이 죽지 않는다.
+ *  타입은 Record<DocType>이지만 화면은 API가 준 문자열을 `as DocType`으로 캐스팅해
+ *  넘긴다 — DocType이 늘고 여기 행을 빠뜨리면 `rule.kind`에서 터진다.
+ *  터지는 대신 **"모른다"**로 답한다: 모르는 서류를 철회 가능으로 두는 것보다 낫다 */
 export function revocationRule(docType: DocType): RevocationRule {
-  return RULES[docType];
+  return (
+    RULES[docType] ?? {
+      kind: "NONE",
+      label: "",
+      note: "이 서류를 이곳에서 그만두는 방법은 아직 안내해 드리지 못합니다.",
+    }
+  );
 }
 
 /** 원장을 REVOKED로 바꿔도 되는 문서인가. 이것만이 철회 API를 통과한다 */

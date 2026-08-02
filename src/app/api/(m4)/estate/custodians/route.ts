@@ -45,8 +45,13 @@ export async function POST(req: Request) {
 
   // 협조 약정서는 서명 대상이다 (게이트 ESIGN_OK). 서명이 곧 초대 수락이다
   const verdict = evaluateGate("CUSTODIAN_AGREEMENT");
-  const session = await store.getOrCreateSession(null, user.id);
-  const draft = await store.createDraft(session.id, "CUSTODIAN_AGREEMENT", verdict);
+  // ⚠ draft는 intent(세션)에 매달린다 — 소유자를 아는 곳이 intents뿐이기 때문이다.
+  //   초대마다 새로 만들면 발화 0건짜리 고아 세션이 쌓이므로, 이 사람의 기존 세션을
+  //   재사용한다. 없을 때만 하나 만든다.
+  const existingDraft = (await store.listDocumentsByUser(user.id)).at(-1);
+  const intentId =
+    existingDraft?.intentId ?? (await store.getOrCreateSession(null, user.id)).id;
+  const draft = await store.createDraft(intentId, "CUSTODIAN_AGREEMENT", verdict);
 
   const custodian = await store.upsertCustodian(user.id, {
     recipientId: to.id,
