@@ -22,12 +22,20 @@ export default function HomePage() {
       >
         서류 준비 시작하기
       </Link>
-      <Link
-        href="/chat"
-        className="text-sm text-stone-500 underline underline-offset-4 hover:text-stone-700"
-      >
-        서류보다 마음 이야기를 먼저 하고 싶어요
-      </Link>
+      <div className="flex flex-col items-center gap-2">
+        <Link
+          href="/estate"
+          className="text-sm text-stone-600 underline underline-offset-4 hover:text-stone-800"
+        >
+          남겨둔 것들 보러 가기 — 내 유산
+        </Link>
+        <Link
+          href="/chat"
+          className="text-sm text-stone-500 underline underline-offset-4 hover:text-stone-700"
+        >
+          서류보다 마음 이야기를 먼저 하고 싶어요
+        </Link>
+      </div>
       <p className="text-sm text-stone-400">
         언제든 멈출 수 있고, 저장된 곳부터 다시 이어집니다.
       </p>
