@@ -13,8 +13,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
 import { STATUTES } from "@/lib/rules/validity-gate";
@@ -25,7 +25,10 @@ interface Turn {
   text: string;
 }
 
-type SignableDoc = "LEGACY_GIFT_AGREEMENT" | "DONATION_PLEDGE";
+type SignableDoc =
+  | "LEGACY_GIFT_AGREEMENT"
+  | "DONATION_PLEDGE"
+  | "HERITAGE_SUPPORT_PLEDGE";
 
 /** 문서 선택 → 파이프라인 진입 발화. 카드 클릭이 곧 이 문장이다 (Express 직접 진입) */
 const DOC_ENTRY: Record<SignableDoc, { title: string; desc: string; utterance: string }> = {
@@ -42,14 +45,42 @@ const DOC_ENTRY: Record<SignableDoc, { title: string; desc: string; utterance: s
     desc: "지금 마음이 향하는 곳에 보태는 약정 — 지역과 금액을 정해 바로 체결합니다.",
     utterance: "고향에 기부하고 싶어요",
   },
+  HERITAGE_SUPPORT_PLEDGE: {
+    title: "문화유산 후원 약정서",
+    desc: "지키고 싶은 문화유산에 보태는 약정 — 후원 대상과 금액을 정해 체결합니다.",
+    utterance: "문화유산을 후원하고 싶어요",
+  },
 };
+
+/** 선택 화면의 묶음 — 남기는 방식으로 나눈다. 트랙 강요가 아니라 문서 진열이다.
+ *  자산 지킴이 약정(CUSTODIAN)은 진열에서 뺐다(2026-08-02 결정) — 배선은 남아 있어
+ *  자산 정리 흐름(M4)이 자라면 그쪽에서 다시 건다 */
+const DOC_GROUPS: { heading: string; docs: SignableDoc[] }[] = [
+  { heading: "지금 남기기", docs: ["DONATION_PLEDGE", "HERITAGE_SUPPORT_PLEDGE"] },
+  { heading: "사후에 남기기", docs: ["LEGACY_GIFT_AGREEMENT"] },
+];
 
 /** 세션 키 — 작성실 전용. 회상(/chat)·안내(/guide) 대화를 덮지 않는다 (보안 1조: id만) */
 const SESSION_KEY = "namgida.writeSessionId";
 const DOC_KEY = "namgida.writeDocType";
 
+/**
+ * useSearchParams는 정적 프리렌더에서 Suspense 경계를 요구한다 — 없으면 dev는 멀쩡한데
+ * `next build`가 /write에서 죽는다 (Vercel 배포 실패로 발견, 2026-08-02).
+ * 그래서 본체를 감싸는 껍데기가 기본 내보내기다.
+ */
 export default function WritePage() {
+  return (
+    <Suspense fallback={null}>
+      <WriteWorkspace />
+    </Suspense>
+  );
+}
+
+function WriteWorkspace() {
   const router = useRouter();
+  /** 내 유산에서 넘어온 자산 — "무엇을 남기는가"가 대화의 첫 문장에 실린다 */
+  const assetParam = useSearchParams().get("asset");
   const [docType, setDocType] = useState<SignableDoc | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -67,15 +98,39 @@ export default function WritePage() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [turns]);
 
+  // 자산에서 온 진입은 이어쓰기보다 우선한다 — "이 자산 남기기"를 눌렀다는 것이
+  // 지금의 의사다. StrictMode 이중 실행이 세션을 두 개 만들지 않게 ref로 잠근다
+  const startedFromAsset = useRef(false);
+
   // 이어쓰기 — 지난 작성이 있으면 그 문서·세션으로 돌아온다 (D-07)
   useEffect(() => {
+    if (assetParam) {
+      if (startedFromAsset.current) return;
+      startedFromAsset.current = true;
+      void pick(
+        "LEGACY_GIFT_AGREEMENT",
+        `유산 기부를 하고 싶어요. ${assetParam}을(를) 남기고 싶습니다.`,
+      );
+      return;
+    }
     const savedSession = localStorage.getItem(SESSION_KEY);
     const savedDoc = localStorage.getItem(DOC_KEY) as SignableDoc | null;
     if (savedSession && savedDoc && DOC_ENTRY[savedDoc]) {
       setSessionId(savedSession);
       setDocType(savedDoc);
       void refreshFacts(savedSession);
+      // 대화 원문 복원은 세션 조회 계약이 없어 아직 못 한다(브라우저 저장은 보안 1조 금지,
+      // 조회 API 신설은 PM 계약 몫). 빈 화면 대신 이어쓰기라는 사실과 갈 곳을 말해 준다
+      setTurns([
+        {
+          role: "assistant",
+          text:
+            "지난 작성을 이어갑니다. 지금까지 정리된 값은 아래 현황과 약정서에서 " +
+            "보실 수 있어요. 이어서 말씀해 주세요.",
+        },
+      ]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 1회 진입 판정
   }, []);
 
   async function refreshFacts(sid: string) {
@@ -124,6 +179,9 @@ export default function WritePage() {
             setSessionId(m.sessionId);
             localStorage.setItem(SESSION_KEY, m.sessionId);
             if (m.expressBranch) expressProposalId = m.expressBranch.proposalId;
+            // 말할 때마다 약정서가 따라온다 — 서버가 턴마다 훑어 저장한 값을 읽는다.
+            // 이게 없으면 "기부처와 돈을 말했는데 약정서가 비어 있다"가 된다 (2026-08-02)
+            void refreshFacts(m.sessionId);
           },
         },
       );
@@ -159,15 +217,18 @@ export default function WritePage() {
     return body.data.status as string;
   }
 
-  /** 문서 카드 선택 — 새 세션으로 진입 발화를 보내고, 무거운 가지는 숙려로 */
-  async function pick(doc: SignableDoc) {
+  /** 문서 카드 선택 — 새 세션으로 진입 발화를 보내고, 무거운 가지는 숙려로.
+   *  자산에서 온 진입은 발화에 그 자산이 실린다 (utteranceOverride) */
+  async function pick(doc: SignableDoc, utteranceOverride?: string) {
     setDocType(doc);
     localStorage.setItem(DOC_KEY, doc);
     localStorage.removeItem(SESSION_KEY);
     setSessionId(null);
     setTurns([]);
     setFacts({});
-    const proposalId = await send(DOC_ENTRY[doc].utterance, { forSession: null });
+    const proposalId = await send(utteranceOverride ?? DOC_ENTRY[doc].utterance, {
+      forSession: null,
+    });
     if (!proposalId) return;
     const status = await decide(proposalId, "ACCEPT");
     // 무거운 가지는 승낙만으로 열리지 않는다 — 오늘 진행할지 한 번 더 묻는다 (P4)
@@ -236,50 +297,86 @@ export default function WritePage() {
           대화로 함께 작성하고, 법이 인정하는 방식으로만 서명합니다.
         </p>
 
-        <div className="mt-6 space-y-4">
-          {(Object.keys(DOC_ENTRY) as SignableDoc[]).map((doc) => (
-            <button
-              key={doc}
-              type="button"
-              onClick={() => void pick(doc)}
-              className="block w-full rounded-2xl border border-stone-300 bg-white p-5 text-left transition hover:border-stone-500 hover:shadow-sm"
-            >
-              <span className="flex items-center justify-between">
-                <span className="font-serif text-lg font-semibold text-stone-900">
-                  {DOC_ENTRY[doc].title}
-                </span>
-                <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
-                  전자서명 가능
-                </span>
-              </span>
-              <span className="mt-2 block leading-relaxed text-stone-600">
-                {DOC_ENTRY[doc].desc}
-              </span>
-            </button>
-          ))}
+        <div className="mt-6 space-y-6">
+          {DOC_GROUPS.map((group) => (
+            <div key={group.heading} className="space-y-3">
+              <h2 className="text-sm font-medium text-stone-400">{group.heading}</h2>
+              {group.docs.map((doc) => (
+                <button
+                  key={doc}
+                  type="button"
+                  onClick={() => void pick(doc)}
+                  className="block w-full rounded-2xl border border-stone-300 bg-white p-5 text-left transition hover:border-stone-500 hover:shadow-sm"
+                >
+                  <span className="flex items-center justify-between">
+                    <span className="font-serif text-lg font-semibold text-stone-900">
+                      {DOC_ENTRY[doc].title}
+                    </span>
+                    <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+                      전자서명 가능
+                    </span>
+                  </span>
+                  <span className="mt-2 block leading-relaxed text-stone-600">
+                    {DOC_ENTRY[doc].desc}
+                  </span>
+                </button>
+              ))}
 
-          {/* 유언장 — 서명 버튼이 존재하지 않는다. 못 하는 것을 문 앞에서 말한다 (P2) */}
-          <div className="rounded-2xl border border-stone-200 bg-stone-100 p-5">
-            <div className="flex items-center justify-between">
-              <span className="font-serif text-lg font-semibold text-stone-700">유언장</span>
-              <span className="rounded bg-rose-100 px-2 py-0.5 text-xs text-rose-800">
-                전자서명으로는 효력이 없습니다
-              </span>
+              {group.heading === "사후에 남기기" && (
+                <>
+                  {/* 유언장 — 서명 버튼이 존재하지 않는다. 못 하는 것을 문 앞에서 말한다 (P2) */}
+                  <div className="rounded-2xl border border-stone-200 bg-stone-100 p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-serif text-lg font-semibold text-stone-700">
+                        유언장
+                      </span>
+                      <span className="rounded bg-rose-100 px-2 py-0.5 text-xs text-rose-800">
+                        전자서명으로는 효력이 없습니다
+                      </span>
+                    </div>
+                    <p className="mt-2 leading-relaxed text-stone-600">
+                      유언은 법이 정한 방식(자필증서 등)으로만 효력이 생깁니다. 대신
+                      자필로 옮겨 쓰실 수 있게 안내해 드립니다.
+                    </p>
+                    <p className="mt-2 text-xs text-stone-400">
+                      {will.map((s) => `${s.id} ${s.title}`).join(" · ")} (
+                      {will[0]!.verifiedAt} 확인)
+                    </p>
+                    <Link
+                      href="/will/handwriting"
+                      className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                    >
+                      자필 필사 가이드 보기
+                    </Link>
+                  </div>
+
+                  {/* 상속 — 못 만드는 것을 숨기지 않는다. 지금 가능한 길만 정직하게 안내 */}
+                  <div className="rounded-2xl border border-stone-200 bg-stone-100 p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-serif text-lg font-semibold text-stone-700">
+                        상속에 관하여
+                      </span>
+                      <span className="rounded bg-stone-200 px-2 py-0.5 text-xs text-stone-600">
+                        안내
+                      </span>
+                    </div>
+                    <p className="mt-2 leading-relaxed text-stone-600">
+                      유언이나 약정이 없으면 재산은 법이 정한 순위대로 상속됩니다.
+                      특정한 곳에 남기고 싶으시면 위의 유산 기부 약정으로, 유언은
+                      자필로 준비하실 수 있습니다. 상속인들 사이의 분할 협의 문서는
+                      등기 실무상 서면·인감이 필요해 여기서 만들지 않습니다.
+                    </p>
+                    <Link
+                      href="/guide"
+                      className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                    >
+                      상속이 궁금하면 물어보기
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
-            <p className="mt-2 leading-relaxed text-stone-600">
-              유언은 법이 정한 방식(자필증서 등)으로만 효력이 생깁니다. 대신 자필로
-              옮겨 쓰실 수 있게 안내해 드립니다.
-            </p>
-            <p className="mt-2 text-xs text-stone-400">
-              {will.map((s) => `${s.id} ${s.title}`).join(" · ")} ({will[0]!.verifiedAt} 확인)
-            </p>
-            <Link
-              href="/will/handwriting"
-              className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
-            >
-              자필 필사 가이드 보기
-            </Link>
-          </div>
+          ))}
 
           <Link
             href="/chat"
@@ -356,6 +453,11 @@ export default function WritePage() {
       <div className="space-y-4">
         {view === "chat" ? (
           <>
+            {assetParam && (
+              <p className="rounded-xl bg-stone-100 px-4 py-2 text-sm text-stone-600">
+                남기려는 자산 — {assetParam}
+              </p>
+            )}
             {turns.map((t, i) => (
               <div key={i} className={t.role === "user" ? "text-right" : ""}>
                 <span
@@ -402,7 +504,9 @@ export default function WritePage() {
               <div className="flex flex-wrap gap-1.5 text-xs">
                 {(docType === "LEGACY_GIFT_AGREEMENT"
                   ? ([["받으실 곳", facts.orgName], ["금액", facts.amount]] as const)
-                  : ([["지역", facts.region], ["금액", facts.amount]] as const)
+                  : docType === "HERITAGE_SUPPORT_PLEDGE"
+                    ? ([["후원 대상", facts.orgName], ["금액", facts.amount]] as const)
+                    : ([["지역", facts.region], ["금액", facts.amount]] as const)
                 ).map(([label, v]) => (
                   <span
                     key={label}

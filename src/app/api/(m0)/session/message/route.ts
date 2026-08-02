@@ -2,9 +2,10 @@
 // 응답: SSE. token 이벤트로 본문을 흘리고, 마지막 meta 이벤트 하나로
 // SessionMessageRes를 보낸다. 프론트 라우팅 판단은 meta에서만 한다.
 import { SessionMessageReq, SessionMessageRes } from "@/lib/contracts";
-import { addUtterance, getOrCreateSession } from "@/lib/ai/session/store";
+import { addUtterance, getOrCreateSession, saveFacts } from "@/lib/ai/session/store";
 import { createProposal, proposeBranches } from "@/lib/ai/branch/propose";
 import { detectGuide } from "@/lib/ai/session/guide";
+import { handoffReply } from "@/lib/ai/session/handoff";
 import { responder } from "@/lib/ai/session/responder";
 import { computeCoverage, nextQuestion } from "@/lib/rules/question-bank";
 import { MockExtractor } from "@/lib/ai/extract/mock-extractor";
@@ -118,6 +119,17 @@ export async function POST(req: Request) {
   });
   const knownFacts = scan.facts.map((f) => ({ key: f.key, value: f.value as string | number }));
 
+  // 훑은 값은 **바로 저장한다** — 응답기는 되읽는데 화면(약정서 미리보기)은 비어 있던
+  // 어긋남의 원인이 여기였다: 값이 추출(POST /extract) 전까지 어디에도 안 남았다.
+  // saveFacts는 확정된 값을 덮지 않고(P1, StorePort 보장), 이후 정식 추출이 같은 키를
+  // 갱신하므로 품질도 수렴한다. 계약 밖 채널이 아니라 기존 facts 저장소를 쓴다 (규칙 1).
+  if (scan.facts.length > 0) {
+    await saveFacts(session.id, scan.facts).catch((err) =>
+      // 미리보기 편의가 대화를 죽이면 안 된다 — 실패는 기록만 남긴다
+      console.warn("[session] 훑은 값 저장 실패:", (err as Error).message),
+    );
+  }
+
   // 축 세션이면 질문은행이 다음 질문을 고른다 — 가지 세션은 슬롯을 모으지 회상하지 않는다
   const nextAxisQuestion = branchType
     ? null
@@ -129,6 +141,29 @@ export async function POST(req: Request) {
         askedIds: askedSoFar(session.utterances.map((u) => u.text)),
         skippedIds: [],
       })?.text ?? null);
+
+  // 다음 행동이 화면(버튼·확인)에 있으면 LLM을 부르지 않는다 (handoff.ts의 도돌이표 해부).
+  // 최신 제안이 재확인 대기(PENDING_RECONFIRM)면 결정은 decide 버튼만 받는다.
+  // ⚠ **이번 턴에 만든 제안은 제외한다** — 첫 직행 턴은 고지·인사(응답기)가 답해야 한다.
+  //   인메모리 스토어는 세션 객체를 참조로 공유해 방금 만든 제안이 session.proposals에
+  //   이미 들어 있다 (Supabase 스냅샷과 달리). 제외하지 않으면 스토어에 따라 첫 턴
+  //   응답이 갈라진다 (route.test가 잡았다, 2026-08-02).
+  const latestProposal = session.proposals
+    .filter((p) => p.id !== proposal?.id)
+    .at(-1);
+  const handoff = guide
+    ? null
+    : handoffReply({
+        branchType,
+        missingRequired: scan.missingRequired,
+        knownFacts,
+        pendingReconfirm:
+          latestProposal?.status === "PENDING_RECONFIRM"
+            ? latestProposal.origin === "EXPRESS"
+              ? "EXPRESS"
+              : "DETECTED"
+            : null,
+      });
 
   // 대화 중 감지 (FR-115A) — Express로 이미 갈라졌으면 감지하지 않는다.
   // 응답 스트림보다 **먼저 띄우고 나중에 거둔다**: 감지를 기다렸다가 응답을 시작하면
@@ -162,11 +197,11 @@ export async function POST(req: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let firstTokenSent = false;
-      if (guide) {
-        // 결정론적 안내 — 첫 토큰이 곧 전체다. 응답기(LLM)는 이 턴을 건너뛴다.
+      if (guide || handoff) {
+        // 결정론적 응답 — 첫 토큰이 곧 전체다. 응답기(LLM)는 이 턴을 건너뛴다.
         // 감지(proposal)와 meta는 그대로 흘린다: 안내를 받았어도 발화에 의사가
         // 실려 있으면 확인형 제안이 뒤따라야 한다 (FR-115A)
-        controller.enqueue(sse("token", guide.reply));
+        controller.enqueue(sse("token", guide?.reply ?? handoff!));
         firstTokenSent = true;
         track("CONVERSE", true, Date.now() - t0);
       } else {

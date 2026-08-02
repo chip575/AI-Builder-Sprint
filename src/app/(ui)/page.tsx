@@ -11,23 +11,34 @@ export default function HomePage() {
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-8 px-6">
       {/* 이 화면은 Shell을 쓰지 않으므로 제목 명조가 자동으로 오지 않는다 — 직접 건다 */}
       <h1 className="text-center font-serif text-3xl font-semibold leading-relaxed">
-        무엇을 남기고 싶으신가요
+        남기실 것들, 여기서 돌봅니다
       </h1>
+      {/* 정체성은 관리다 — 자산은 시간이 지나며 바뀌고, 남긴 뜻은 때가 되면 되짚는다.
+          서류 작성은 그 관리 중에 일어나는 행위라 대문이 아니라 안쪽 문이다 (2026-08-02) */}
       <p className="text-center font-serif text-stone-500">
-        대화로 함께 서류를 준비합니다. 법이 인정하는 방식으로만 서명합니다.
+        자산과 남기신 뜻을 시간이 지나도 관리합니다. 서명은 법이 인정하는
+        방식으로만 합니다.
       </p>
       <Link
-        href="/write"
+        href="/estate"
         className="rounded-full bg-stone-900 px-8 py-3 text-stone-50 transition hover:bg-stone-700"
       >
-        서류 준비 시작하기
+        내 유산 정리 시작하기
       </Link>
-      <Link
-        href="/chat"
-        className="text-sm text-stone-500 underline underline-offset-4 hover:text-stone-700"
-      >
-        서류보다 마음 이야기를 먼저 하고 싶어요
-      </Link>
+      <div className="flex flex-col items-center gap-2">
+        <Link
+          href="/write"
+          className="text-sm text-stone-600 underline underline-offset-4 hover:text-stone-800"
+        >
+          바로 약정서를 준비할래요
+        </Link>
+        <Link
+          href="/chat"
+          className="text-sm text-stone-500 underline underline-offset-4 hover:text-stone-700"
+        >
+          마음 이야기를 먼저 하고 싶어요
+        </Link>
+      </div>
       <p className="text-sm text-stone-400">
         언제든 멈출 수 있고, 저장된 곳부터 다시 이어집니다.
       </p>
