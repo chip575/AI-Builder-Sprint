@@ -4,7 +4,7 @@
 import { SessionMessageReq, SessionMessageRes } from "@/lib/contracts";
 import { addUtterance, getOrCreateSession, saveFacts } from "@/lib/ai/session/store";
 import { createProposal, proposeBranches } from "@/lib/ai/branch/propose";
-import { detectGuide } from "@/lib/ai/session/guide";
+import { detectGuide, isQuestionShaped } from "@/lib/ai/session/guide";
 import { handoffReply } from "@/lib/ai/session/handoff";
 import { assetReadback } from "@/lib/ai/prompts/asset-readback";
 import { summarize } from "@/app/api/(m4)/estate/inventory";
@@ -86,6 +86,20 @@ export async function POST(req: Request) {
 
   // 안내 층 — 질문형 발화는 LLM 없이 코드가 답한다 (P3 · lib/ai/session/guide.ts)
   const guide = detectGuide(parsed.data.text);
+
+  // 안내 커버리지 — **무엇을 카드로 만들지 짐작으로 정하지 않기 위한 계측.**
+  //
+  // 미스 전부를 세지 않는다. "고향에 기부하고 싶어요"는 미스지만 결함이 아니라
+  // 가지 대화다. 셀 값은 **질문 모양인데 주제를 모르는 것** 하나다 — 그게 우리가
+  // 답해야 하는데 못 답하는 목록이다.
+  //
+  // ⚠ 발화 원문을 남기지 않는다 (보안 1조). 무엇을 물었는지는 이미 세션 발화로
+  //   저장되어 있고 RLS가 지킨다 — 여기서 로그로 한 번 더 흘리면 그 보호를 우회한다.
+  if (!guide && isQuestionShaped(parsed.data.text)) {
+    console.info("[guide] MISS — 질문형인데 주제 없음");
+  } else if (guide) {
+    console.info(`[guide] HIT topic=${guide.topic}`);
+  }
 
   // Express 판정은 첫 발화에만 적용된다 (FR-115B "첫 발화가 명시적 의사").
   // 코드 판정이 우선 — UNCERTAIN은 Solar 분류 대상이지만 mock에선 축으로 (결정론).

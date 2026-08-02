@@ -88,6 +88,13 @@ const REPLIES: Record<GuideTopic, () => GuideReply> = {
         "세상을 떠난 뒤에 재산 일부를 남기는 방법으로 ‘사인증여 약정’이 있습니다. " +
           "받으실 분과 생전에 계약으로 맺어 두고, 효력은 사망 시에 생깁니다. " +
           "유언과 달리 계약이라서 여기서 전자서명으로 체결하실 수 있습니다. " +
+          // ⚠ 철회 가능 고지는 **빼면 안 되는 단서**다 (legal-basis §1 표·§4.1).
+          //   대법원 2022. 7. 28. 2017다245330이 민법 §1108①(유증 철회)을 사인증여에
+          //   준용된다고 판시했다. 이걸 안 알리면 사용자는 "한 번 서명하면 끝"으로 읽고,
+          //   기관은 구속력 있는 확약으로 오해한다. 둘 다 사실과 다르다.
+          //   조문(§1108①)을 근거 줄에 싣는 것은 STATUTES 추가가 필요해 사람 리뷰 대기다
+          //   (절대규칙 5 — validity-gate 보호 경로).
+          "체결하신 뒤에도 살아 계시는 동안에는 언제든 철회하실 수 있습니다. " +
           "다만 가족에게 법이 보장하는 몫(유류분)이 있어, 약정 전에 그 내용을 함께 " +
           "안내해 드립니다. 원하시면 “유산을 기부하고 싶어요”라고 말씀해 주세요.",
         statutes,
@@ -151,6 +158,12 @@ const REPLIES: Record<GuideTopic, () => GuideReply> = {
  * 질문형 발화 → 안내. 아니면 null (축·가지 대화로 진행).
  * 의사 표현은 여기 오기 전에 express-detect가 가져간다 — 라우트가 그 순서를 보장한다.
  */
+/** 질문 모양인가 — 안내 커버리지를 재는 데 쓴다.
+ *  "질문인데 우리가 주제를 모른다"가 카드로 만들 목록이지, 모든 미스가 그렇지는 않다 */
+export function isQuestionShaped(text: string): boolean {
+  return QUESTION.test(text);
+}
+
 export function detectGuide(text: string): GuideReply | null {
   if (!QUESTION.test(text)) return null;
   for (const rule of TOPIC_RULES) {
