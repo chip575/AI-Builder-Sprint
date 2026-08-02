@@ -8,7 +8,7 @@
 ## 0. 지금 상태 (한눈에)
 
 ```
-테스트    518 passed | 1 todo   (56 파일)
+테스트    526 passed | 1 todo   (57 파일)
 tsc       0 error
 gate      PASS  (신선도 검사 추가됨 — 9항목)
 build     성공
@@ -94,7 +94,9 @@ DB        recipients 테이블 적용 완료 (db push 했습니다)
 | `a3b3f58` 🔒 | 철회 계약 · **§1112 정정** · **§1108 추가** · 철회 가능 표 |
 | `1356294` | 철회 API — 원장 `REVOKED` |
 | `5e6ff46` | 철회 화면 · 통지 발송 · `/ledger` 진입점 |
-| (마지막) | 마음 유언 서류화 · `AssetPeek` · 법령 신선도 검사 |
+| `?` | 마음 유언 서류화 · `AssetPeek` · 법령 신선도 검사 |
+| `1f1f019` | **지킴이 초대·회수** — 서명해야 열람이 열린다 |
+| `c0ee846` | 지킴이 화면 |
 
 🔒 = **보호 경로**(`lib/contracts`·`lib/rules`). 훅을 우회해 적용했습니다 — 승인해 주신 대로입니다. **커밋을 따로 뗐으니 `git show <해시>`로 diff만 보실 수 있습니다.**
 
@@ -111,23 +113,28 @@ DB        recipients 테이블 적용 완료 (db push 했습니다)
 
 ## 🟢 4. 다음에 구현할 것 (우선순위 순)
 
-### 4-1. 지킴이(Custodian) 초대 — **가장 크게 비어 있음**
+### 4-1. ~~지킴이 초대~~ — **밤새 만들었습니다**
 
-```
-✅ 모두싸인 템플릿 CUSTODIAN     실재·검증됨
-✅ 계약 Custodian / InviteReq / ScopePatch
-✅ DB 테이블 custodians          이미 있음 (20260731080000_estate.sql)
-✅ recipientId                   방금 풀림
-❌ StorePort 메서드              없음
-❌ 라우트                        없음
-❌ 화면                          없음
-```
+`/estate`에 "지킴이" 섹션이 생겼습니다. 확인해 주십시오:
 
-`grep CustodianInvite` 하면 **계약 파일 자기 자신만** 나옵니다. 막혀 있던 게 `recipientId`였고 이제 풀렸으니 바로 만들 수 있습니다.
+1. 마이페이지 → 알릴 분 → **지킴이**로 한 분 등록
+2. `/estate` → 지킴이 → 고르고 · 성함 적고 · 범위 체크 → `협조를 부탁드리기`
+3. 그분 메일로 **협조 약정서**가 가는지
+4. 서명 전에는 `수락 기다리는 중`, 서명 뒤에 `열람 가능`으로 바뀌는지
 
-설계는 이미 좋습니다 — 지킴이가 **서명해야** `grantedAt`이 차고 그게 열람 권한 기준입니다(`PENDING` = 열람 0건). 열람 범위 변경은 약정서 본문 변경이라 **MATERIAL → 재서명**(NFR-713).
+**설계상 중요한 것**: 초대만으로 열람이 열리지 않습니다. 웹훅 `COMPLETED`에서만
+`grantedAt`이 찹니다 — 상대가 수락 안 했는데 권한이 생기면 **사용자는 맡긴 줄 알고
+상대는 맡은 줄 모르는** 상태가 됩니다.
 
-필요한 것: `listCustodians` / `upsertCustodian` / `grantCustodian` / `revokeCustodian` (memory + supabase) → `POST /api/estate/custodians` (초대 = 생성 + 서명 요청) → `/estate`에 섹션.
+거둔 권한은 **뒤늦게 온 서명 웹훅으로도 되살아나지 않습니다.** `grantedAt`은 지우지
+않습니다 — "언제 열렸다가 언제 닫혔나"가 남아야 합니다.
+
+> ⚠ 아직 안 만든 것: **열람 범위 변경**(`CustodianScopePatch`). 범위를 넓히면
+> 약정서 본문이 바뀌므로 MATERIAL → 재서명이어야 합니다 (NFR-713). 지금은
+> 재초대로 덮어쓰면 PENDING으로 돌아가는 것까지만 됩니다.
+>
+> ⚠ 그리고 **열람 자체가 아직 없습니다.** 권한은 열리는데 지킴이가 볼 화면이
+> 없습니다 — 그건 열람권 매트릭스와 함께 만들 일입니다.
 
 ### 4-2. `/estate`의 사용자 필터 없음 — **보안**
 
@@ -181,6 +188,8 @@ src/app/(ui)/(m4)/estate/AssetStatus.tsx
 src/app/(ui)/(m4)/clm/RevokeCell.tsx
 src/app/(ui)/(m0)/mypage/RecipientBook.tsx
 src/app/(ui)/(m2)/heartwill/SaveAsDocument.tsx
+src/app/(ui)/(m4)/estate/CustodianBook.tsx
+src/app/api/(m4)/estate/custodians/route.ts
 ```
 
 ---
