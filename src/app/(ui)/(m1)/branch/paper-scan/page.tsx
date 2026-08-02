@@ -140,7 +140,13 @@ function PaperScanUpload() {
 
 export default function PaperScanPage() {
   return (
-    <Shell title="종이 약정 옮기기" fr={["FR-401", "NFR-711"]}>
+    // 여기로 오는 문은 "내 유산"의 서류 서랍이다 — 돌아가는 길이 없으면
+    // 자산을 등록하러 왔다가 원래 자리로 못 돌아간다 (P4)
+    <Shell
+      title="종이 약정 옮기기"
+      fr={["FR-401", "NFR-711"]}
+      back={{ href: "/estate", label: "내 유산으로" }}
+    >
       <Suspense fallback={<p className="text-stone-500">불러오는 중…</p>}>
         <PaperScanUpload />
       </Suspense>

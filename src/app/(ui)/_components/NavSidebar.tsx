@@ -22,21 +22,27 @@ const LINKS: { href: string; label: string; hint: string }[] = [
   { href: "/estate", label: "내 유산", hint: "자산과 다가오는 약속" },
   { href: "/clm", label: "서류 이력", hint: "남긴 서류를 시간 순서로" },
   { href: "/write", label: "새 약정 준비하기", hint: "대화로 서류를 채웁니다" },
+  // 종이로 받은 서류도 같은 서랍에서 들어온다 — "내 자산" 섹션 머리에 있던 밑줄 링크를
+  // 여기로 옮겼다. 거기서는 터치 영역이 44px에 못 미쳤다 (P2)
+  { href: "/branch/paper-scan", label: "종이 문서로 등록", hint: "찍어서 올리면 읽어 드립니다" },
 ];
 
 export function NavSidebarToggle({
   open,
   onToggle,
+  label = "메뉴",
 }: {
   open: boolean;
   onToggle: () => void;
+  /** 화면마다 이 곁칸을 부르는 이름이 다를 수 있다. 기본값은 지금까지의 "메뉴" */
+  label?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onToggle}
       // 이름은 상태에 따라 바뀌지 않는다 — 열림·닫힘은 aria-expanded가 말한다
-      aria-label="메뉴"
+      aria-label={label}
       aria-expanded={open}
       aria-controls={NAV_SIDEBAR_ID}
       className="flex min-h-11 min-w-11 shrink-0 items-center gap-2 rounded-xl px-2 text-sm text-stone-600 transition hover:bg-stone-200/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-500"
@@ -54,7 +60,7 @@ export function NavSidebarToggle({
       >
         <path d="M3 5.5h14M3 10h14M3 14.5h14" />
       </svg>
-      메뉴
+      {label}
     </button>
   );
 }
@@ -62,9 +68,13 @@ export function NavSidebarToggle({
 export function NavSidebarPanel({
   open,
   onClose,
+  hideHrefs = [],
 }: {
   open: boolean;
   onClose: () => void;
+  /** 이 화면이 헤더에 이미 내놓은 문은 서랍에서 뺀다 — 같은 버튼을 두 곳에 두지 않는다.
+   *  컴포넌트에서 지우지 않는 이유: 다른 화면(/clm)에는 그 문이 필요하다 */
+  hideHrefs?: string[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -118,7 +128,7 @@ export function NavSidebarPanel({
         </div>
 
         <nav className="space-y-2">
-          {LINKS.map((l) => {
+          {LINKS.filter((l) => !hideHrefs.includes(l.href)).map((l) => {
             const here = pathname === l.href;
             return (
               <Link
