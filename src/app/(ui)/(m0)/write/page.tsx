@@ -13,7 +13,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
@@ -66,6 +66,8 @@ const DOC_KEY = "namgida.writeDocType";
 
 export default function WritePage() {
   const router = useRouter();
+  /** 내 유산에서 넘어온 자산 — "무엇을 남기는가"가 대화의 첫 문장에 실린다 */
+  const assetParam = useSearchParams().get("asset");
   const [docType, setDocType] = useState<SignableDoc | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -83,8 +85,21 @@ export default function WritePage() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [turns]);
 
+  // 자산에서 온 진입은 이어쓰기보다 우선한다 — "이 자산 남기기"를 눌렀다는 것이
+  // 지금의 의사다. StrictMode 이중 실행이 세션을 두 개 만들지 않게 ref로 잠근다
+  const startedFromAsset = useRef(false);
+
   // 이어쓰기 — 지난 작성이 있으면 그 문서·세션으로 돌아온다 (D-07)
   useEffect(() => {
+    if (assetParam) {
+      if (startedFromAsset.current) return;
+      startedFromAsset.current = true;
+      void pick(
+        "LEGACY_GIFT_AGREEMENT",
+        `유산 기부를 하고 싶어요. ${assetParam}을(를) 남기고 싶습니다.`,
+      );
+      return;
+    }
     const savedSession = localStorage.getItem(SESSION_KEY);
     const savedDoc = localStorage.getItem(DOC_KEY) as SignableDoc | null;
     if (savedSession && savedDoc && DOC_ENTRY[savedDoc]) {
@@ -92,6 +107,7 @@ export default function WritePage() {
       setDocType(savedDoc);
       void refreshFacts(savedSession);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 1회 진입 판정
   }, []);
 
   async function refreshFacts(sid: string) {
@@ -175,15 +191,18 @@ export default function WritePage() {
     return body.data.status as string;
   }
 
-  /** 문서 카드 선택 — 새 세션으로 진입 발화를 보내고, 무거운 가지는 숙려로 */
-  async function pick(doc: SignableDoc) {
+  /** 문서 카드 선택 — 새 세션으로 진입 발화를 보내고, 무거운 가지는 숙려로.
+   *  자산에서 온 진입은 발화에 그 자산이 실린다 (utteranceOverride) */
+  async function pick(doc: SignableDoc, utteranceOverride?: string) {
     setDocType(doc);
     localStorage.setItem(DOC_KEY, doc);
     localStorage.removeItem(SESSION_KEY);
     setSessionId(null);
     setTurns([]);
     setFacts({});
-    const proposalId = await send(DOC_ENTRY[doc].utterance, { forSession: null });
+    const proposalId = await send(utteranceOverride ?? DOC_ENTRY[doc].utterance, {
+      forSession: null,
+    });
     if (!proposalId) return;
     const status = await decide(proposalId, "ACCEPT");
     // 무거운 가지는 승낙만으로 열리지 않는다 — 오늘 진행할지 한 번 더 묻는다 (P4)
@@ -408,6 +427,11 @@ export default function WritePage() {
       <div className="space-y-4">
         {view === "chat" ? (
           <>
+            {assetParam && (
+              <p className="rounded-xl bg-stone-100 px-4 py-2 text-sm text-stone-600">
+                남기려는 자산 — {assetParam}
+              </p>
+            )}
             {turns.map((t, i) => (
               <div key={i} className={t.role === "user" ? "text-right" : ""}>
                 <span
