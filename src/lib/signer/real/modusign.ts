@@ -95,6 +95,32 @@ function roleFor(templateKey: string): string {
   return roles[0];
 }
 
+/** 참여자 목록. 역할이 2인인 서식에 상대가 주어지면 둘로 나간다.
+ *  ⚠ 역할 순서는 TEMPLATE_ROLES가 정한다 — 콘솔의 signingOrder와 같아야 한다.
+ *    본인이 먼저 서명하고 그다음이 상대다 (FAMILY_ACK 제5조 · REVOCATION 제2조).
+ *  ⚠ 상대를 안 넘기면 **1인으로 나간다.** 조용히 실패하지 않고, 상대 서명란은
+ *    비어 있는 채로 문서가 미완료로 남는다 — 그게 사실이기 때문이다 */
+function participantsFor(input: SignRequestInput) {
+  const roles = TEMPLATE_ROLES[assertKnown(input.templateKey)];
+  const list: { role: string; name: string; signingMethod: { type: string; value: string } }[] = [
+    {
+      // 역할명은 콘솔 입력값과 **한 글자도 달라선 안 된다** — 다르면 요청이 거부된다.
+      // 그래서 코드에 문자열을 흩지 않고 표 한 곳에서 가져온다
+      role: roles[0],
+      name: input.signerName,
+      signingMethod: { type: "EMAIL", value: input.signerEmail },
+    },
+  ];
+  if (roles.length > 1 && input.counterparty) {
+    list.push({
+      role: roles[1]!,
+      name: input.counterparty.name,
+      signingMethod: { type: "EMAIL", value: input.counterparty.email },
+    });
+  }
+  return list;
+}
+
 /** 우리 키 → 콘솔 dataLabel. 검증을 통과한 값만 번역한다 */
 function buildRequesterInputs(
   templateKey: string,
@@ -254,15 +280,7 @@ export class ModusignSigner implements SignerPort {
         templateId,
         document: {
           title: `남기다 · ${input.templateKey}`,
-          participantMappings: [
-            {
-              // 역할명은 콘솔 입력값과 **한 글자도 달라선 안 된다** — 다르면 요청이 거부된다.
-              // 그래서 코드에 문자열을 흩지 않고 표 한 곳에서 가져온다
-              role: roleFor(input.templateKey),
-              name: input.signerName,
-              signingMethod: { type: "EMAIL", value: input.signerEmail },
-            },
-          ],
+          participantMappings: participantsFor(input),
           // 서식에 인쇄될 값 — 우리 키를 콘솔 dataLabel로 번역해 싣는다.
           // 번역을 건너뛰면 값이 안 실려 나가고 **에러 없이 빈칸이 인쇄된다**
           ...(mappings.length > 0 ? { requesterInputMappings: mappings } : {}),

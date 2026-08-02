@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorNote, Notice, Shell } from "@/app/(ui)/_components/Shell";
+import { RevokeCell } from "./RevokeCell";
 
 interface Row {
   draftId: string;
@@ -33,6 +34,8 @@ const DOC_LABEL: Record<string, string> = {
   INTENT_AFFIRMATION: "의사 확인서",
   HANDWRITTEN_WILL: "자필 유언",
   HEART_LETTER: "마음 편지",
+  DIGITAL_LEGACY_INSTRUCTION: "디지털 유산 지시서",
+  REVOCATION_NOTICE: "철회 통지서",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -154,7 +157,8 @@ export default function ClmPage() {
                   <th className="py-2 pr-3 font-normal">서류</th>
                   <th className="py-2 pr-3 font-normal">상태</th>
                   <th className="py-2 pr-3 font-normal">효력</th>
-                  <th className="py-2 font-normal">보기</th>
+                  <th className="py-2 pr-3 font-normal">보기</th>
+                  <th className="py-2 font-normal">그만두기</th>
                 </tr>
               </thead>
               <tbody>
@@ -181,6 +185,21 @@ export default function ClmPage() {
                       >
                         열기
                       </Link>
+                      {/* 이력 진입점 — 지금까지 /ledger 화면이 있는데 갈 길이 없었다.
+                          subjectId가 필요해 곁칸(NavSidebar)에는 둘 수 없고, 이 줄에는
+                          그 문서의 id가 있으니 여기가 자리다 */}
+                      <Link
+                        href={`/ledger/${r.draftId}`}
+                        className="ml-3 text-stone-500 underline underline-offset-4"
+                      >
+                        이력
+                      </Link>
+                    </td>
+                    {/* 그만두기 — 버튼 글자가 서류마다 다르다. 네 단어(취소·철회·해지·회수)를
+                        한 말로 뭉개면 사용자가 자기가 무엇을 하는지 모른다 (lib/rules/revocation).
+                        철회할 수 없는 서류는 버튼 대신 왜 그런지를 보여 준다 */}
+                    <td className="py-3">
+                      <RevokeCell row={r} onDone={() => void load()} />
                     </td>
                   </tr>
                 ))}
