@@ -55,6 +55,24 @@ export async function getCurrentUserId(req: Request): Promise<string | null> {
   return data.user.id;
 }
 
+/**
+ * 로그인 사용자의 신원 정보. 서명 요청처럼 **이름·연락처가 서면에 인쇄되는** 경로가
+ * 쓴다. id만으로는 계약서를 채울 수 없다.
+ * 인증 비활성 환경에서는 null — 그 경로는 mock이라 서면이 없다.
+ */
+export async function getCurrentUser(
+  req: Request,
+): Promise<{ id: string; email: string; name: string | null } | null> {
+  if (!authEnabled()) return null;
+  const token = readCookie(req, AUTH_COOKIE);
+  if (!token) return null;
+  const { data, error } = await authClient().auth.getUser(token);
+  if (error || !data.user?.email) return null;
+  const meta = data.user.user_metadata as Record<string, unknown> | undefined;
+  const name = typeof meta?.name === "string" ? meta.name : null;
+  return { id: data.user.id, email: data.user.email, name };
+}
+
 /** 로그인이 필요할 때의 공통 응답 — 라우트마다 문구가 갈리지 않게 한 곳에 둔다 */
 export function loginRequired(): Response {
   return Response.json(

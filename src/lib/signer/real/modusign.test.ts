@@ -41,11 +41,20 @@ const make = (fetchImpl: typeof fetch, extra: Record<string, unknown> = {}) =>
     ...extra,
   });
 
+// 필수 칸을 채운 요청 — 실제 호출부와 같은 모양이다.
+// fields를 비우면 어댑터가 검증에서 거부한다 (그게 이 계층의 존재 이유다)
 const input = {
   templateKey: "DONATION_PLEDGE",
   draftId: "00000000-0000-4000-8000-000000000001",
   signerName: "김가상",
   signerEmail: "fake@example.com",
+  fields: {
+    donor_name: "김가상",
+    donor_contact: "fake@example.com",
+    org_name: "부산 지역아동센터",
+    amount_krw: 1_000_000,
+    donation_date: "2026-08-02",
+  },
 };
 
 describe("realSigner — 요청 조립", () => {

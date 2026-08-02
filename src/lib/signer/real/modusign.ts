@@ -100,8 +100,11 @@ function buildRequesterInputs(
   templateKey: string,
   fields: Record<string, unknown> | undefined,
 ): { dataLabel: string; value: string }[] {
-  if (!fields) return [];
+  // fields를 안 넘겼다고 조용히 빈 배열을 돌려주지 않는다. 그러면 검증층 전체가
+  // 우회되고 **빈칸이 인쇄된 계약서**가 서명된다 — 이 파일이 막으려던 바로 그 결과다.
+  // 빈 객체로 검증을 태우면 어느 칸이 비었는지가 오류로 나온다 (실측 2026-08-02)
   const key = assertKnown(templateKey);
+  fields ??= {};
   const built = buildTemplateFields(key, fields);
   if (!built.ok) {
     // 서면에 인쇄될 값이다 — 경고가 아니라 거부다 (template-fields 주석 참조)
@@ -239,13 +242,16 @@ export class ModusignSigner implements SignerPort {
   }
 
   async requestWithTemplate(input: SignRequestInput): Promise<SignRequestResult> {
-    // 값 검증(칸 넘침·서식별 금칙)을 먼저 통과시킨다 — 서명된 뒤에는 고칠 수 없다
+    // 설정 오류가 값 오류보다 먼저다 — 보낼 곳이 없는데 값을 나무라면
+    // "무엇을 고쳐야 하는가"가 뒤집혀 보인다 (템플릿 미등록은 .env 문제다)
+    const templateId = this.templateIdFor(assertKnown(input.templateKey));
+    // 값 검증(칸 넘침·서식별 금칙)은 그다음 — 서명된 뒤에는 고칠 수 없다
     const mappings = buildRequesterInputs(input.templateKey, input.fields);
 
     const doc = await this.call<ModusignDocument>("/documents/request-with-template", {
       method: "POST",
       body: {
-        templateId: this.templateIdFor(assertKnown(input.templateKey)),
+        templateId,
         document: {
           title: `남기다 · ${input.templateKey}`,
           participantMappings: [
