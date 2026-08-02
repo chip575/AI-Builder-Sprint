@@ -90,7 +90,10 @@ export default function ClmPage() {
       back={{ href: "/estate", label: "내 유산으로" }}
     >
       <div className="space-y-5">
-        <p className="text-stone-600">남기신 서류를 시간 순서로 모아 보여 드립니다.</p>
+        <p className="text-stone-500">
+          남기신 서류를 시간 순서로 모아 보여 드립니다 — 서명한 것과 손으로 남긴 것이
+          한 줄에 섭니다.
+        </p>
 
         {/* 필터 — 서버가 거른다. 모르는 값은 서버가 무시하므로 목록이 통째로 비지 않는다 */}
         <div className="flex flex-wrap gap-2">
@@ -133,6 +136,8 @@ export default function ClmPage() {
 
         <ErrorNote error={error} />
 
+        <h2 className="font-serif text-lg font-semibold text-stone-900">남긴 서류</h2>
+
         {rows === null ? (
           <p className="text-sm text-stone-500">불러오는 중…</p>
         ) : rows.length === 0 && !error ? (
@@ -170,7 +175,7 @@ export default function ClmPage() {
                           그때 연다 (보안 3조). 완료본은 증빙 화면이 그 문을 맡는다 */}
                       <Link
                         href={r.status === "COMPLETED" ? `/vault/${r.draftId}` : `/doc/${r.draftId}`}
-                        className="underline underline-offset-4"
+                        className="text-ink underline underline-offset-4"
                       >
                         열기
                       </Link>
