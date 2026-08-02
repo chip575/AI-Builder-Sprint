@@ -8,6 +8,7 @@ import type { Asset, Beneficiary } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
+import type { Recipient, RecipientKind, RecipientUpsertReq } from "../contracts/recipient";
 import { buildNode, withDerivedStatus } from "../ledger/chain";
 import { maskIdentifier } from "./mask";
 import type { StorePort } from "./port";
@@ -343,6 +344,9 @@ export class InMemoryStore implements StorePort {
   }
 
   private profiles = new Map<string, ProfileRecord>();
+  /** 소유자를 값에 넣어 둔다 — 계약(Recipient)에는 userId가 없다.
+   *  나가는 값에서 빼는 이유: 소유자는 쿠키가 정하지 응답이 알려줄 것이 아니다 */
+  private recipients = new Map<string, Recipient & { userId: string }>();
 
   async getProfile(userId: string): Promise<ProfileRecord | undefined> {
     const p = this.profiles.get(userId);
@@ -366,6 +370,45 @@ export class InMemoryStore implements StorePort {
     };
     this.profiles.set(userId, next);
     return { ...next };
+  }
+
+  async listRecipients(userId: string, kind?: RecipientKind): Promise<Recipient[]> {
+    return [...this.recipients.values()]
+      .filter((r) => r.userId === userId && (kind ? r.kind === kind : true))
+      .map(({ userId: _u, ...r }) => ({ ...r }))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async upsertRecipient(userId: string, input: RecipientUpsertReq): Promise<Recipient> {
+    // 같은 (역할·이메일)이 이미 있으면 그것을 고친다. 중복 등록은 통지를 두 번 보낸다
+    const dup = [...this.recipients.values()].find(
+      (r) =>
+        r.userId === userId &&
+        r.kind === input.kind &&
+        r.email.toLowerCase() === input.email.toLowerCase(),
+    );
+    const id = input.id ?? dup?.id ?? crypto.randomUUID();
+    const prev = this.recipients.get(id);
+    const row = {
+      userId,
+      id,
+      kind: input.kind,
+      name: input.name,
+      email: input.email,
+      relation: input.relation ?? null,
+      createdAt: prev?.createdAt ?? new Date().toISOString(),
+    };
+    this.recipients.set(id, row);
+    const { userId: _u, ...out } = row;
+    return { ...out };
+  }
+
+  async deleteRecipient(userId: string, id: string): Promise<boolean> {
+    // 소유자를 확인하고 지운다 — id만 받으면 남의 것을 지울 수 있다
+    const row = this.recipients.get(id);
+    if (!row || row.userId !== userId) return false;
+    this.recipients.delete(id);
+    return true;
   }
 
   async listDocumentsByUser(

@@ -9,6 +9,7 @@ import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode, LedgerNodeStatus, Materiality } from "../contracts/ledger";
 import type { Obligation, ObligationKind } from "../contracts/obligations";
+import type { Recipient, RecipientKind, RecipientUpsertReq } from "../contracts/recipient";
 import { buildNode, withDerivedStatus } from "../ledger/chain";
 import { maskIdentifier } from "./mask";
 import type { StorePort } from "./port";
@@ -583,6 +584,82 @@ export class SupabaseStore implements StorePort {
     // ⚠ 연락처를 audit detail에 남기지 않는다 (보안 1조) — 무엇을 고쳤는지만 남긴다
     await this.audit("profile.save", userId, { fields: Object.keys(patch) });
     return (await this.getProfile(userId))!;
+  }
+
+  async listRecipients(userId: string, kind?: RecipientKind): Promise<Recipient[]> {
+    let q = this.db
+      .from("recipients")
+      .select("id, kind, name, email, relation, created_at")
+      .eq("user_id", userId);
+    if (kind) q = q.eq("kind", kind);
+    const { data, error } = await q.order("created_at", { ascending: true });
+    if (error) this.fail("recipients.list", error);
+    return (data ?? []).map((r) => ({
+      id: r.id as string,
+      kind: r.kind as RecipientKind,
+      name: r.name as string,
+      email: r.email as string,
+      relation: (r.relation as string | null) ?? null,
+      createdAt: r.created_at as string,
+    }));
+  }
+
+  async upsertRecipient(userId: string, input: RecipientUpsertReq): Promise<Recipient> {
+    // 유니크 인덱스가 (user_id, kind, lower(email))라 같은 상대를 두 번 넣으면 충돌한다.
+    // 충돌을 오류로 올리지 않고 **그 행을 고치는 것**으로 받는다 — 사용자에게는
+    // "이미 있습니다"보다 "고쳐졌습니다"가 맞는 결과다
+    const existing = input.id
+      ? null
+      : (
+          await this.db
+            .from("recipients")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("kind", input.kind)
+            .ilike("email", input.email)
+            .maybeSingle()
+        ).data;
+
+    const id = input.id ?? (existing?.id as string | undefined);
+    const row = {
+      ...(id ? { id } : {}),
+      user_id: userId,
+      kind: input.kind,
+      name: input.name,
+      email: input.email,
+      relation: input.relation ?? null,
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await this.db
+      .from("recipients")
+      .upsert(row, { onConflict: "id" })
+      .select("id, kind, name, email, relation, created_at")
+      .single();
+    if (error) this.fail("recipients.upsert", error);
+    // ⚠ 이메일을 audit에 남기지 않는다 (보안 1조) — 무엇을 했는지와 역할까지만
+    await this.audit("recipient.save", userId, { kind: input.kind });
+    return {
+      id: data!.id as string,
+      kind: data!.kind as RecipientKind,
+      name: data!.name as string,
+      email: data!.email as string,
+      relation: (data!.relation as string | null) ?? null,
+      createdAt: data!.created_at as string,
+    };
+  }
+
+  async deleteRecipient(userId: string, id: string): Promise<boolean> {
+    // user_id를 조건에 함께 건다 — id만 걸면 남의 행이 지워진다 (D-18과 같은 정신)
+    const { data, error } = await this.db
+      .from("recipients")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select("id");
+    if (error) this.fail("recipients.delete", error);
+    const removed = (data ?? []).length > 0;
+    if (removed) await this.audit("recipient.delete", userId, {});
+    return removed;
   }
 
   async listDocumentsByUser(

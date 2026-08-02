@@ -6,6 +6,7 @@ import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
 import type { Obligation, ObligationKind } from "../contracts/obligations";
+import type { Recipient, RecipientKind, RecipientUpsertReq } from "../contracts/recipient";
 import type {
   AssetWriteInput,
   BeneficiaryWriteInput,
@@ -122,6 +123,16 @@ export interface StorePort {
   getProfile(userId: string): Promise<ProfileRecord | undefined>;
   /** 부분 수정. 보내지 않은 항목은 그대로 둔다 */
   saveProfile(userId: string, patch: Partial<Omit<ProfileRecord, "userId">>): Promise<ProfileRecord>;
+
+  /** 알릴 상대 — 기관·유가족·지킴이 (FR-405 · FR-112).
+   *  계약 넷(Beneficiary·Custodian·FamilyAck·DeliveryPatch)의 recipientId가 가리키던 실체다.
+   *  ⚠ 이메일은 개인정보라 audit·로그에 원문을 남기지 않는다 (보안 1조) */
+  listRecipients(userId: string, kind?: RecipientKind): Promise<Recipient[]>;
+  /** id가 있으면 수정, 없으면 생성. 같은 (역할·이메일)이 이미 있으면 그것을 고친다 —
+   *  중복 등록은 통지를 두 번 보내는 결과가 된다 */
+  upsertRecipient(userId: string, input: RecipientUpsertReq): Promise<Recipient>;
+  /** 남의 것을 지우지 않도록 userId를 함께 받는다. 없으면 false */
+  deleteRecipient(userId: string, id: string): Promise<boolean>;
 
   listDocumentsByUser(
     userId: string,
