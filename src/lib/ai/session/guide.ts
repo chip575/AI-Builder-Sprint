@@ -12,8 +12,10 @@
 import type { Statute } from "../../contracts/gate";
 import { STATUTES } from "../../rules/validity-gate";
 import { debtNoticeStatutes } from "../../rules/inheritance";
+import { referralText } from "../../referral/registry";
 
 export type GuideTopic =
+  | "TAX"          // 세법 — **답하지 않는다.** 문의처로 보낸다
   | "WILL"         // 유언장 — 전자서명 무효, 필사 가이드로
   | "LEGACY_GIFT"  // 사인증여(유산기부) — 전자서명 가능 + 유류분 고지
   | "DEADLINE"     // 상속 승인·포기 기간
@@ -34,6 +36,11 @@ const QUESTION =
 
 /** 주제 규칙 — 구체적인 것 먼저 (express-detect와 같은 원칙) */
 const TOPIC_RULES: { topic: GuideTopic; pattern: RegExp }[] = [
+  // 세법이 **맨 앞이다.** "상속세 신고 기한은?"이 DEADLINE에 걸리면 민법 조문을 답하게
+  // 되고, 묻지도 않은 상속 포기 기간을 세금 질문의 답인 양 내놓는다.
+  // ⚠ 여기에 "공제"를 넣지 않는다 — 우리 서식의 기부 공제는 확인 화면이 계산하는
+  //   우리 일이다. 넣으면 기부 대화가 통째로 "문의하세요"로 끝난다
+  { topic: "TAX", pattern: /(상속세|증여세|양도소득세|취득세|세무|절세|세율|세금이\s*얼마|세금\s*얼마)/ },
   // "상속 포기는 언제까지"가 INHERITANCE에 먼저 걸리면 기한 답을 못 준다
   { topic: "DEADLINE", pattern: /(포기|한정승인|기한|기간|언제까지)/ },
   { topic: "WILL", pattern: /유언/ },
@@ -95,7 +102,8 @@ const REPLIES: Record<GuideTopic, () => GuideReply> = {
       reply: compose(
         "상속을 받을지 정리하는 데에는 법으로 정한 기간이 있습니다. " +
           "기간의 시작점은 사망일이 아니라 ‘상속 개시를 안 날’이라 사정마다 다릅니다 — " +
-          "그래서 저희는 남은 날짜를 계산해 드리지 않습니다.",
+          "그래서 저희는 남은 날짜를 계산해 드리지 않습니다. " +
+          referralText("INHERITANCE_LAW"),
         statutes,
       ),
     };
@@ -109,11 +117,26 @@ const REPLIES: Record<GuideTopic, () => GuideReply> = {
         "유언이나 약정이 없으면 재산은 민법이 정한 순위에 따라 상속인에게 넘어갑니다(법정상속). " +
           "남기고 싶은 곳이 따로 있으시면 생전에 사인증여 약정으로 정해 두실 수 있고, " +
           "유언장은 자필로 작성하셔야 효력이 있습니다. 상속에는 승인·포기 기간 같은 " +
-          "법정 기한도 있으니, 구체적인 사정은 전문가와 상담하시기를 권합니다.",
+          "법정 기한도 있으니, 구체적인 사정은 전문가와 상담하시기를 권합니다. " +
+          // "상담하시기를 권합니다"로 끝나면 거절만 남는다 — 어디로 가라는 말이 있어야
+          // 사용자가 다음 행동을 할 수 있다 (NFR-705 nextAction과 같은 정신)
+          referralText("INHERITANCE_LAW"),
         statutes,
       ),
     };
   },
+  // 세법 — **답을 만들지 않는다.** 조문도 붙이지 않는다: 근거를 달면 답처럼 읽힌다.
+  // 상속세는 재산 종류·공제·상속인 수에 따라 달라져서, 여기서 어림잡는 순간 그 숫자가
+  // 사용자의 결정 기준이 된다. 우리 서식이 계산하는 것(기부 공제)과는 다른 층이다
+  TAX: () => ({
+    topic: "TAX",
+    statutes: [],
+    reply:
+      "세금은 저희가 계산해 드리지 않습니다. 상속세·증여세는 재산의 종류와 상속인 수에 " +
+      "따라 크게 달라져서, 어림으로 말씀드리면 오히려 판단을 그르치게 합니다. " +
+      `${referralText("TAX")} ` +
+      "다만 이 서비스에서 만드시는 기부 약정의 예상 공제액은 확인 화면에서 계산해 보여 드립니다.",
+  }),
   DONATION: () => ({
     topic: "DONATION",
     statutes: [],

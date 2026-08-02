@@ -205,6 +205,27 @@ describe("재산 — 가지마다 시키는 일이 반대다", () => {
     expect(p).not.toContain("아래는 우리가 확인한 재산이다");
   });
 
+  it("안내의 한계와 문의처가 조건 없이 들어간다 (법률·세무 리스크)", () => {
+    // 서류를 만드는 일은 잘 하면서 "상속세 얼마 나와요"에 그럴듯하게 답하던 구멍.
+    // 법률·세무에서 그럴듯한 오답은 침묵보다 나쁘다 — 사용자가 믿고 움직인다
+    for (const c of combos) {
+      const p = buildSystemPrompt(c);
+      expect(p, JSON.stringify(c)).toContain("답하지 않는 것");
+      expect(p, JSON.stringify(c)).toContain("유류분이 얼마인지");
+      expect(p, JSON.stringify(c)).toContain("세액을 계산하거나 어림잡아 말하지 않는다");
+      // 거절만 하고 끝내지 않는다 — 어디로 갈지가 함께 있어야 한다
+      expect(p, JSON.stringify(c)).toContain("대한법률구조공단");
+      expect(p, JSON.stringify(c)).toContain("국세상담센터");
+    }
+  });
+
+  it("서류 만들기는 우리 일이라고 남겨 둔다 — 통과 케이스", () => {
+    // 한계만 걸면 "아무것도 안 하는 상담원"이 된다. 무엇을 하는지가 함께 있어야 한다
+    const p = buildSystemPrompt(base);
+    expect(p).toContain("서류를 만드는 일");
+    expect(p).toContain("확인 화면이 계산한다");
+  });
+
   it("보안 조항은 조건 없이 들어간다 — 가지도 서류도 없을 때까지 포함", () => {
     // 조건이 붙으면 언젠가 그 조건이 거짓인 경로가 생기고, 그때 조용히 빠진다
     for (const c of combos) {
