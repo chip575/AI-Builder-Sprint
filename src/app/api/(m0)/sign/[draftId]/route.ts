@@ -7,6 +7,8 @@ import { track } from "@/lib/observability/track";
 import { logGateVerdict } from "@/lib/observability/gate-log";
 import { getDraft, markDraftRequested } from "../../documents/store";
 import { getCurrentUser } from "@/lib/auth/session";
+import { store } from "@/lib/store";
+import { effectiveProfile } from "../../me/route";
 import { getSession } from "@/lib/ai/session/store";
 
 export async function POST(
@@ -83,8 +85,14 @@ export async function POST(
   // 있었다(M-AUTH 연결 전 임시). 인증이 붙은 뒤에도 남아 있어서, real 모드에서는
   // 서명 요청이 존재하지 않는 주소로 나갔다 (2026-08-02 실측).
   const user = await getCurrentUser(req);
+  // 마이페이지 값이 서식에 인쇄된다. 비어 있으면 대체값을 넣는다 —
+  // 빈칸으로 서명되는 것보다 낫고, 임의의 가짜 번호를 찍는 것보다 정직하다
+  const profile = user ? await store.getProfile(user.id) : undefined;
+  const eff = user
+    ? effectiveProfile(user.email, profile)
+    : { displayName: "김가상", contact: "fake@example.com", orgName: null };
   const signerEmail = user?.email ?? "fake@example.com"; // 인증 비활성(mock) 경로
-  const signerName = user?.name ?? user?.email?.split("@")[0] ?? "김가상";
+  const signerName = eff.displayName;
 
   // 서면에 인쇄될 값 — 대화에서 확정된 fact로 채운다.
   // 채우지 못한 필수 칸은 어댑터의 검증이 잡아 **거부**한다. 빈칸으로 서명되는 것보다
@@ -94,10 +102,10 @@ export async function POST(
     session?.facts.find((f) => f.key === key && f.confirmed)?.value;
   const fields: Record<string, unknown> = {
     donor_name: signerName,
-    donor_contact: signerEmail,
+    donor_contact: eff.contact,
     // ⚠ region으로 대체하지 않는다 — "부산"을 기관 명칭 칸에 인쇄하면 계약서가
     //   존재하지 않는 기관을 가리킨다. 없으면 비운 채로 검증에 걸리게 둔다
-    org_name: fact("orgName"),
+    org_name: fact("orgName") ?? eff.orgName,
     amount_krw: fact("amount"),
     donation_date: new Date().toISOString().slice(0, 10),
   };

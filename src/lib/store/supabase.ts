@@ -19,6 +19,7 @@ import {
   type BeneficiaryWriteInput,
   type BranchProposalRecord,
   type DraftRecord,
+  type ProfileRecord,
   type EvidenceRecord,
   type FamilyAckRecord,
   type FamilyAckTarget,
@@ -548,6 +549,40 @@ export class SupabaseStore implements StorePort {
       .lte("updated_at", cutoff);
     if (error) this.fail("drafts.stale", error);
     return (data ?? []).map(toDraft);
+  }
+
+  async getProfile(userId: string): Promise<ProfileRecord | undefined> {
+    const { data, error } = await this.db
+      .from("profiles").select("*").eq("user_id", userId).maybeSingle();
+    if (error) this.fail("profiles.select", error);
+    if (!data) return undefined;
+    return {
+      userId: data.user_id,
+      displayName: data.display_name ?? null,
+      contact: data.contact ?? null,
+      orgName: data.org_name ?? null,
+    };
+  }
+
+  async saveProfile(
+    userId: string,
+    patch: Partial<Omit<ProfileRecord, "userId">>,
+  ): Promise<ProfileRecord> {
+    // 부분 수정 — undefined는 "안 건드림", null은 "지움". 둘을 섞으면 폼에서
+    // 비워 보낸 칸과 아예 안 보낸 칸이 같은 뜻이 되어 값을 잃는다
+    const cur = await this.getProfile(userId);
+    const row = {
+      user_id: userId,
+      display_name: patch.displayName === undefined ? (cur?.displayName ?? null) : patch.displayName,
+      contact: patch.contact === undefined ? (cur?.contact ?? null) : patch.contact,
+      org_name: patch.orgName === undefined ? (cur?.orgName ?? null) : patch.orgName,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await this.db.from("profiles").upsert(row, { onConflict: "user_id" });
+    if (error) this.fail("profiles.upsert", error);
+    // ⚠ 연락처를 audit detail에 남기지 않는다 (보안 1조) — 무엇을 고쳤는지만 남긴다
+    await this.audit("profile.save", userId, { fields: Object.keys(patch) });
+    return (await this.getProfile(userId))!;
   }
 
   async listDocumentsByUser(

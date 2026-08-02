@@ -18,6 +18,7 @@ import type {
   MetricRecord,
   StageStat,
   DraftRecord,
+  ProfileRecord,
   EvidenceRecord,
   HeartWillApplyResult,
   HeartWillParagraphDraft,
@@ -117,6 +118,11 @@ export interface StorePort {
    * 빠뜨린다. listLedgerNodes(subjectId)와 같은 규약이다 (D-18: 열어주지 않으면 닫혀 있다).
    * document_drafts에는 소유자 열이 없으므로 어댑터가 intents를 조인해 거른다.
    */
+  /** 마이페이지 값 — 없으면 undefined. 서식에 인쇄될 성명·연락처를 여기서 읽는다 */
+  getProfile(userId: string): Promise<ProfileRecord | undefined>;
+  /** 부분 수정. 보내지 않은 항목은 그대로 둔다 */
+  saveProfile(userId: string, patch: Partial<Omit<ProfileRecord, "userId">>): Promise<ProfileRecord>;
+
   listDocumentsByUser(
     userId: string,
     filter?: { docType?: DocType; status?: DocStatus; from?: string; to?: string },

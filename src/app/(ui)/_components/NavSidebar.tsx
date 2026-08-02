@@ -25,6 +25,8 @@ const LINKS: { href: string; label: string; hint: string }[] = [
   // 종이로 받은 서류도 같은 서랍에서 들어온다 — "내 자산" 섹션 머리에 있던 밑줄 링크를
   // 여기로 옮겼다. 거기서는 터치 영역이 44px에 못 미쳤다 (P2)
   { href: "/branch/paper-scan", label: "종이 문서로 등록", hint: "찍어서 올리면 읽어 드립니다" },
+  // 약정서에 인쇄될 값을 미리 정해 두는 곳. 서명 확인 화면에서도 여기로 보낸다
+  { href: "/mypage", label: "내 정보", hint: "약정서에 들어갈 성명·연락처" },
 ];
 
 export function NavSidebarToggle({
