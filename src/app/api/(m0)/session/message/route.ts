@@ -5,6 +5,7 @@ import { SessionMessageReq, SessionMessageRes } from "@/lib/contracts";
 import { addUtterance, getOrCreateSession } from "@/lib/ai/session/store";
 import { createProposal, proposeBranches } from "@/lib/ai/branch/propose";
 import { detectGuide } from "@/lib/ai/session/guide";
+import { handoffReply } from "@/lib/ai/session/handoff";
 import { responder } from "@/lib/ai/session/responder";
 import { computeCoverage, nextQuestion } from "@/lib/rules/question-bank";
 import { MockExtractor } from "@/lib/ai/extract/mock-extractor";
@@ -113,6 +114,23 @@ export async function POST(req: Request) {
         skippedIds: [],
       })?.text ?? null);
 
+  // 다음 행동이 화면(버튼·확인)에 있으면 LLM을 부르지 않는다 (handoff.ts의 도돌이표 해부).
+  // 최신 제안이 재확인 대기(PENDING_RECONFIRM)면 결정은 decide 버튼만 받는다.
+  const latestProposal = session.proposals.at(-1);
+  const handoff = guide
+    ? null
+    : handoffReply({
+        branchType,
+        missingRequired: scan.missingRequired,
+        knownFacts,
+        pendingReconfirm:
+          latestProposal?.status === "PENDING_RECONFIRM"
+            ? latestProposal.origin === "EXPRESS"
+              ? "EXPRESS"
+              : "DETECTED"
+            : null,
+      });
+
   // 대화 중 감지 (FR-115A) — Express로 이미 갈라졌으면 감지하지 않는다.
   // 응답 스트림보다 **먼저 띄우고 나중에 거둔다**: 감지를 기다렸다가 응답을 시작하면
   // NFR-702의 기준(첫 토큰 2초)이 모델 두 번 호출 시간이 된다.
@@ -145,11 +163,11 @@ export async function POST(req: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let firstTokenSent = false;
-      if (guide) {
-        // 결정론적 안내 — 첫 토큰이 곧 전체다. 응답기(LLM)는 이 턴을 건너뛴다.
+      if (guide || handoff) {
+        // 결정론적 응답 — 첫 토큰이 곧 전체다. 응답기(LLM)는 이 턴을 건너뛴다.
         // 감지(proposal)와 meta는 그대로 흘린다: 안내를 받았어도 발화에 의사가
         // 실려 있으면 확인형 제안이 뒤따라야 한다 (FR-115A)
-        controller.enqueue(sse("token", guide.reply));
+        controller.enqueue(sse("token", guide?.reply ?? handoff!));
         firstTokenSent = true;
         track("CONVERSE", true, Date.now() - t0);
       } else {
