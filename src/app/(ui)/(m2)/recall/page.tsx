@@ -6,7 +6,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { postSse } from "@/lib/sse";
 import { ErrorNote, Notice, PrimaryButton, Shell } from "@/app/(ui)/_components/Shell";
 import {
@@ -15,10 +15,14 @@ import {
   nextQuestion,
   PAUSE_PROMPT,
 } from "@/lib/rules/question-bank";
-import type { AxisCoverage } from "@/lib/contracts";
 import type { Question } from "@/lib/contracts";
 
 const AXIS_LABEL = new Map(AXES.map((a) => [a.id as string, a.label as string]));
+
+/** 브라우저에 남기는 것은 세션 id뿐이다 — 내용은 서버에 있다 (보안 1조).
+ *  /chat·/guide·/write와 같은 규칙이다. 이게 없으면 새로고침 한 번에 회상 세션이
+ *  사라지고, 마음 유언으로 가는 길(=sessionId)도 함께 끊긴다 */
+const SESSION_KEY = "namgida.recallSessionId";
 
 export default function RecallPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -28,12 +32,17 @@ export default function RecallPage() {
   const [question, setQuestion] = useState<Question | null>(() =>
     nextQuestion({ utterances: [], askedIds: [], skippedIds: [] }),
   );
-  const [coverage, setCoverage] = useState<AxisCoverage>([]);
   const [input, setInput] = useState("");
   const [reply, setReply] = useState("");
   const [paused, setPaused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
+
+  // 지난 회상으로 돌아온다 — 세션 주기와 무관하게 이어쓴다 (FR-110 · D-07)
+  useEffect(() => {
+    const saved = localStorage.getItem(SESSION_KEY);
+    if (saved) setSessionId(saved);
+  }, []);
 
   /** 다음 질문으로. 건너뛴 질문은 목록에서 영구히 빠진다 (FR-301 수락 기준) */
   function advance(nextAnswers: string[], nextAsked: string[], nextSkipped: string[]) {
@@ -50,7 +59,14 @@ export default function RecallPage() {
 
   async function submit() {
     const text = input.trim();
-    if (!text || busy || !question) return;
+    if (busy || !question) return;
+    // 버튼을 조용히 죽이지 않는다 — 빈 채로 눌러도 왜 안 되는지 들을 수 있어야 한다 (NFR-705)
+    if (!text) {
+      return setError({
+        message: "아직 적으신 내용이 없어요.",
+        nextAction: "위 칸에 떠오르는 대로 한 문장만 적어 주세요. 짧아도 괜찮습니다.",
+      });
+    }
     setBusy(true);
     setError(null);
     setInput("");
@@ -63,9 +79,11 @@ export default function RecallPage() {
         {
           onToken: (t) => setReply((prev) => prev + t),
           onMeta: (m) => {
-            const meta = m as { sessionId: string; axisCoverage: AxisCoverage };
+            // axisCoverage도 함께 오지만 화면은 쓰지 않는다 — 셈을 보여주지 않기로 했다
+            const meta = m as { sessionId: string };
             setSessionId(meta.sessionId);
-            setCoverage(meta.axisCoverage);
+            // 다음에 들어와도 이 회상으로 돌아올 수 있게 남긴다
+            localStorage.setItem(SESSION_KEY, meta.sessionId);
           },
         },
       );
@@ -98,37 +116,13 @@ export default function RecallPage() {
     advance(answers, asked, nextSkipped);
   }
 
-  const answeredTotal = coverage.reduce((n, c) => n + c.answered, 0);
-  const grandTotal = coverage.reduce((n, c) => n + c.total, 0);
-
   return (
-    <Shell title="회상" fr={["FR-301", "FR-110"]} back={{ href: "/chat", label: "대화로" }}>
-      {/* 커버리지 — 진도가 아니라 "어느 이야기를 아직 안 했나"를 보여준다 */}
-      {coverage.length > 0 && (
-        <section className="mb-6 rounded-xl border border-stone-200 p-4">
-          <p className="mb-3 text-sm text-stone-600">
-            지금까지 {answeredTotal}가지 이야기를 남기셨습니다 (전체 {grandTotal})
-          </p>
-          <ul className="space-y-2">
-            {coverage.map((c) => (
-              <li key={c.axis} className="flex items-center gap-3 text-sm">
-                <span className="w-28 shrink-0 text-stone-700">
-                  {AXIS_LABEL.get(c.axis) ?? c.axis}
-                </span>
-                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-200">
-                  <span
-                    className="block h-full bg-stone-500"
-                    style={{ width: `${(c.answered / c.total) * 100}%` }}
-                  />
-                </span>
-                <span className="w-10 shrink-0 text-right text-stone-500">
-                  {c.answered}/{c.total}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+    // 돌아갈 곳은 "내 유산"이다 — 마음 이야기로 들어오는 문이 거기에 있다 (2026-08-02 개편)
+    <Shell title="회상" fr={["FR-301", "FR-110"]} back={{ href: "/estate", label: "이전으로" }}>
+      {/* 커버리지 카드를 걷어냈다 (진행률 바 5개 · N/4 분수 · "전체 20" 총량).
+          축을 다 채워야 끝나는 과제로 읽히기 때문이다. 마음 유언은 완성 시점이 따로
+          없고 갱신되는 과정 자체가 산출물이다 (FR-111) — 셈이 있으면 그 말이 거짓이 된다.
+          ⚠ 대체물을 두지 않는다. "지금까지 N가지"도 결국 얼마나 채웠나로 읽힌다 (P4). */}
 
       {reply && (
         <p className="mb-6 whitespace-pre-wrap rounded-xl bg-stone-100 p-4 text-stone-800">
@@ -177,7 +171,9 @@ export default function RecallPage() {
           />
 
           <div className="flex items-center gap-3">
-            <PrimaryButton onClick={submit} disabled={busy || input.trim() === ""}>
+            {/* 빈 입력으로 죽이지 않는다 — 눌렀을 때 무엇이 모자란지 말해 준다 (NFR-705).
+                회색으로 두되 비활성화하지 않는 이유가 이것이다 */}
+            <PrimaryButton onClick={submit} disabled={busy}>
               {busy ? "남기는 중…" : "이 이야기 남기기"}
             </PrimaryButton>
             {/* 건너뛴 질문은 다시 묻지 않는다 */}
@@ -185,7 +181,8 @@ export default function RecallPage() {
               type="button"
               onClick={skip}
               disabled={busy}
-              className="text-sm text-stone-500 underline underline-offset-4 hover:text-stone-700"
+              // whitespace-nowrap — 좁은 화면에서 "이 질문은 / 건너뛸게요"로 갈라졌다
+              className="shrink-0 whitespace-nowrap text-sm text-stone-500 underline underline-offset-4 hover:text-stone-700"
             >
               이 질문은 건너뛸게요
             </button>
