@@ -36,6 +36,9 @@ export const DocType = z.enum([
   "HANDWRITTEN_WILL",         // 유언장 — ESIGN_INVALID, 서명 버튼 금지 (민법 §1066)
   "HEART_LETTER",             // 마음의 편지 — NON_BINDING
   "DIGITAL_LEGACY_INSTRUCTION", // 디지털 유산 처리 지시서 — NON_BINDING (FR-403)
+  // 철회 통지서 — 사인증여 철회의 의사표시 (민법 §1108① · 대법원 2017다245330).
+  // 기관 서명은 수령 확인이지 효력 요건이 아니다 — 서식 제2조가 그렇게 말한다
+  "REVOCATION_NOTICE",
 ]);
 export type DocType = z.infer<typeof DocType>;
 
