@@ -188,6 +188,14 @@ export interface StorePort {
   /** 노드 1건 — 가족 인지 요청이 대상 노드를 확인할 때 쓴다 */
   getLedgerNode(nodeId: string): Promise<LedgerNode | undefined>;
 
+  /** 이 subject의 모든 노드를 REVOKED로 (FR-405 · 민법 §1108①).
+   *  ACTIVE/SUPERSEDED는 순서에서 유도되지만 REVOKED는 저장값이다 —
+   *  철회는 사용자의 행위지 순서의 결과가 아니기 때문이다 (chain.ts).
+   *  전부 REVOKED가 되면 유도에서 다 빠져 **살아 있는 뜻이 없어진다.**
+   *  ⚠ 해시는 다시 계산하지 않는다. status는 봉인 대상이 아니고(chain.ts 머리말),
+   *    재계산하면 지난 노드의 해시가 바뀌어 체인 검증이 통째로 깨진다 */
+  revokeLedgerSubject(subjectId: string): Promise<number>;
+
   // ── 가족 인지 (FR-554) ────────────────────────────────────
   /** 통지 대상에게 인지 요청을 남긴다. **빈 배열이면 아무것도 만들지 않는다** —
    *  알리지 않을 자유가 본인에게 있고, 요청 0건은 결함이 아니다 (P4) */

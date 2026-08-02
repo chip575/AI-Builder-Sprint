@@ -33,8 +33,8 @@ describe("dataLabel 표 — 형식", () => {
     }
   });
 
-  it("서식 8종이 모두 있다", () => {
-    expect(TEMPLATES).toHaveLength(8);
+  it("등록한 서식이 모두 있다", () => {
+    expect(TEMPLATES).toHaveLength(9);
   });
 });
 
@@ -81,23 +81,33 @@ describe("toDataLabel", () => {
 });
 
 describe("서명자 역할", () => {
-  it("8종 모두 역할이 정의돼 있다", () => {
+  it("모든 서식에 역할이 정의돼 있다", () => {
     for (const t of TEMPLATES) {
       expect(TEMPLATE_ROLES[t].length, t).toBeGreaterThan(0);
     }
   });
 
-  it("가족 인지만 2인이고 순서가 본인 → 가족이다 (서식 제5조)", () => {
+  /** 상대가 서명해야 완료되는 서식 — **상대가 서명하지 않으면 문서가 완료되지 않는다.**
+   *  그 미완료가 결함이 아니라 사실인 서식만 여기 들어온다. 늘리기 전에 다시 생각한다:
+   *  · FAMILY_ACK — 가족이 확인해야 확인서다. 안 하면 확인이 없었던 것이다
+   *  · REVOCATION_NOTICE — 기관 서명은 **수령 확인**이다. 서식 제2조가 "서명 여부와
+   *    관계없이 철회는 성립한다"고 명시하므로, 미완료로 남아도 철회는 유효하다 */
+  const TWO_PARTY = new Set(["FAMILY_ACK", "REVOCATION_NOTICE"]);
+
+  it("2인 서식은 둘뿐이고, 순서는 본인이 먼저다", () => {
     for (const t of TEMPLATES) {
-      const expected = t === "FAMILY_ACK" ? 2 : 1;
-      expect(TEMPLATE_ROLES[t].length, t).toBe(expected);
+      expect(TEMPLATE_ROLES[t].length, t).toBe(TWO_PARTY.has(t) ? 2 : 1);
+      if (TWO_PARTY.has(t)) expect(TEMPLATE_ROLES[t][0], t).toBe("본인");
     }
-    expect(TEMPLATE_ROLES.FAMILY_ACK).toEqual(["본인", "가족"]);
+    expect(TEMPLATE_ROLES.FAMILY_ACK).toEqual(["본인", "가족"]); // 서식 제5조
+    expect(TEMPLATE_ROLES.REVOCATION_NOTICE).toEqual(["본인", "기관"]); // 서식 제2조
   });
 
-  it("기관 날인란은 참여자가 아니다 — 참여자가 2인이 되면 문서가 완료되지 않는다", () => {
+  it("기관 날인란을 참여자로 만들지 않는다 — 서명할 사람이 없으면 영원히 미완료다", () => {
+    // 8종에서 기관 날인란을 전부 뺀 이유가 이것이다. 철회 통지서는 예외인데,
+    // 거기서는 기관 서명이 **날인이 아니라 수령 확인**이고 안 해도 효력에 영향이 없다
     for (const t of TEMPLATES) {
-      if (t === "FAMILY_ACK") continue;
+      if (TWO_PARTY.has(t)) continue;
       expect(TEMPLATE_ROLES[t], t).not.toContain("기관");
     }
   });

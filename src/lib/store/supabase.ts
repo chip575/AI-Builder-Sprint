@@ -953,6 +953,20 @@ export class SupabaseStore implements StorePort {
     return withDerivedStatus((data ?? []).map(toLedgerNode));
   }
 
+  async revokeLedgerSubject(subjectId: string): Promise<number> {
+    // status만 바꾼다. node_hash는 그대로 둔다 — 재계산하면 체인 검증이 통째로 깨진다
+    const { data, error } = await this.db
+      .from("ledger_nodes")
+      .update({ status: "REVOKED" })
+      .eq("subject_id", subjectId)
+      .neq("status", "REVOKED")
+      .select("id");
+    if (error) this.fail("ledger_nodes.revoke", error);
+    const n = (data ?? []).length;
+    if (n > 0) await this.audit("ledger.revoke", subjectId, { nodes: n });
+    return n;
+  }
+
   async getLedgerNode(nodeId: string): Promise<LedgerNode | undefined> {
     const { data, error } = await this.db
       .from("intent_ledger_nodes")
