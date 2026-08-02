@@ -57,7 +57,7 @@ export function DocPreview({
   docType,
   facts,
 }: {
-  docType: "LEGACY_GIFT_AGREEMENT" | "DONATION_PLEDGE";
+  docType: "LEGACY_GIFT_AGREEMENT" | "DONATION_PLEDGE" | "HERITAGE_SUPPORT_PLEDGE";
   facts: PreviewFacts;
 }) {
   const s562 = STATUTES.CIVIL_562;
@@ -69,7 +69,31 @@ export function DocPreview({
         미리보기 — 확정하시기 전까지 아무것도 정해지지 않습니다
       </p>
 
-      {docType === "LEGACY_GIFT_AGREEMENT" ? (
+      {docType === "HERITAGE_SUPPORT_PLEDGE" ? (
+        <div className="space-y-5">
+          <h2 className="text-center font-serif text-2xl font-semibold tracking-widest text-stone-900">
+            문화유산 후원 약정서
+          </h2>
+          <p className="leading-relaxed text-stone-700">
+            후원자(이하 “후원자”)와 기관(이하 “기관”)은 문화유산의 보존을 위하여
+            다음과 같이 약정을 체결한다.
+          </p>
+          <Article no={1} title="후원 대상">
+            후원자는 <Slot value={facts.orgName} hint="후원할 곳" /> 이(가) 지키는
+            문화유산의 보존을 후원한다.
+          </Article>
+          <Article no={2} title="후원 금액">
+            후원자는 금 <Slot value={won(facts.amount)} hint="금액" /> 을 후원한다.
+          </Article>
+          <Article no={3} title="용도">
+            후원금은 문화유산의 보존·관리 목적 외에 사용하지 아니한다.
+          </Article>
+          <Article no={4} title="철회">
+            후원자는 체결 전 언제든지 약정을 중단할 수 있다.
+          </Article>
+          <SignatureBlock partyLabel="후원자" />
+        </div>
+      ) : docType === "LEGACY_GIFT_AGREEMENT" ? (
         <div className="space-y-5">
           <h2 className="text-center font-serif text-2xl font-semibold tracking-widest text-stone-900">
             유산 기부 약정서

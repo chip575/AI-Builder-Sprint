@@ -9,7 +9,7 @@
 // 판독이 채우는 것은 **값**이고, 종류(category)와 처리 지시(disposition)는 사람이 정한다 —
 // 기계가 "이건 부동산입니다"라고 단정하면 그 순간 확인 없는 확정이 된다.
 import { AssetUpsertReq } from "@/lib/contracts";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 import { scanner } from "@/lib/ai/document";
 import { CONFIDENCE } from "@/lib/ai/extract/confidence";
 import { store } from "@/lib/store";
@@ -36,6 +36,7 @@ function pick(
 export async function POST(req: Request) {
   const t0 = Date.now();
   const userId = await getCurrentUserId(req);
+  if (!userId) return loginRequired();
   const body = await req.json().catch(() => null);
   const parsed = AssetUpsertReq.safeParse(body);
   if (!parsed.success) return assetParseFailure(body);

@@ -35,7 +35,10 @@ export async function GET(
   if (!draft) return notFound();
 
   const session = await getSession(draft.intentId);
-  // 타인 소유는 존재 여부도 흘리지 않는다 — 403이 아니라 404
+  // 타인 소유는 존재 여부도 흘리지 않는다 — 403이 아니라 404.
+  // 비로그인(currentUserId=null)도 여기서 걸린다: userId는 절대 null이 아니므로
+  // 비교가 항상 참이 되어 404다. **의도된 동작이다** — 이 화면에서는 401보다 404가
+  // 맞다(로그인하면 볼 수 있는 무언가가 있다는 사실조차 알리지 않는다)
   if (!session || session.userId !== currentUserId) return notFound();
 
   const evidence = await store.getEvidenceByDraft(docId);

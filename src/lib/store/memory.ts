@@ -341,6 +341,23 @@ export class InMemoryStore implements StorePort {
     );
   }
 
+  async listDocumentsByUser(
+    userId: string,
+    filter?: { docType?: DocType; status?: DocStatus; from?: string; to?: string },
+  ): Promise<DraftRecord[]> {
+    // 소유자는 draft가 아니라 intent가 안다 — 조인에 해당하는 자리다
+    const mine = new Set(
+      [...this.sessions.values()].filter((s) => s.userId === userId).map((s) => s.id),
+    );
+    return [...this.drafts.values()]
+      .filter((d) => mine.has(d.intentId))
+      .filter((d) => (filter?.docType ? d.docType === filter.docType : true))
+      .filter((d) => (filter?.status ? d.status === filter.status : true))
+      .filter((d) => (filter?.from ? d.createdAt >= filter.from : true))
+      .filter((d) => (filter?.to ? d.createdAt <= filter.to : true))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)); // 최신이 위
+  }
+
   async recordReconcile(corrected: number): Promise<void> {
     this.reconciles.push({ at: new Date().toISOString(), corrected });
   }

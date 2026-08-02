@@ -1,6 +1,6 @@
 // M-AUTH 테스트 — 키 없는 환경(채점 경로)의 동작이 핵심이다 (NFR-707).
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getCurrentUserId, authEnabled, sessionCookie } from "@/lib/auth/session";
+import { getCurrentUserId, authEnabled, loginRequired, sessionCookie } from "@/lib/auth/session";
 import { DEV_USER_ID } from "@/lib/store/types";
 import { POST } from "./[action]/route";
 
@@ -43,12 +43,23 @@ describe("M-AUTH — 키 없는 환경 (NFR-707 채점 경로)", () => {
     expect(body.error.nextAction).toContain("진행");
   });
 
-  it("현재 사용자 = DEV_USER_ID — 쿠키가 있어도 마찬가지", async () => {
+  it("인증 비활성이면 DEV_USER_ID — 쿠키가 있어도 마찬가지 (NFR-707)", async () => {
+    // 키 없는 채점 경로는 로그인 없이 전 흐름이 돌아야 한다. 여기서만 DEV_USER_ID다 —
+    // 인증이 켜진 환경의 비로그인은 null이고, 그 쌍이 이 변경의 핵심이다
     expect(await getCurrentUserId(new Request("http://localhost/"))).toBe(DEV_USER_ID);
     const withCookie = new Request("http://localhost/", {
       headers: { cookie: "namgida_session=any-token" }, // 헤더 값은 ASCII만 가능
     });
     expect(await getCurrentUserId(withCookie)).toBe(DEV_USER_ID);
+  });
+
+  it("loginRequired는 401 envelope다 — 기술 코드를 노출하지 않는다 (NFR-705)", async () => {
+    const res = loginRequired();
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("LOGIN_REQUIRED");
+    expect(body.error.nextAction).toBeTruthy();
   });
 });
 

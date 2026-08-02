@@ -8,6 +8,7 @@ import { canTransition, EVENT_TO_STATUS } from "../state-machine";
 import { store } from "../../store";
 import type {
   DocumentDetail,
+  DocumentListFilter,
   SignerPort,
   SignRequestInput,
   SignRequestResult,
@@ -84,6 +85,9 @@ export class MockSigner implements SignerPort {
   /** 외부 세계의 상태를 우리 기록과 **다른 자리**에 남긴다.
    *  실패해도 흐름을 막지 않는다 — mock은 개발 보조이지 진실이 아니다. */
   private async persist(doc: MockDoc): Promise<void> {
+    // 쓰기 지점이 하나라 여기서 찍으면 빠지는 경로가 없다.
+    // 델타 조회(updatedSince)의 기준이므로 real의 updatedAt과 같은 뜻이어야 한다
+    doc.updatedAt = new Date().toISOString();
     try {
       await store.putMockDoc(doc.documentId, {
         doc: doc as unknown as Record<string, unknown>,
@@ -121,9 +125,17 @@ export class MockSigner implements SignerPort {
     return this.load(documentId);
   }
 
-  async listDocuments(filter?: { status?: DocStatus }): Promise<DocumentDetail[]> {
-    const all = [...this.docs.values()];
-    return filter?.status ? all.filter((d) => d.status === filter.status) : all;
+  async listDocuments(filter?: DocumentListFilter): Promise<DocumentDetail[]> {
+    // real 어댑터와 **같은 규칙**으로 거른다. mock이 더 관대하면 배포에서만 깨진다
+    let all = [...this.docs.values()];
+    if (filter?.status) all = all.filter((d) => d.status === filter.status);
+    if (filter?.updatedSince) {
+      const since = filter.updatedSince;
+      all = all.filter((d) => (d.updatedAt ?? "") >= since);
+    }
+    // 최신순 — 델타 조회는 "바뀐 것부터"가 자연스럽다
+    all.sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+    return filter?.limit ? all.slice(0, filter.limit) : all;
   }
 
   async resendNotification(documentId: string): Promise<void> {
