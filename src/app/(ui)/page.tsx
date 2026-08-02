@@ -18,7 +18,7 @@ export default function HomePage() {
       </p>
       <Link
         href="/write"
-        className="rounded-full bg-stone-900 px-8 py-3 text-stone-50 transition hover:bg-stone-700"
+        className="rounded-full bg-ink px-8 py-3 text-stone-50 transition hover:bg-ink-hover"
       >
         서류 준비 시작하기
       </Link>
@@ -28,7 +28,7 @@ export default function HomePage() {
       >
         서류보다 마음 이야기를 먼저 하고 싶어요
       </Link>
-      <p className="text-sm text-stone-400">
+      <p className="text-sm text-stone-500">
         언제든 멈출 수 있고, 저장된 곳부터 다시 이어집니다.
       </p>
       {/* FR-110이 금지한 것은 **진입 시 트랙·카테고리 선택**이다. 이건 사용자 여정의

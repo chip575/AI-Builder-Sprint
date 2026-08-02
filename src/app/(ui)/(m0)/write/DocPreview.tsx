@@ -17,7 +17,7 @@ function Slot({ value, hint }: { value: string | null | undefined; hint: string 
   return value ? (
     <mark className="rounded bg-amber-100 px-1 font-medium text-stone-900">{value}</mark>
   ) : (
-    <span className="rounded border border-dashed border-stone-400 px-2 text-stone-400">
+    <span className="rounded border border-dashed border-stone-400 px-2 text-stone-500">
       {hint}
     </span>
   );
@@ -43,11 +43,11 @@ function SignatureBlock({ partyLabel }: { partyLabel: string }) {
     <div className="mt-6 space-y-2 border-t border-stone-300 pt-4 text-sm text-stone-600">
       <p className="flex items-baseline justify-between">
         <span>{partyLabel}</span>
-        <span className="text-stone-400">(전자서명 — 요청 후 모두싸인에서 서명합니다)</span>
+        <span className="text-stone-500">(전자서명 — 요청 후 모두싸인에서 서명합니다)</span>
       </p>
       <p className="flex items-baseline justify-between">
         <span>기관</span>
-        <span className="text-stone-400">(기명날인 — 문서에 인쇄됩니다)</span>
+        <span className="text-stone-500">(기명날인 — 문서에 인쇄됩니다)</span>
       </p>
     </div>
   );
@@ -65,7 +65,7 @@ export function DocPreview({
 
   return (
     <div className="rounded-2xl border border-stone-300 bg-white p-6 shadow-sm">
-      <p className="mb-4 text-xs text-stone-400">
+      <p className="mb-4 text-xs text-stone-500">
         미리보기 — 확정하시기 전까지 아무것도 정해지지 않습니다
       </p>
 
@@ -99,7 +99,7 @@ export function DocPreview({
             기부자는 생전에 언제든지 이 약정을 변경하거나 철회할 수 있다.
           </Article>
           {/* 근거 조문 — 갱신일자와 함께 (P3) */}
-          <p className="text-xs leading-relaxed text-stone-400">
+          <p className="text-xs leading-relaxed text-stone-500">
             근거: {s562.id} {s562.title} · {s1112.id} {s1112.title} ({s562.verifiedAt} 확인)
           </p>
           <SignatureBlock partyLabel="기부자" />

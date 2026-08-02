@@ -26,17 +26,17 @@ const LOOK: Record<HeartWillOrigin, { label: string; box: string; tag: string }>
   AI_DRAFT: {
     label: "AI가 옮긴 문장",
     box: "border-dashed border-stone-300 bg-white",
-    tag: "bg-stone-100 text-stone-500",
+    tag: "bg-stone-100 text-stone-600",
   },
   USER_EDITED: {
     label: "직접 고치신 문장",
     box: "border-solid border-stone-400 bg-stone-50",
-    tag: "bg-stone-800 text-stone-50",
+    tag: "bg-ink text-stone-50",
   },
   USER_WRITTEN: {
     label: "직접 쓰신 문장",
     box: "border-solid border-stone-400 bg-stone-50",
-    tag: "bg-stone-800 text-stone-50",
+    tag: "bg-ink text-stone-50",
   },
 };
 

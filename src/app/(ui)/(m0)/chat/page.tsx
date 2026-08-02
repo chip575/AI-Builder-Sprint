@@ -197,7 +197,7 @@ export default function ChatPage() {
             className={`min-h-11 rounded-xl border px-3 text-sm transition ${
               storyCount && storyCount > 0
                 ? "border-stone-400 bg-white text-stone-800 hover:bg-stone-100"
-                : "border-stone-200 text-stone-400 hover:bg-stone-100"
+                : "border-stone-200 text-stone-500 hover:bg-stone-100 hover:text-stone-700"
             }`}
           >
             정리된 내용 확인
@@ -242,7 +242,7 @@ export default function ChatPage() {
             <button
               type="submit"
               disabled={busy || !input.trim()}
-              className="min-h-11 rounded-xl bg-stone-900 px-5 text-stone-50 disabled:bg-stone-300"
+              className="min-h-11 rounded-xl bg-ink px-5 text-stone-50 disabled:bg-stone-300 disabled:text-stone-600"
             >
               보내기
             </button>
@@ -271,7 +271,7 @@ export default function ChatPage() {
             <span
               className={
                 t.role === "user"
-                  ? "inline-block max-w-[85%] rounded-2xl bg-stone-900 px-4 py-3 text-left leading-relaxed text-stone-50"
+                  ? "inline-block max-w-[85%] rounded-2xl bg-ink px-4 py-3 text-left leading-relaxed text-stone-50"
                   : // 묻는 쪽만 명조 — 버튼·라벨의 고딕과 대비를 만든다
                     "inline-block max-w-[85%] rounded-2xl bg-white px-4 py-3 font-serif leading-relaxed text-stone-800 shadow-sm"
               }
@@ -290,7 +290,7 @@ export default function ChatPage() {
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 onClick={() => void decide(p, "ACCEPT")}
-                className="min-h-11 flex-1 rounded-xl bg-stone-900 px-4 py-3 text-sm text-stone-50"
+                className="min-h-11 flex-1 rounded-xl bg-ink px-4 py-3 text-sm text-stone-50"
               >
                 네, 그렇게 할게요
               </button>

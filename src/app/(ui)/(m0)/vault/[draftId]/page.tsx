@@ -78,7 +78,7 @@ export default function VaultPage() {
 
             <a
               href={evidence.pdfUrl}
-              className="block min-h-11 rounded-xl bg-stone-900 px-6 py-3 text-center text-stone-50"
+              className="block min-h-11 rounded-xl bg-ink px-6 py-3 text-center text-stone-50"
             >
               증빙 PDF 내려받기
             </a>

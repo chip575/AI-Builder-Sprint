@@ -159,7 +159,7 @@ export default function RecallPage() {
         </section>
       ) : question ? (
         <section className="space-y-4">
-          <p className="text-xs uppercase tracking-wide text-stone-400">
+          <p className="text-xs uppercase tracking-wide text-stone-500">
             {AXIS_LABEL.get(question.axis) ?? question.axis}
           </p>
           {/* 한 번에 한 질문 — 여기에 질문이 둘 이상 렌더되면 설문지가 된다.
@@ -204,7 +204,7 @@ export default function RecallPage() {
           {sessionId && (
             <Link
               href={`/heartwill?sessionId=${sessionId}`}
-              className="inline-flex min-h-11 items-center rounded-xl bg-stone-900 px-6 text-stone-50 transition hover:bg-stone-700"
+              className="inline-flex min-h-11 items-center rounded-xl bg-ink px-6 text-stone-50 transition hover:bg-ink-hover"
             >
               마음 유언 정리해 보기
             </Link>

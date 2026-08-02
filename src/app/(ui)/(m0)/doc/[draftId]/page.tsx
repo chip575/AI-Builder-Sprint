@@ -101,7 +101,7 @@ export default function DocPage() {
               {status.parties.map((p, i) => (
                 <li key={i} className="flex justify-between text-sm">
                   <span>{p.name}</span>
-                  <span className={p.signedAt ? "text-emerald-700" : "text-stone-400"}>
+                  <span className={p.signedAt ? "text-emerald-700" : "text-stone-500"}>
                     {p.signedAt ? "서명함" : "대기"}
                   </span>
                 </li>

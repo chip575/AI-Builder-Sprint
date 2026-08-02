@@ -156,7 +156,7 @@ export default function GuidePage() {
             className={`min-h-11 rounded-xl border px-3 text-sm transition ${
               covered && covered > 0
                 ? "border-stone-400 bg-white text-stone-800 hover:bg-stone-100"
-                : "border-stone-200 text-stone-400 hover:bg-stone-100"
+                : "border-stone-200 text-stone-500 hover:bg-stone-100 hover:text-stone-700"
             }`}
           >
             정리된 내용 확인
@@ -198,7 +198,7 @@ export default function GuidePage() {
             <button
               type="submit"
               disabled={busy || !input.trim()}
-              className="min-h-11 rounded-xl bg-stone-900 px-5 text-stone-50 disabled:bg-stone-300"
+              className="min-h-11 rounded-xl bg-ink px-5 text-stone-50 disabled:bg-stone-300 disabled:text-stone-600"
             >
               보내기
             </button>
@@ -234,7 +234,7 @@ export default function GuidePage() {
             <span
               className={
                 t.role === "user"
-                  ? "inline-block max-w-[85%] rounded-2xl bg-stone-900 px-4 py-3 text-left leading-relaxed text-stone-50"
+                  ? "inline-block max-w-[85%] rounded-2xl bg-ink px-4 py-3 text-left leading-relaxed text-stone-50"
                   : // 안내는 근거 줄이 길다 — 개행을 살려야 조문이 읽힌다
                     "inline-block max-w-[85%] whitespace-pre-line rounded-2xl bg-white px-4 py-3 font-serif leading-relaxed text-stone-800 shadow-sm"
               }
@@ -252,7 +252,7 @@ export default function GuidePage() {
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 onClick={() => void decide(p, "ACCEPT")}
-                className="min-h-11 flex-1 rounded-xl bg-stone-900 px-4 py-3 text-sm text-stone-50"
+                className="min-h-11 flex-1 rounded-xl bg-ink px-4 py-3 text-sm text-stone-50"
               >
                 네, 그렇게 할게요
               </button>

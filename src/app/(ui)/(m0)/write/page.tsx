@@ -270,7 +270,8 @@ export default function WritePage() {
               유언은 법이 정한 방식(자필증서 등)으로만 효력이 생깁니다. 대신 자필로
               옮겨 쓰실 수 있게 안내해 드립니다.
             </p>
-            <p className="mt-2 text-xs text-stone-400">
+            {/* 이 카드는 bg-stone-100이라 500이면 4.39:1로 못 미친다 — 한 단계 더 */}
+            <p className="mt-2 text-xs text-stone-600">
               {will.map((s) => `${s.id} ${s.title}`).join(" · ")} ({will[0]!.verifiedAt} 확인)
             </p>
             <Link
@@ -311,7 +312,7 @@ export default function WritePage() {
           <button
             type="button"
             onClick={() => void toConfirm()}
-            className="min-h-11 rounded-xl bg-stone-900 px-3 text-sm text-stone-50"
+            className="min-h-11 rounded-xl bg-ink px-3 text-sm text-stone-50"
           >
             내용 확인하고 서명 준비
           </button>
@@ -345,7 +346,7 @@ export default function WritePage() {
             <button
               type="submit"
               disabled={busy || !input.trim()}
-              className="min-h-11 rounded-xl bg-stone-900 px-5 text-stone-50 disabled:bg-stone-300"
+              className="min-h-11 rounded-xl bg-ink px-5 text-stone-50 disabled:bg-stone-300 disabled:text-stone-600"
             >
               보내기
             </button>
@@ -361,7 +362,7 @@ export default function WritePage() {
                 <span
                   className={
                     t.role === "user"
-                      ? "inline-block max-w-[85%] rounded-2xl bg-stone-900 px-4 py-2.5 text-left leading-relaxed text-stone-50"
+                      ? "inline-block max-w-[85%] rounded-2xl bg-ink px-4 py-2.5 text-left leading-relaxed text-stone-50"
                       : "inline-block max-w-[85%] whitespace-pre-line rounded-2xl bg-white px-4 py-2.5 font-serif leading-relaxed text-stone-800 shadow-sm"
                   }
                 >
@@ -381,7 +382,7 @@ export default function WritePage() {
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={() => void proceed("PROCEED_TODAY")}
-                    className="min-h-11 flex-1 rounded-xl bg-stone-900 px-4 text-sm text-stone-50"
+                    className="min-h-11 flex-1 rounded-xl bg-ink px-4 text-sm text-stone-50"
                   >
                     오늘 시작할게요
                   </button>
@@ -409,7 +410,8 @@ export default function WritePage() {
                     className={`rounded px-2 py-0.5 ${
                       v != null
                         ? "bg-emerald-100 text-emerald-800"
-                        : "bg-stone-100 text-stone-400"
+                        // stone-100 바탕 위에서는 500이 4.39:1로 못 미친다 — 한 단계 더
+                        : "bg-stone-100 text-stone-600"
                     }`}
                   >
                     {label} {v != null ? "채움" : "비어 있음"}
