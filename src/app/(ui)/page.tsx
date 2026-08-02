@@ -21,7 +21,7 @@ export default function HomePage() {
       </p>
       <Link
         href="/estate"
-        className="rounded-full bg-stone-900 px-8 py-3 text-stone-50 transition hover:bg-stone-700"
+        className="rounded-full bg-ink px-8 py-3 text-stone-50 transition hover:bg-ink-hover"
       >
         내 유산 정리 시작하기
       </Link>
@@ -39,7 +39,8 @@ export default function HomePage() {
           마음 이야기를 먼저 하고 싶어요
         </Link>
       </div>
-      <p className="text-sm text-stone-400">
+      {/* 안내문은 stone-400이면 2.48:1로 못 읽힌다 — 500(4.58:1)으로 올린다 */}
+      <p className="text-sm text-stone-500">
         언제든 멈출 수 있고, 저장된 곳부터 다시 이어집니다.
       </p>
       {/* FR-110이 금지한 것은 **진입 시 트랙·카테고리 선택**이다. 이건 사용자 여정의

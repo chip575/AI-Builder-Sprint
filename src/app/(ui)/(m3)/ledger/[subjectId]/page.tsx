@@ -12,9 +12,9 @@ import { ErrorNote, Notice, Shell } from "@/app/(ui)/_components/Shell";
 import type { FamilyAckRes, LedgerNode, LedgerRes } from "@/lib/contracts";
 
 const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
-  ACTIVE: { label: "지금의 뜻", cls: "border-stone-800 bg-stone-800 text-white" },
+  ACTIVE: { label: "지금의 뜻", cls: "border-ink bg-ink text-white" },
   SUPERSEDED: { label: "지나간 뜻", cls: "border-stone-300 bg-white text-stone-500" },
-  REVOKED: { label: "철회됨", cls: "border-stone-300 bg-stone-100 text-stone-400" },
+  REVOKED: { label: "철회됨", cls: "border-stone-300 bg-stone-100 text-stone-600" },
 };
 
 const MATERIALITY_LABEL: Record<string, string> = {
@@ -106,7 +106,7 @@ export default function LedgerPage({
                   <span className="text-xs text-stone-500">
                     {MATERIALITY_LABEL[node.materiality] ?? node.materiality}
                   </span>
-                  <span className="ml-auto text-xs text-stone-400">
+                  <span className="ml-auto text-xs text-stone-500">
                     {new Date(node.createdAt).toLocaleDateString("ko-KR")}
                   </span>
                 </div>

@@ -150,7 +150,7 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className="min-h-11 w-full rounded-xl bg-stone-900 px-6 py-3 text-stone-50 transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-300"
+      className="min-h-11 w-full rounded-xl bg-ink px-6 py-3 text-stone-50 transition hover:bg-ink-hover disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600"
     >
       {children}
     </button>

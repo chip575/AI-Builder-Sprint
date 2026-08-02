@@ -76,7 +76,7 @@ export default async function HeartWillPage({
             />
             <button
               type="submit"
-              className="min-h-11 w-full rounded-xl bg-stone-900 px-6 py-3 text-stone-50 transition hover:bg-stone-700"
+              className="min-h-11 w-full rounded-xl bg-ink px-6 py-3 text-stone-50 transition hover:bg-ink-hover"
             >
               이어서 보기
             </button>

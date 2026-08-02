@@ -171,7 +171,7 @@ export default function EstatePage() {
             </Link>
             <Link
               href="/write"
-              className="inline-flex min-h-11 items-center rounded-xl bg-stone-900 px-3 text-sm text-stone-50"
+              className="inline-flex min-h-11 items-center rounded-xl bg-ink px-3 text-sm text-stone-50"
             >
               새 약정 준비하기
             </Link>
@@ -213,7 +213,7 @@ export default function EstatePage() {
             </div>
           ))}
           {loaded && obligations.length === 0 && (
-            <p className="text-sm text-stone-400">
+            <p className="text-sm text-stone-500">
               아직 예정된 약속이 없습니다. 약정을 맺으면 되짚을 날이 여기에 생깁니다.
             </p>
           )}
@@ -246,7 +246,7 @@ export default function EstatePage() {
             </div>
           ))}
           {loaded && pledges.length === 0 && (
-            <p className="text-sm text-stone-400">
+            <p className="text-sm text-stone-500">
               아직 맺은 약정이 없습니다.{" "}
               <Link href="/write" className="underline underline-offset-4">
                 작성실에서 시작
@@ -290,7 +290,7 @@ export default function EstatePage() {
             </div>
           ))}
           {loaded && assets.length === 0 && (
-            <p className="text-sm text-stone-400">
+            <p className="text-sm text-stone-500">
               아직 정리한 자산이 없습니다. 아래에서 하나씩 적어 두실 수 있어요.
             </p>
           )}
@@ -328,7 +328,7 @@ export default function EstatePage() {
               type="button"
               onClick={() => void addAsset()}
               disabled={busy || !assetLabel.trim()}
-              className="min-h-11 rounded-xl bg-stone-900 px-4 text-sm text-stone-50 disabled:bg-stone-300"
+              className="min-h-11 rounded-xl bg-ink px-4 text-sm text-stone-50 disabled:bg-stone-300 disabled:text-stone-600"
             >
               적어두기
             </button>
@@ -347,7 +347,7 @@ export default function EstatePage() {
             </div>
           ))}
           {loaded && ledger.length === 0 && (
-            <p className="text-sm text-stone-400">
+            <p className="text-sm text-stone-500">
               아직 바뀐 기록이 없습니다. 뜻이 바뀌면 그 과정도 서명으로 남습니다.
             </p>
           )}

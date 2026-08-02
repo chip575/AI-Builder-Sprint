@@ -134,7 +134,7 @@ export default function ClmPage() {
         <ErrorNote error={error} />
 
         {rows === null ? (
-          <p className="text-sm text-stone-400">불러오는 중…</p>
+          <p className="text-sm text-stone-500">불러오는 중…</p>
         ) : rows.length === 0 && !error ? (
           // 빈 것도 상태다. 말하지 않으면 화면이 고장 난 것과 구분되지 않는다
           <Notice>아직 남기신 서류가 없습니다. 대화로 정리하시면 여기에 쌓입니다.</Notice>
