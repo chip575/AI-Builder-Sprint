@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { cosine } from "../ai/embed/port";
 import type { Obligation, ObligationKind } from "../contracts/obligations";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
-import type { Asset, Beneficiary } from "../contracts/estate";
+import type { Asset, AssetCategory, Beneficiary, Custodian } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
@@ -587,6 +587,59 @@ export class InMemoryStore implements StorePort {
 
   async listLedgerNodes(subjectId: string): Promise<LedgerNode[]> {
     return withDerivedStatus(this.ledger.get(subjectId) ?? []);
+  }
+
+  private custodians = new Map<string, Custodian & { userId: string }>();
+
+  async listCustodians(userId: string): Promise<Custodian[]> {
+    return [...this.custodians.values()]
+      .filter((c) => c.userId === userId)
+      .map(({ userId: _u, ...c }) => ({ ...c }));
+  }
+
+  async upsertCustodian(
+    userId: string,
+    input: { recipientId: string; displayName: string; viewScope: AssetCategory[]; agreementDraftId?: string | null },
+  ): Promise<Custodian> {
+    // 같은 상대를 두 번 지정하지 않는다 — 재초대는 상태 갱신이다 (DB unique와 같은 규칙)
+    const prev = [...this.custodians.values()].find(
+      (c) => c.userId === userId && c.recipientId === input.recipientId,
+    );
+    const row = {
+      userId,
+      id: prev?.id ?? randomUUID(),
+      recipientId: input.recipientId,
+      displayName: input.displayName,
+      viewScope: input.viewScope,
+      // 재초대해도 PENDING으로 되돌린다 — 새 약정서에 서명해야 다시 열린다 (NFR-713)
+      status: "PENDING" as const,
+      agreementDraftId: input.agreementDraftId ?? prev?.agreementDraftId ?? null,
+      grantedAt: null,
+      revokedAt: null,
+    };
+    this.custodians.set(row.id, row);
+    const { userId: _u, ...out } = row;
+    return { ...out };
+  }
+
+  async grantCustodian(agreementDraftId: string): Promise<Custodian | undefined> {
+    const row = [...this.custodians.values()].find(
+      (c) => c.agreementDraftId === agreementDraftId,
+    );
+    if (!row || row.status === "REVOKED") return undefined; // 회수된 권한은 서명으로 되살아나지 않는다
+    row.status = "ACTIVE";
+    row.grantedAt = new Date().toISOString();
+    const { userId: _u, ...out } = row;
+    return { ...out };
+  }
+
+  async revokeCustodian(userId: string, id: string): Promise<boolean> {
+    const row = this.custodians.get(id);
+    if (!row || row.userId !== userId || row.status === "REVOKED") return false;
+    row.status = "REVOKED";
+    row.revokedAt = new Date().toISOString();
+    // grantedAt은 지우지 않는다 — "언제 열렸다가 언제 닫혔나"가 남아야 한다
+    return true;
   }
 
   async revokeLedgerSubject(subjectId: string): Promise<number> {

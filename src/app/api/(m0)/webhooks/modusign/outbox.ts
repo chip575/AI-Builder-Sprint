@@ -80,6 +80,16 @@ async function processOne(
   if (target === "COMPLETED") {
     await ensureEvidence(draft.draftId, documentId, doc);
   }
+  // 지킴이 협조 약정이 체결되면 **그때** 열람이 열린다 (FR-405 · NFR-713).
+  // 초대만으로 열지 않는 이유: 상대가 수락하지 않았는데 권한이 생기면,
+  // 사용자는 맡긴 줄 알고 상대는 맡은 줄 모르는 상태가 된다.
+  // 실패가 체결을 되돌리지 않는다 — 다음 웹훅·리컨실러가 다시 시도한다
+  if (target === "COMPLETED" && draft.docType === "CUSTODIAN_AGREEMENT") {
+    await store
+      .grantCustodian(draft.draftId)
+      .catch((err) => console.warn("[webhook] 지킴이 권한 부여 실패:", (err as Error).message));
+  }
+
   // 체결이 끝나면 다음에 돌아올 약속을 만든다 (02.3 §3 8단계 · FR-204 · FR-508).
   // 실패가 체결을 되돌리지 않는다 — 약속은 부가물이고 증빙이 본체다
   if (target === "COMPLETED") {

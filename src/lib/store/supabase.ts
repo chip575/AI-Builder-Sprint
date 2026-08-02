@@ -4,7 +4,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
-import type { Asset, AssetOrigin, Beneficiary, DigitalDisposition } from "../contracts/estate";
+import type { Asset, AssetCategory, AssetOrigin, Beneficiary, Custodian, DigitalDisposition } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode, LedgerNodeStatus, Materiality } from "../contracts/ledger";
@@ -90,6 +90,18 @@ const toAsset = (r: Row): Asset => {
     ? { ...base, category: "DIGITAL", disposition: r.disposition as DigitalDisposition }
     : { ...base, category: r.category };
 };
+
+const toCustodian = (r: Row): Custodian => ({
+  id: r.id,
+  recipientId: r.recipient_id,
+  displayName: r.display_name,
+  // jsonb — 빈 배열이 기본값이고 그것이 최소 권한이다 (NFR-713)
+  viewScope: (r.view_scope ?? []) as AssetCategory[],
+  status: r.status,
+  agreementDraftId: r.agreement_draft_id ?? null,
+  grantedAt: iso(r.granted_at) ?? null,
+  revokedAt: iso(r.revoked_at) ?? null,
+});
 
 const toBeneficiary = (r: Row): Beneficiary => ({
   id: r.id,
@@ -951,6 +963,70 @@ export class SupabaseStore implements StorePort {
       .order("seq");
     if (error) this.fail("ledger.select", error);
     return withDerivedStatus((data ?? []).map(toLedgerNode));
+  }
+
+  async listCustodians(userId: string): Promise<Custodian[]> {
+    const { data, error } = await this.db
+      .from("custodians")
+      .select("id, recipient_id, display_name, view_scope, status, agreement_draft_id, granted_at, revoked_at")
+      .eq("user_id", userId)
+      .order("created_at");
+    if (error) this.fail("custodians.list", error);
+    return (data ?? []).map(toCustodian);
+  }
+
+  async upsertCustodian(
+    userId: string,
+    input: { recipientId: string; displayName: string; viewScope: AssetCategory[]; agreementDraftId?: string | null },
+  ): Promise<Custodian> {
+    const { data, error } = await this.db
+      .from("custodians")
+      .upsert(
+        {
+          user_id: userId,
+          recipient_id: input.recipientId,
+          display_name: input.displayName,
+          view_scope: input.viewScope,
+          // 재초대해도 PENDING으로 되돌린다 — 새 약정서에 서명해야 다시 열린다
+          status: "PENDING",
+          agreement_draft_id: input.agreementDraftId ?? null,
+          granted_at: null,
+        },
+        { onConflict: "user_id,recipient_id" },
+      )
+      .select("id, recipient_id, display_name, view_scope, status, agreement_draft_id, granted_at, revoked_at")
+      .single();
+    if (error) this.fail("custodians.upsert", error);
+    await this.audit("custodian.invite", userId, { scope: input.viewScope });
+    return toCustodian(data!);
+  }
+
+  async grantCustodian(agreementDraftId: string): Promise<Custodian | undefined> {
+    // 회수된 권한은 서명으로 되살아나지 않는다 — status 조건을 함께 건다
+    const { data, error } = await this.db
+      .from("custodians")
+      .update({ status: "ACTIVE", granted_at: new Date().toISOString() })
+      .eq("agreement_draft_id", agreementDraftId)
+      .neq("status", "REVOKED")
+      .select("id, recipient_id, display_name, view_scope, status, agreement_draft_id, granted_at, revoked_at")
+      .maybeSingle();
+    if (error) this.fail("custodians.grant", error);
+    return data ? toCustodian(data) : undefined;
+  }
+
+  async revokeCustodian(userId: string, id: string): Promise<boolean> {
+    // grantedAt은 지우지 않는다 — "언제 열렸다가 언제 닫혔나"가 남아야 한다
+    const { data, error } = await this.db
+      .from("custodians")
+      .update({ status: "REVOKED", revoked_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", userId)
+      .neq("status", "REVOKED")
+      .select("id");
+    if (error) this.fail("custodians.revoke", error);
+    const done = (data ?? []).length > 0;
+    if (done) await this.audit("custodian.revoke", userId, {});
+    return done;
   }
 
   async revokeLedgerSubject(subjectId: string): Promise<number> {
