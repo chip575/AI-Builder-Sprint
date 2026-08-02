@@ -115,7 +115,8 @@ function LoginForm() {
 
 export default function AuthPage() {
   return (
-    <Shell title="시작하기" fr={["FR-auth"]}>
+    // 곁칸을 끄는 유일한 화면 — 갈 곳이 전부 로그인 뒤에 있고 로그아웃 항목은 뜻이 없다
+    <Shell title="시작하기" fr={["FR-auth"]} nav={false}>
       <Suspense fallback={<p className="text-stone-500">불러오는 중…</p>}>
         <LoginForm />
       </Suspense>

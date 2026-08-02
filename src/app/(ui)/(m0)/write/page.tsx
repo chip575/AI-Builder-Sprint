@@ -292,7 +292,7 @@ function WriteWorkspace() {
   if (!docType) {
     const will = [STATUTES.CIVIL_1060, STATUTES.CIVIL_1066];
     return (
-      <Shell title="어떤 서류를 준비할까요" fr={["FR-115B", "FR-104"]}>
+      <Shell title="어떤 서류를 남길까요" fr={["FR-115B", "FR-104"]}>
         <p className="text-stone-500">
           대화로 함께 작성하고, 법이 인정하는 방식으로만 서명합니다.
         </p>
@@ -379,7 +379,7 @@ function WriteWorkspace() {
           ))}
 
           <Link
-            href="/chat"
+            href="/recall"
             className="block text-sm text-stone-500 underline underline-offset-4"
           >
             서류보다 마음 이야기를 먼저 하고 싶어요

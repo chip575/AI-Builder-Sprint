@@ -154,13 +154,15 @@ function FactSheet() {
         {sheet.confirmedAt ? "확인함 — 다음으로" : "이대로 확인했어요"}
       </PrimaryButton>
 
-      {/* 나가는 문 — 이게 없으면 이 화면이 막다른 길이 된다 */}
+      {/* 나가는 문 — 이게 없으면 이 화면이 막다른 길이 된다.
+          작성실로 보낸다: 여기로 오는 길이 /write이고, /chat은 입구가 없어져
+          아무도 못 가는 화면을 가리키게 된다 (2026-08-02 개편) */}
       <button
         type="button"
-        onClick={() => router.push("/chat")}
+        onClick={() => router.push("/write")}
         className="min-h-11 w-full text-sm text-stone-500 underline underline-offset-4"
       >
-        대화로 돌아가기
+        ← 작성실로 돌아가기
       </button>
     </div>
   );

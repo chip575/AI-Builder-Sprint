@@ -7,10 +7,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
-import {
-  ChatSidebarPanel,
-  ChatSidebarToggle,
-} from "@/app/(ui)/_components/ChatSidebar";
 
 interface Turn {
   role: "user" | "assistant";
@@ -47,8 +43,6 @@ export default function ChatPage() {
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
   /** 지난 세션에서 이어온 것인지 — 처음 온 사람과 돌아온 사람에게 다른 화면을 준다 */
   const [resumed, setResumed] = useState(false);
-  /** 곁칸 — 겹쳐서 열리므로 대화 폭에 영향을 주지 않는다. 기본은 닫힘 */
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [savedCount, setSavedCount] = useState<number | null>(null);
   /** 이번 대화에서 다뤄진 이야기 수 — 저장되고 있다는 것이 화면에 보여야 한다 */
   const [covered, setCovered] = useState<number | null>(null);
@@ -183,12 +177,7 @@ export default function ChatPage() {
       title="무엇을 남기고 싶으신가요"
       fr={["FR-101", "FR-110", "FR-115B"]}
       headerBar={{
-        leading: (
-          <ChatSidebarToggle
-            open={sidebarOpen}
-            onToggle={() => setSidebarOpen((v) => !v)}
-          />
-        ),
+        // leading은 Shell이 채운다 — 이동용 곁칸 토글이 전 화면 같은 자리에 선다
         // 흐리게 두되 **비활성화하지 않는다** — 눌러 보고 왜 안 되는지 들을 수 있어야 한다
         trailing: (
           <button
@@ -250,14 +239,33 @@ export default function ChatPage() {
         </div>
       }
     >
-      {/* 겹쳐서 열린다 — 대화 폭은 열든 닫든 그대로다 */}
-      <ChatSidebarPanel
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        storyCount={storyCount}
-        branchLabel={branch ? (BRANCH_LABEL[branch] ?? branch) : null}
-        onReset={reset}
-      />
+      {/* 대화 맥락은 곁칸이 아니라 본문에 둔다 — 곁칸은 이제 "화면 사이를 옮기는 문"이라
+          성격이 다르다. 다만 카드로 쌓으면 화면이 다시 빽빽해지므로 한 줄로 줄인다.
+          ⚠ 숫자는 세어주기까지만 — 분모·막대를 붙이지 않는다 (P4 · FR-111) */}
+      {(resumed || branch) && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-stone-600">
+          {resumed && <span>지난번 이야기를 이어갑니다.</span>}
+          {storyCount !== null && storyCount > 0 && (
+            <span className="text-stone-500">
+              지금까지 {storyCount}가지가 정리되어 있어요.
+            </span>
+          )}
+          {branch && (
+            <span className="text-stone-500">
+              진행 중 — {BRANCH_LABEL[branch] ?? branch}
+            </span>
+          )}
+          {resumed && (
+            <button
+              type="button"
+              onClick={reset}
+              className="min-h-11 text-stone-500 underline underline-offset-4 hover:text-stone-700"
+            >
+              새로 시작할게요
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="space-y-4">
         {/* 이어온 사람에게도 첫 화면이 비어 보이지 않게 한다 — 지난 대화 안내는 곁칸에 있다 */}

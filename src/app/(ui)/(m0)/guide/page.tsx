@@ -167,7 +167,7 @@ export default function GuidePage() {
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <Link
-              href="/chat"
+              href="/recall"
               className="inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
             >
               마음 이야기를 나눌래요

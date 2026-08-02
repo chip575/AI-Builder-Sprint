@@ -5,7 +5,8 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { NavSidebarPanel, NavSidebarToggle } from "./NavSidebar";
 
 export function Shell({
   title,
@@ -15,6 +16,8 @@ export function Shell({
   back,
   headerBar,
   bottomBar,
+  nav = true,
+  navHideHrefs,
 }: {
   title: string;
   /** 이 화면이 구현하는 FR — 우상단 배지 */
@@ -35,7 +38,18 @@ export function Shell({
    *  ⚠ 그러므로 **바 안에 "나중에 생각할래요"를 반드시 넣어야 한다.**
    *    전 화면 필수 항목이라 어느 화면에서도 사라지면 안 된다 (P4) */
   bottomBar?: ReactNode;
+  /** 이동용 곁칸. **기본으로 켜진다** — 문이 화면마다 다른 자리에 있으면 사용자는
+   *  매번 찾아야 한다. 끄는 자리는 로그인 전 화면뿐이다(/auth): 갈 곳이 전부
+   *  로그인 뒤에 있고 로그아웃 항목은 뜻이 없다 */
+  nav?: boolean;
+  /** 이 화면이 헤더에 이미 내놓은 문은 곁칸에서 뺀다 (같은 버튼을 두 곳에 두지 않는다) */
+  navHideHrefs?: string[];
 }) {
+  const [navOpen, setNavOpen] = useState(false);
+  // 곁칸을 켜면 머리가 2행이 된다 — 토글이 설 자리가 1행이기 때문이다.
+  // 그래서 headerBar를 넘기지 않은 화면도 2행 머리를 쓰게 된다
+  const bar = nav || headerBar ? (headerBar ?? {}) : null;
+
   const heading = (
     /* 제목은 서비스가 건네는 말이므로 명조. 전 화면 공통이고 화면별 예외는 두지 않는다.
        ⚠ font-serif는 이 h1에만 건다 — header나 main에 걸면 Notice의 법적 고지·
@@ -60,10 +74,9 @@ export function Shell({
 
   return (
     <main
-      className={`mx-auto flex max-w-2xl flex-col px-5 pt-8 text-base ${
-        // 하단 바를 쓰는 화면은 dvh로 잰다 (키보드 대응). 나머지는 지금까지와 같다
-        bottomBar ? "min-h-dvh" : "min-h-screen pb-32"
-      }`}
+      // dvh로 잰다 — 100vh는 모바일에서 키보드가 올라와도 갱신되지 않아 입력창이 가려진다.
+      // 하단 바가 흐름 안에 있으므로 고정 버튼용 아래 여백(pb-32)은 필요 없다
+      className="mx-auto flex min-h-dvh max-w-2xl flex-col px-5 pt-8 text-base"
     >
       {back && (
         <Link
@@ -74,15 +87,23 @@ export function Shell({
         </Link>
       )}
 
-      {headerBar ? (
+      {bar ? (
         // 2행 — 위는 좌우 조작, 아래는 가운데 제목. 배경을 깔아야 아래 글이 비쳐 보이지 않는다
         <header className="sticky top-0 z-20 -mx-5 mb-6 bg-stone-50 px-5 py-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
             {/* 왼쪽이 비어도 자리는 지킨다 — 없으면 오른쪽 조작이 가운데로 끌려온다 */}
-            {headerBar.leading ?? <span />}
+            <div className="flex min-w-0 items-center gap-1">
+              {nav && (
+                <NavSidebarToggle
+                  open={navOpen}
+                  onToggle={() => setNavOpen((v) => !v)}
+                />
+              )}
+              {bar.leading ?? (!nav ? <span /> : null)}
+            </div>
             <div className="flex items-center gap-2">
               {badges}
-              {headerBar.trailing}
+              {bar.trailing}
             </div>
           </div>
           <div className="mt-1 text-center">{heading}</div>
@@ -94,32 +115,38 @@ export function Shell({
         </header>
       )}
 
+      {nav && (
+        <NavSidebarPanel
+          open={navOpen}
+          onClose={() => setNavOpen(false)}
+          hideHrefs={navHideHrefs}
+        />
+      )}
+
       <div className="flex-1">{children}</div>
 
       {footer ? <div className="mt-8">{footer}</div> : null}
 
-      {bottomBar ? (
-        // 문서 흐름 안에서 아래에 붙인다 — fixed로 띄우면 모바일 키보드가 올라올 때
-        // 레이아웃 뷰포트가 그대로라 입력창이 키보드 뒤로 들어간다.
-        //
-        // z-50인 이유: sticky는 **그 자체로 stacking context를 만든다.** 그래서 바 안쪽 자식에
-        // z-index를 줘도 바깥의 오버레이(z-40) 위로 올라가지 못한다. 바에 직접 걸어야
-        // 곁칸이 열려도 "나중에 생각할래요"가 덮이지 않는다 (P4 — 그만두는 문은 막히지 않는다).
-        <div className="sticky bottom-0 z-50 -mx-5 mt-6 border-t border-stone-200 bg-stone-50 px-5 py-3">
-          {bottomBar}
-        </div>
-      ) : (
-        /* P4 — 어떤 단계에서도 중단할 수 있다. 재촉 문구 금지.
-           z-[60]인 이유: 화면이 오버레이(드로어 등)를 띄우면 이 링크가 그 아래 깔려
-           **그만두는 문이 막힌다.** 무엇이 위에 뜨든 이것만은 항상 누를 수 있어야 한다.
-           (하단 바를 쓰는 화면은 바 안에 같은 링크를 둔다) */
-        <Link
-          href="/"
-          className="fixed bottom-6 right-6 z-[60] min-h-11 rounded-full border border-stone-300 bg-white px-5 py-3 text-sm text-stone-600 shadow-sm transition hover:bg-stone-50"
-        >
-          나중에 생각할래요
-        </Link>
-      )}
+      {/* 하단 바 — 전 화면 같은 자리다. 화면이 자기 바를 주면 그것을, 아니면 기본 바를 쓴다.
+          문서 흐름 안에서 아래에 붙인다: fixed로 띄우면 모바일 키보드가 올라올 때
+          레이아웃 뷰포트가 그대로라 입력창이 키보드 뒤로 들어간다.
+
+          z-50인 이유: sticky는 **그 자체로 stacking context를 만든다.** 그래서 바 안쪽 자식에
+          z-index를 줘도 바깥의 오버레이(z-40) 위로 올라가지 못한다. 바에 직접 걸어야
+          곁칸이 열려도 "나중에 생각할래요"가 덮이지 않는다 (P4 — 그만두는 문은 막히지 않는다). */}
+      <div className="sticky bottom-0 z-50 -mx-5 mt-6 border-t border-stone-200 bg-stone-50 px-5 py-3">
+        {bottomBar ?? (
+          /* P4 — 어떤 단계에서도 중단할 수 있다. 재촉 문구 금지 */
+          <div className="flex justify-end">
+            <Link
+              href="/"
+              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm text-stone-500 transition hover:bg-stone-100 hover:text-stone-700"
+            >
+              나중에 생각할래요
+            </Link>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
