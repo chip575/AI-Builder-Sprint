@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
 import { AssetStatus } from "./AssetStatus";
+import { CustodianBook } from "./CustodianBook";
 import type { InventorySummary } from "@/lib/contracts";
 
 interface Obligation {
@@ -312,6 +313,9 @@ export default function EstatePage() {
             </p>
           )}
         </section>
+
+        {/* ── 지킴이 (FR-405 · NFR-713) ── */}
+        <CustodianBook />
 
         {/* ── 내 자산 (FR-402) ── */}
         <section className="space-y-3">
