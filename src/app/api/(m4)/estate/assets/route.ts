@@ -7,13 +7,14 @@
 // 검증을 UI에 맡기지 않는다: 디지털 자산에 처리 지시가 없으면 **계약 파싱에서** 막힌다
 // (FR-403). 화면이 바뀌어도 규칙은 그대로다.
 import { AssetUpsertReq } from "@/lib/contracts";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 import { store } from "@/lib/store";
 import { assetParseFailure, err, findUnknownBeneficiary } from "../guards";
 import { buildInventory } from "../inventory";
 
 export async function POST(req: Request) {
   const userId = await getCurrentUserId(req);
+  if (!userId) return loginRequired();
   const body = await req.json().catch(() => null);
   const parsed = AssetUpsertReq.safeParse(body);
   if (!parsed.success) return assetParseFailure(body);
@@ -38,5 +39,6 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   const userId = await getCurrentUserId(req);
+  if (!userId) return loginRequired();
   return Response.json({ ok: true, data: await buildInventory(userId) });
 }

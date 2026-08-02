@@ -160,12 +160,22 @@ export default function EstatePage() {
       fr={["FR-402", "FR-508"]}
       headerBar={{
         trailing: (
-          <Link
-            href="/write"
-            className="inline-flex min-h-11 items-center rounded-xl bg-stone-900 px-3 text-sm text-stone-50"
-          >
-            새 약정 준비하기
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* 서류 이력 진입 — 배치·문구는 FE가 정한다. 여기서는 도착지가 실재한다는
+                것만 보장한다 (링크만 만들고 라우트를 안 만들면 런타임 404다) */}
+            <Link
+              href="/clm"
+              className="inline-flex min-h-11 items-center rounded-xl border border-stone-300 px-3 text-sm text-stone-700"
+            >
+              서류 이력
+            </Link>
+            <Link
+              href="/write"
+              className="inline-flex min-h-11 items-center rounded-xl bg-stone-900 px-3 text-sm text-stone-50"
+            >
+              새 약정 준비하기
+            </Link>
+          </div>
         ),
       }}
     >

@@ -110,6 +110,17 @@ export interface StorePort {
   // ── reconciler (FR-504) ───────────────────────────────────
   /** 진행 중인데 오래 갱신되지 않은 draft — 웹훅 유실 후보 */
   listStaleRequestedDrafts(olderThanMs: number): Promise<DraftRecord[]>;
+  /**
+   * 이 **사람**의 문서 목록 (서류 이력 화면).
+   *
+   * userId를 선택 인자로 두지 않는다 — 빠뜨리면 전체가 나오는 시그니처는 언젠가
+   * 빠뜨린다. listLedgerNodes(subjectId)와 같은 규약이다 (D-18: 열어주지 않으면 닫혀 있다).
+   * document_drafts에는 소유자 열이 없으므로 어댑터가 intents를 조인해 거른다.
+   */
+  listDocumentsByUser(
+    userId: string,
+    filter?: { docType?: DocType; status?: DocStatus; from?: string; to?: string },
+  ): Promise<DraftRecord[]>;
   /** 상태별 문서 건수 — 기관 대시보드 (FR-601) */
   countDraftsByStatus(): Promise<Record<string, number>>;
   recordReconcile(corrected: number): Promise<void>;

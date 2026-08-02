@@ -550,6 +550,29 @@ export class SupabaseStore implements StorePort {
     return (data ?? []).map(toDraft);
   }
 
+  async listDocumentsByUser(
+    userId: string,
+    filter?: { docType?: DocType; status?: DocStatus; from?: string; to?: string },
+  ): Promise<DraftRecord[]> {
+    // 소유자 열이 draft에 없다 — intents를 거쳐야 한다. 서비스 롤이라 RLS가 걸러주지
+    // 않으므로 **명시 필터가 유일한 방어선**이다 (D-18)
+    const { data: mine, error: iErr } = await this.db
+      .from("intents").select("id").eq("user_id", userId);
+    if (iErr) this.fail("intents.byUser", iErr);
+    const ids = (mine ?? []).map((r: { id: string }) => r.id);
+    if (ids.length === 0) return [];
+
+    let q = this.db.from("document_drafts").select("*").in("intent_id", ids);
+    if (filter?.docType) q = q.eq("doc_type", filter.docType);
+    if (filter?.status) q = q.eq("status", filter.status);
+    if (filter?.from) q = q.gte("created_at", filter.from);
+    if (filter?.to) q = q.lte("created_at", filter.to);
+
+    const { data, error } = await q.order("created_at", { ascending: false });
+    if (error) this.fail("drafts.byUser", error);
+    return (data ?? []).map(toDraft);
+  }
+
   async recordReconcile(corrected: number): Promise<void> {
     // 전용 테이블 없이 audit_logs를 쓴다 — 리컨실 이력은 append-only가 오히려 맞다
     await this.audit("reconcile.run", "cron", { corrected });
