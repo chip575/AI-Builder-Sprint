@@ -945,6 +945,8 @@ export class SupabaseStore implements StorePort {
         draft_id: node.draftId ?? null,
         prev_hash: node.prevHash,
         node_hash: node.nodeHash,
+        // 철회 노드는 쌓을 때 정해진다 — UPDATE가 막혀 있어 나중에 바꿀 수 없다
+        status: node.status,
         created_at: node.createdAt,
       })
       .select()
@@ -1027,20 +1029,6 @@ export class SupabaseStore implements StorePort {
     const done = (data ?? []).length > 0;
     if (done) await this.audit("custodian.revoke", userId, {});
     return done;
-  }
-
-  async revokeLedgerSubject(subjectId: string): Promise<number> {
-    // status만 바꾼다. node_hash는 그대로 둔다 — 재계산하면 체인 검증이 통째로 깨진다
-    const { data, error } = await this.db
-      .from("ledger_nodes")
-      .update({ status: "REVOKED" })
-      .eq("subject_id", subjectId)
-      .neq("status", "REVOKED")
-      .select("id");
-    if (error) this.fail("ledger_nodes.revoke", error);
-    const n = (data ?? []).length;
-    if (n > 0) await this.audit("ledger.revoke", subjectId, { nodes: n });
-    return n;
   }
 
   async getLedgerNode(nodeId: string): Promise<LedgerNode | undefined> {

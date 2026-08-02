@@ -244,6 +244,95 @@ export function storeContractTests(
       });
     });
 
+    // ── 알릴 상대 · 지킴이 · 철회 (FR-405) ────────────────────
+    //
+    // ⚠ **이 블록이 없어서 Supabase 어댑터의 테이블 이름 오타가 526개 테스트를
+    //   통과했다** (2026-08-03). 새 StorePort 메서드를 여기 넣지 않으면 인메모리만
+    //   검사되고 실 DB 경로는 아무도 안 본다 — 증상은 에러가 아니라 배포 후 500이다.
+    describe("알릴 상대 · 지킴이 · 철회", () => {
+      it("상대를 넣고 역할로 거른다. 소유자가 다르면 안 보인다", async () => {
+        const s = await makeStore();
+        const me = randomUUID();
+        const other = randomUUID();
+        await s.upsertRecipient(me, { kind: "ORG", name: "가상재단", email: `o${Date.now()}@example.org` });
+        await s.upsertRecipient(me, { kind: "FAMILY", name: "김가상", email: `f${Date.now()}@example.org`, relation: "장녀" });
+        await s.upsertRecipient(other, { kind: "ORG", name: "남의 기관", email: `x${Date.now()}@example.org` });
+
+        expect(await s.listRecipients(me)).toHaveLength(2);
+        expect(await s.listRecipients(me, "ORG")).toHaveLength(1);
+        // 소유 격리 — 남의 것이 섞이면 통지가 엉뚱한 곳으로 간다
+        expect((await s.listRecipients(other)).every((r) => r.name === "남의 기관")).toBe(true);
+      });
+
+      it("남의 상대는 지워지지 않는다", async () => {
+        const s = await makeStore();
+        const me = randomUUID();
+        const other = randomUUID();
+        const his = await s.upsertRecipient(other, { kind: "ORG", name: "남의 기관", email: `d${Date.now()}@example.org` });
+        expect(await s.deleteRecipient(me, his.id)).toBe(false);
+        expect(await s.listRecipients(other)).toHaveLength(1);
+      });
+
+      it("지킴이는 서명 전까지 열람이 열리지 않는다", async () => {
+        const s = await makeStore();
+        const me = randomUUID();
+        const p = await s.upsertRecipient(me, { kind: "CUSTODIAN", name: "이가상", email: `c${Date.now()}@example.org` });
+        const session = await s.getOrCreateSession(null, me);
+        const draft = await s.createDraft(session.id, "CUSTODIAN_AGREEMENT", { verdict: "ESIGN_OK", statutes: [] });
+
+        const c = await s.upsertCustodian(me, {
+          recipientId: p.id,
+          displayName: "이가상",
+          viewScope: ["FINANCIAL"],
+          agreementDraftId: draft.draftId,
+        });
+        expect(c.status).toBe("PENDING");
+        expect(c.grantedAt).toBeNull(); // 🔴 열람의 기준은 grantedAt이다
+
+        const granted = await s.grantCustodian(draft.draftId);
+        expect(granted?.status).toBe("ACTIVE");
+        expect(granted?.grantedAt).not.toBeNull();
+
+        // 거둔 뒤에는 뒤늦은 서명으로도 되살아나지 않는다
+        expect(await s.revokeCustodian(me, c.id)).toBe(true);
+        expect(await s.grantCustodian(draft.draftId)).toBeUndefined();
+      });
+
+      it("철회하면 모든 노드가 REVOKED가 되고 해시는 그대로다", async () => {
+        const s = await makeStore();
+        // subject_id에 FK가 걸려 있다 — 임의 uuid를 넣으면 실 DB에서만 터진다.
+        // 인메모리는 FK가 없어 통과하므로, 이 한 줄이 두 구현의 차이를 메운다
+        // subject_id → intents(id) FK. **draftId가 아니라 intentId다** —
+        // 인메모리는 FK가 없어 무엇을 넣든 통과하므로 실 DB에서만 드러난다
+        const subjectId = (await s.getOrCreateSession(null, randomUUID())).id;
+        await s.appendLedgerNode({
+          subjectId,
+          changeSummary: { first: true },
+          changeReason: "처음 남긴 뜻",
+          materiality: "MATERIAL",
+        });
+        const before = await s.listLedgerNodes(subjectId);
+        const hashBefore = before.map((n) => n.nodeHash);
+
+        // 🔴 철회는 **쌓는 행위**다. 지난 노드를 고치려 하면 append-only 트리거가
+        //    막는다 (NFR-704) — 인메모리에는 트리거가 없어 실 DB에서만 드러난다
+        await s.appendLedgerNode({
+          subjectId,
+          changeSummary: { revoked: true },
+          changeReason: "받으실 곳을 바꾸기로 했습니다",
+          materiality: "MATERIAL",
+          status: "REVOKED",
+        });
+
+        const after = await s.listLedgerNodes(subjectId);
+        // 마지막이 REVOKED면 체인 전체가 닫힌다 — 살아 있는 뜻이 없다
+        expect(after.every((n) => n.status === "REVOKED")).toBe(true);
+        expect(after.some((n) => n.status === "ACTIVE")).toBe(false);
+        // 지난 노드의 해시는 그대로다 — 고치지 않았으니 당연하고, 그게 요점이다
+        expect(after.slice(0, hashBefore.length).map((n) => n.nodeHash)).toEqual(hashBefore);
+      });
+    });
+
     it("mock 슬롯: 마지막으로 쓴 상태가 읽힌다 (인스턴스 교체 대비)", async () => {
       const s = await makeStore();
       const docId = `mock-${randomUUID()}`;

@@ -642,19 +642,6 @@ export class InMemoryStore implements StorePort {
     return true;
   }
 
-  async revokeLedgerSubject(subjectId: string): Promise<number> {
-    const chain = this.ledger.get(subjectId);
-    if (!chain) return 0;
-    // 저장값만 바꾼다 — nodeHash는 손대지 않는다 (status는 봉인 대상이 아니다)
-    let n = 0;
-    for (const node of chain) {
-      if (node.status === "REVOKED") continue;
-      node.status = "REVOKED";
-      n += 1;
-    }
-    return n;
-  }
-
   async getLedgerNode(nodeId: string): Promise<LedgerNode | undefined> {
     for (const chain of this.ledger.values()) {
       const found = chain.find((n) => n.id === nodeId);

@@ -16,6 +16,9 @@ import type { DocType, Recipient } from "@/lib/contracts";
 
 interface Row {
   draftId: string;
+  /** 원장(Intent Ledger)의 subject는 draft가 아니라 **intent**다
+   *  (intent_ledger_nodes.subject_id → intents.id). 철회·이력이 이 값을 쓴다 */
+  intentId: string;
   docType: string;
   status: string;
 }
@@ -78,7 +81,7 @@ export function RevokeCell({ row, onDone }: { row: Row; onDone: () => void }) {
   async function submit() {
     setBusy(true);
     setMsg(null);
-    const res = await fetch(`/api/ledger/${row.draftId}/revoke`, {
+    const res = await fetch(`/api/ledger/${row.intentId}/revoke`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ changeReason: reason.trim() }),
@@ -92,7 +95,7 @@ export function RevokeCell({ row, onDone }: { row: Row; onDone: () => void }) {
     // 철회는 됐다. 통지는 **별개 단계**라, 실패해도 철회를 되돌리지 않는다
     let note = "철회했습니다.";
     if (notifyId) {
-      const n = await fetch(`/api/ledger/${row.draftId}/notify`, {
+      const n = await fetch(`/api/ledger/${row.intentId}/notify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recipientId: notifyId }),
@@ -119,11 +122,11 @@ export function RevokeCell({ row, onDone }: { row: Row; onDone: () => void }) {
         className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500"
       />
       <div>
-        <label className="block text-sm text-stone-500" htmlFor={`notify-${row.draftId}`}>
+        <label className="block text-sm text-stone-500" htmlFor={`notify-${row.intentId}`}>
           받으실 곳에 알리기
         </label>
         <select
-          id={`notify-${row.draftId}`}
+          id={`notify-${row.intentId}`}
           value={notifyId}
           onChange={(e) => setNotifyId(e.target.value)}
           className="mt-1 min-h-11 w-full rounded-xl border border-stone-300 bg-white px-2 text-sm"

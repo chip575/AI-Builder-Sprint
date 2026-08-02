@@ -36,9 +36,15 @@ export async function POST(
     return err("INVALID_REQUEST", "받으실 곳을 찾지 못했습니다.", "목록에서 골라 주세요.", 400);
   }
 
-  // 소유 확인 — 남의 약정에 대해 통지를 보내면 그 사람의 기관에 우리 이름으로 메일이 간다
-  const mine = await store.listDocumentsByUser(user.id);
-  const origin = mine.find((d) => d.draftId === subjectId);
+  // 소유 확인 — 남의 약정에 대해 통지를 보내면 그 사람의 기관에 우리 이름으로 메일이 간다.
+  // ⚠ subjectId는 intentId다 (revoke 라우트 주석 참조)
+  const session = await store.getSession(subjectId);
+  if (!session || session.userId !== user.id) {
+    return err("NOT_FOUND", "해당 약정을 찾을 수 없습니다.", "목록에서 다시 골라 주세요.", 404);
+  }
+  const origin = (await store.listDocumentsByUser(user.id))
+    .filter((d) => d.intentId === subjectId && d.docType !== "INTENT_AFFIRMATION")
+    .at(-1);
   if (!origin) {
     return err("NOT_FOUND", "해당 약정을 찾을 수 없습니다.", "목록에서 다시 골라 주세요.", 404);
   }
@@ -66,7 +72,7 @@ export async function POST(
 
   // 통지서는 **새 문서다.** 원 약정 문서를 고치지 않는다 — 서명된 것은 그대로 둔다 (P5)
   const verdict = evaluateGate("REVOCATION_NOTICE");
-  const notice = await store.createDraft(origin.intentId, "REVOCATION_NOTICE", verdict);
+  const notice = await store.createDraft(subjectId, "REVOCATION_NOTICE", verdict);
 
   const profile = await store.getProfile(user.id);
   const eff = effectiveProfile(user.email, profile);

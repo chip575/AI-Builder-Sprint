@@ -15,6 +15,8 @@ import { RevokeCell } from "./RevokeCell";
 
 interface Row {
   draftId: string;
+  /** 원장 subject — 이력·철회가 쓴다 (intent_ledger_nodes.subject_id → intents.id) */
+  intentId: string;
   docType: string;
   status: string;
   createdAt: string;
@@ -189,7 +191,7 @@ export default function ClmPage() {
                           subjectId가 필요해 곁칸(NavSidebar)에는 둘 수 없고, 이 줄에는
                           그 문서의 id가 있으니 여기가 자리다 */}
                       <Link
-                        href={`/ledger/${r.draftId}`}
+                        href={`/ledger/${r.intentId}`}
                         className="ml-3 text-stone-500 underline underline-offset-4"
                       >
                         이력

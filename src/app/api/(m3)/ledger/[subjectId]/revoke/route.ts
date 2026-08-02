@@ -43,14 +43,24 @@ export async function POST(
   }
 
   // ── 소유 확인 ──
-  // subjectId는 draftId다 (원장의 주체 = 그 문서). 남의 문서를 철회하면 그 사람의
-  // 약정이 사라지므로, GET과 달리 여기서는 반드시 건다.
+  // ⚠ subjectId는 **intentId**다. draftId가 아니다 —
+  //   intent_ledger_nodes.subject_id가 intents(id)를 참조한다(0602 마이그레이션).
+  //   draftId로 다루면 실 DB에서 FK 위반으로 터진다 (인메모리는 FK가 없어 통과한다).
+  // 남의 약정을 철회하면 그 사람의 뜻이 사라지므로 반드시 건다.
   // ⚠ GET /api/ledger/[subjectId]에는 이 검사가 없다 — 유족 열람 경로가 아직
   //   설계되지 않아 열어 둔 상태다. 열람권 매트릭스와 함께 닫아야 한다 (별건).
-  const mine = await store.listDocumentsByUser(userId);
-  const draft = mine.find((d) => d.draftId === subjectId);
-  if (!draft) {
+  const session = await store.getSession(subjectId);
+  if (!session || session.userId !== userId) {
     // 없는 것과 남의 것을 같은 응답으로 돌려준다 — 구분해 주면 남의 id를 탐색할 수 있다
+    return err("NOT_FOUND", "해당 약정을 찾을 수 없습니다.", "목록에서 다시 골라 주세요.", 404);
+  }
+  // 이 뜻이 어떤 서류였는지가 철회 가능 여부를 정한다.
+  // 의사 확인서(INTENT_AFFIRMATION)는 변경 기록이지 약정 본체가 아니라 제외한다
+  const drafts = (await store.listDocumentsByUser(userId)).filter(
+    (d) => d.intentId === subjectId && d.docType !== "INTENT_AFFIRMATION",
+  );
+  const draft = drafts.at(-1);
+  if (!draft) {
     return err("NOT_FOUND", "해당 약정을 찾을 수 없습니다.", "목록에서 다시 골라 주세요.", 404);
   }
 
@@ -75,15 +85,16 @@ export async function POST(
   // 사유·시점·해시가 남는 자리가 여기뿐이다. 노드 없이 상태만 바꾸면 "언제 왜
   // 철회했는가"가 사라지고, 남는 것은 "사라졌다"는 사실뿐이다.
   // MATERIAL — 뜻 자체가 바뀌는 변경이다 (FR-552)
+  // ⚠ 지난 노드를 고치지 않는다. 원장은 append-only이고 트리거가 UPDATE를 막는다
+  //   (NFR-704). status를 바꾸려던 첫 설계는 인메모리에서만 돌고 실 DB에서 터졌다.
+  //   철회 노드 하나가 체인 전체를 닫는다 (chain.ts withDerivedStatus)
   await store.appendLedgerNode({
     subjectId,
     changeSummary: { revoked: true, docType: draft.docType },
     changeReason: parsed.data.changeReason,
     materiality: "MATERIAL",
+    status: "REVOKED",
   });
-
-  // 방금 쌓은 노드까지 포함해 전부 REVOKED로. 그래야 유도에서 ACTIVE가 사라진다
-  await store.revokeLedgerSubject(subjectId);
 
   const after = await store.listLedgerNodes(subjectId);
   return Response.json({
