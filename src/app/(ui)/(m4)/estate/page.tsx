@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
+import { NavSidebarPanel, NavSidebarToggle } from "@/app/(ui)/_components/NavSidebar";
 
 interface Obligation {
   id: string;
@@ -84,6 +85,7 @@ export default function EstatePage() {
   const [assetLabel, setAssetLabel] = useState("");
   const [assetCategory, setAssetCategory] = useState("FINANCIAL");
   const [assetValue, setAssetValue] = useState("");
+  const [navOpen, setNavOpen] = useState(false);
 
   const load = useCallback(async () => {
     const [ob, inv] = await Promise.all([
@@ -159,26 +161,12 @@ export default function EstatePage() {
       title="내 유산"
       fr={["FR-402", "FR-508"]}
       headerBar={{
-        trailing: (
-          <div className="flex items-center gap-2">
-            {/* 서류 이력 진입 — 배치·문구는 FE가 정한다. 여기서는 도착지가 실재한다는
-                것만 보장한다 (링크만 만들고 라우트를 안 만들면 런타임 404다) */}
-            <Link
-              href="/clm"
-              className="inline-flex min-h-11 items-center rounded-xl border border-stone-300 px-3 text-sm text-stone-700"
-            >
-              서류 이력
-            </Link>
-            <Link
-              href="/write"
-              className="inline-flex min-h-11 items-center rounded-xl bg-ink px-3 text-sm text-stone-50"
-            >
-              새 약정 준비하기
-            </Link>
-          </div>
-        ),
+        // 문은 곁칸 하나로 모은다 — 헤더에 버튼을 늘리면 제목이 밀리고,
+        // 화면마다 다른 버튼이 서서 어디에 무엇이 있는지 예측할 수 없게 된다
+        leading: <NavSidebarToggle open={navOpen} onToggle={() => setNavOpen((v) => !v)} />,
       }}
     >
+      <NavSidebarPanel open={navOpen} onClose={() => setNavOpen(false)} />
       <div className="space-y-8">
         <p className="text-stone-500">
           남기신 것들이 시간이 지나도 관리됩니다 — 체결은 끝이 아니라 시작입니다.

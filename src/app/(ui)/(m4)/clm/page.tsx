@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorNote, Notice, Shell } from "@/app/(ui)/_components/Shell";
+import { NavSidebarPanel, NavSidebarToggle } from "@/app/(ui)/_components/NavSidebar";
 
 interface Row {
   draftId: string;
@@ -57,6 +58,7 @@ export default function ClmPage() {
   const [from, setFrom] = useState("");
   /** 외부 동기화는 화면당 1회 — 필터 변경마다 왕복하면 목록이 느려진다 */
   const syncedRef = useRef(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   const load = useCallback(async () => {
     const q = new URLSearchParams();
@@ -87,8 +89,11 @@ export default function ClmPage() {
     <Shell
       title="서류 이력"
       fr={["FR-508", "FR-556"]}
-      back={{ href: "/estate", label: "내 유산으로" }}
+      headerBar={{
+        leading: <NavSidebarToggle open={navOpen} onToggle={() => setNavOpen((v) => !v)} />,
+      }}
     >
+      <NavSidebarPanel open={navOpen} onClose={() => setNavOpen(false)} />
       <div className="space-y-5">
         <p className="text-stone-500">
           남기신 서류를 시간 순서로 모아 보여 드립니다 — 서명한 것과 손으로 남긴 것이
