@@ -36,6 +36,8 @@ export const config = {
     // /clm — 남긴 서류를 모아 보는 화면. 내용이 붙기 전에 넣어 둔다:
     // 화면이 채워진 뒤에 보호를 추가하면 그 사이가 공개 구간으로 남는다
     "/clm/:path*",
+    // /mypage — 계약서에 인쇄될 개인정보를 다룬다 (NFR-714)
+    "/mypage/:path*",
     "/guide/:path*",
     "/confirm/:path*",
     "/rewards/:path*",

@@ -18,6 +18,7 @@ import {
   type BeneficiaryWriteInput,
   type BranchProposalRecord,
   type DraftRecord,
+  type ProfileRecord,
   type EvidenceRecord,
   type FamilyAckRecord,
   type FamilyAckTarget,
@@ -339,6 +340,32 @@ export class InMemoryStore implements StorePort {
     return [...this.drafts.values()].filter(
       (d) => d.status === "REQUESTED" && new Date(d.createdAt).getTime() <= cutoff,
     );
+  }
+
+  private profiles = new Map<string, ProfileRecord>();
+
+  async getProfile(userId: string): Promise<ProfileRecord | undefined> {
+    const p = this.profiles.get(userId);
+    return p ? { ...p } : undefined;
+  }
+
+  async saveProfile(
+    userId: string,
+    patch: Partial<Omit<ProfileRecord, "userId">>,
+  ): Promise<ProfileRecord> {
+    // 부분 수정 — 보내지 않은 항목은 그대로 둔다. undefined와 null을 가른다:
+    // undefined는 "안 건드림", null은 "지움"
+    const cur = this.profiles.get(userId) ?? {
+      userId, displayName: null, contact: null, orgName: null,
+    };
+    const next: ProfileRecord = {
+      userId,
+      displayName: patch.displayName === undefined ? cur.displayName : patch.displayName,
+      contact: patch.contact === undefined ? cur.contact : patch.contact,
+      orgName: patch.orgName === undefined ? cur.orgName : patch.orgName,
+    };
+    this.profiles.set(userId, next);
+    return { ...next };
   }
 
   async listDocumentsByUser(

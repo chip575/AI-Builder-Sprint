@@ -63,7 +63,11 @@ export async function getCurrentUserId(req: Request): Promise<string | null> {
 export async function getCurrentUser(
   req: Request,
 ): Promise<{ id: string; email: string; name: string | null } | null> {
-  if (!authEnabled()) return null;
+  // 인증 비활성(키 없는 채점 경로)에서는 **dev 신원**을 돌려준다 — getCurrentUserId와
+  // 짝을 맞춘다. null을 주면 마이페이지·서명 확인이 통째로 막혀 NFR-707이 깨진다
+  if (!authEnabled()) {
+    return { id: DEV_USER_ID, email: "dev@namgida.local", name: null };
+  }
   const token = readCookie(req, AUTH_COOKIE);
   if (!token) return null;
   const { data, error } = await authClient().auth.getUser(token);

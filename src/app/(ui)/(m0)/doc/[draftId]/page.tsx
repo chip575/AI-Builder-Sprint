@@ -22,6 +22,11 @@ export default function DocPage() {
   const [signUrl, setSignUrl] = useState<string | null>(null);
   const [docId, setDocId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** 서명 요청 확인 단계 — 되돌릴 수 없는 행동 앞에 한 번 멈춘다 */
+  const [confirming, setConfirming] = useState(false);
+  const [sent, setSent] = useState(false);
+  /** 어디로 보내는지 — 마이페이지 연락처가 아니라 **로그인 계정**으로 간다 */
+  const [sendTo, setSendTo] = useState<string | null>(null);
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -29,6 +34,14 @@ export default function DocPage() {
     const body = await fetch(`/api/sign/${draftId}/status`).then((r) => r.json());
     if (body.ok) setStatus(body.data);
   }, [draftId]);
+
+  useEffect(() => {
+    // 확인 화면에 보여줄 수신 주소. 실패해도 확인 단계는 뜬다 (주소만 생략)
+    void fetch("/api/me")
+      .then((r) => r.json())
+      .then((b) => setSendTo(b.ok ? b.data.email : null))
+      .catch(() => setSendTo(null));
+  }, []);
 
   useEffect(() => {
     void poll();
@@ -55,7 +68,13 @@ export default function DocPage() {
       body: JSON.stringify({ mode: "LINK" }),
     }).then((r) => r.json());
     setBusy(false);
-    if (!body.ok) return setError(body.error);
+    if (!body.ok) {
+      // 실패하면 확인 화면에 머문다 — 닫아버리면 무엇이 잘못됐는지 보고도
+      // 다시 시도할 자리가 사라진다
+      return setError(body.error);
+    }
+    setConfirming(false);
+    setSent(true);
     setSignUrl(body.data.signUrl);
     // mock 문서 ID 확보 — 서명 완료 시뮬레이션용 (실 모드에선 서명자가 직접 서명한다)
     const docs = await fetch("/api/dev/documents").then((r) => r.json());
@@ -122,10 +141,49 @@ export default function DocPage() {
 
         <ErrorNote error={error} />
 
-        {status?.status === "DRAFT" && (
-          <PrimaryButton onClick={() => void requestSign()} disabled={busy}>
+        {status?.status === "DRAFT" && !confirming && (
+          <PrimaryButton onClick={() => setConfirming(true)} disabled={busy}>
             서명 요청하기
           </PrimaryButton>
+        )}
+
+        {/* 확인 단계 — 서명 요청은 되돌릴 수 없다. 상대에게 메일이 나가고
+            요청 잔여가 줄어든다. **어디로 가는지**를 보여주지 않으면 확인이 아니다 */}
+        {status?.status === "DRAFT" && confirming && (
+          <div className="space-y-3 rounded-xl border border-stone-400 bg-white p-4">
+            <p className="leading-relaxed text-stone-800">
+              {sendTo ? (
+                <>
+                  등록된 이메일 <strong>{sendTo}</strong>(으)로 서명 요청을 보냅니다.
+                </>
+              ) : (
+                "등록된 이메일로 서명 요청을 보냅니다."
+              )}
+            </p>
+            <p className="text-sm text-stone-500">
+              보내고 나면 취소하실 수 있지만, 상대에게는 이미 안내가 갑니다.
+            </p>
+            <div className="flex gap-2">
+              <PrimaryButton onClick={() => void requestSign()} disabled={busy}>
+                {busy ? "전송 중…" : "보내기"}
+              </PrimaryButton>
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                disabled={busy}
+                className="min-h-11 flex-1 rounded-xl border border-stone-300 px-4 text-sm text-stone-600"
+              >
+                아직요
+              </button>
+            </div>
+            <a href="/mypage" className="block text-sm text-ink underline underline-offset-4">
+              보내는 사람 정보 확인하기
+            </a>
+          </div>
+        )}
+
+        {sent && status?.status === "REQUESTED" && (
+          <p className="text-center text-sm text-stone-600">전송 완료</p>
         )}
 
         {status?.status === "REQUESTED" && (

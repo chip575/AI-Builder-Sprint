@@ -43,6 +43,14 @@ export interface SessionRecord {
   startedAt: string;
 }
 
+/** 마이페이지 (FR-501). 연락처는 개인정보라 로그·프롬프트에 나가지 않는다 (보안 1조) */
+export interface ProfileRecord {
+  userId: string;
+  displayName: string | null;
+  contact: string | null;
+  orgName: string | null;
+}
+
 export interface DraftRecord {
   draftId: string;
   intentId: string;
