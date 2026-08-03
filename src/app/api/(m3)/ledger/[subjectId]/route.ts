@@ -8,13 +8,38 @@
 // 사라진다 — 유족이 알아야 할 것은 이력의 존재가 아니라 이력이 온전한지 여부다.
 import { LedgerRes } from "@/lib/contracts";
 import { verifyChain, withDerivedStatus } from "@/lib/ledger/chain";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 import { store } from "@/lib/store";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ subjectId: string }> },
 ) {
+  const userId = await getCurrentUserId(req);
+  if (!userId) return loginRequired();
   const { subjectId } = await ctx.params;
+
+  // ⚠ 소유 확인 (2026-08-03 추가).
+  //   전에는 **id만 알면 남의 뜻 이력이 통째로 보였다.** "유족 열람 경로가 아직
+  //   설계되지 않아 열어 둔다"고 적어 뒀었는데, 그건 곧 **지금 아무나 볼 수 있다**는
+  //   뜻이었다. 유족 접근은 어차피 별도 인증 경로로 만들 것이라(초대 + 확인 코드)
+  //   지금 닫아도 나중에 막히는 것이 없다.
+  //   subjectId는 intentId다 (intent_ledger_nodes.subject_id → intents.id).
+  const session = await store.getSession(subjectId);
+  if (!session || session.userId !== userId) {
+    // 없는 것과 남의 것을 같은 응답으로 — 구분해 주면 남의 id를 탐색할 수 있다
+    return Response.json(
+      {
+        ok: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "해당 이력을 찾을 수 없습니다.",
+          nextAction: "주소를 다시 확인해 주세요.",
+        },
+      },
+      { status: 404 },
+    );
+  }
 
   const raw = await store.listLedgerNodes(subjectId);
   if (raw.length === 0) {

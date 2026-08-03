@@ -5,6 +5,7 @@ import { FactSheetReq, FactSheetRes } from "@/lib/contracts";
 import { getSession } from "@/lib/ai/session/store";
 import { requiredSlotsFor } from "@/lib/ai/extract/mock-extractor";
 import { computeTaxDeduction } from "@/lib/rules/hometown-donation";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 
 export async function GET(req: Request) {
   const parsed = FactSheetReq.safeParse({
@@ -24,7 +25,12 @@ export async function GET(req: Request) {
     );
   }
 
-  const session = await getSession(parsed.data.intentId);
+  // 소유 확인 (2026-08-03 추가) — 전에는 **세션 id만 알면 남의 대화에서 뽑은 값이
+  // 보였다.** 없는 것과 남의 것을 같은 응답으로 돌려준다: 구분해 주면 id를 탐색할 수 있다
+  const userId = await getCurrentUserId(req);
+  if (!userId) return loginRequired();
+  const found = await getSession(parsed.data.intentId);
+  const session = found && found.userId === userId ? found : undefined;
   if (!session) {
     return Response.json(
       {
