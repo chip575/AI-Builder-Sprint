@@ -2,6 +2,7 @@
 // P1을 화면으로 강제하는 유일한 지점 — 이 화면의 "확인" 버튼을 누르지 않으면 서버가 문서 생성을 거부한다.
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import type { FactSheetRes } from "@/lib/contracts";
@@ -64,7 +65,24 @@ function FactSheet() {
     router.push(`/rewards?intentId=${intentId}`);
   }
 
-  if (!intentId) return <p className="text-stone-500">대화를 먼저 시작해 주세요.</p>;
+  // 확인할 대상이 없다는 뜻이다 — 여기로 오는 정상 경로는 전부 작성실 계열이라
+  // 한 줄만 띄우면 갈 곳 없는 화면이 된다 (P4 · NFR-705)
+  if (!intentId) {
+    return (
+      <div className="space-y-4">
+        <p className="leading-relaxed text-stone-700">
+          아직 확인하실 내용이 없습니다. 작성실에서 어떤 서류를 남기실지 이야기해
+          주시면, 정리된 값을 여기에서 함께 확인합니다.
+        </p>
+        <Link
+          href="/write"
+          className="inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+        >
+          작성실로 가기
+        </Link>
+      </div>
+    );
+  }
   if (!sheet) return <p className="text-stone-500">불러오는 중…</p>;
 
   return (
