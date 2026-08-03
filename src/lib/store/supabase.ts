@@ -562,7 +562,13 @@ export class SupabaseStore implements StorePort {
       .from("pipeline_metrics")
       .select("stage, ok, ms")
       .order("id", { ascending: false })
-      .limit(5000); // 최근 구간만 — 무한 성장 방어
+      // ⚠ **PostgREST가 응답 행 수를 프로젝트 설정(db-max-rows, 기본 1000)으로 자른다.**
+      //   예전에는 5000이라 적어 뒀는데 실제로는 1000만 왔다 — 코드가 거짓말을 하고 있었다
+      //   (2026-08-03 실측: 표에 1033행, 응답 1000행).
+      //   그 결과 창이 미끄러져 **fail 개수가 줄어들 수 있다.** 지표를 "누적"으로 읽으면 안 되고
+      //   "최근 1000건의 분포"로 읽어야 한다. 더 긴 구간이 필요하면 페이지네이션이나
+      //   DB 집계로 바꿔야 하고, limit 숫자만 올리는 것으로는 늘지 않는다.
+      .limit(1000);
     if (error) this.fail("pipeline_metrics.select", error);
     return summarizeMetrics((data ?? []) as MetricRecord[]);
   }
