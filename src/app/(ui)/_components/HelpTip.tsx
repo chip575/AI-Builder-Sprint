@@ -63,3 +63,47 @@ export function SectionHeading({
     </div>
   );
 }
+
+/**
+ * 떠 있는 도움말 — **가져다 대면 보이고**, 눌러도 열리고, 키보드로도 열린다.
+ *
+ * ⚠ 호버만으로 만들지 않는다. 터치 기기에는 호버가 없고 키보드에는 포인터가 없다 —
+ *   호버만 걸면 그 두 경우에 설명이 **아예 존재하지 않는 것**이 된다 (NFR-708).
+ * ⚠ 자리를 밀지 않는다(absolute). 목록 한가운데서 블록이 펼쳐지면 누르려던 항목이
+ *   움직여서, 설명을 보려다 엉뚱한 것을 누르게 된다.
+ */
+export function InlineHelp({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+
+  return (
+    <span
+      className="relative inline-flex"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        aria-expanded={open}
+        aria-controls={id}
+        aria-label={`${label} 설명`}
+        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-300 text-[11px] leading-none text-stone-500 transition hover:border-stone-500 hover:text-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-500"
+      >
+        ?
+      </button>
+
+      {/* 닫혀 있어도 DOM에 남긴다 — 버튼의 aria-controls가 가리킬 대상이 있어야 한다 */}
+      <span
+        id={id}
+        role="tooltip"
+        hidden={!open}
+        className="absolute left-0 top-7 z-10 w-64 rounded-xl border border-stone-200 bg-white p-3 text-sm leading-relaxed text-stone-600 shadow-lg"
+      >
+        {children}
+      </span>
+    </span>
+  );
+}

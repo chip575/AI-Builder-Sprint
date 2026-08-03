@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
 import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
 import { ScrollList } from "@/app/(ui)/_components/ScrollList";
+import { SECTION_PANEL, SECTION_STACK } from "@/app/(ui)/_components/section";
 import { AssetStatus } from "./AssetStatus";
 import { DigitalLegacy } from "./DigitalLegacy";
 import type { InventorySummary } from "@/lib/contracts";
@@ -210,7 +211,12 @@ export default function EstatePage() {
         </div>
       }
     >
-      <div className="space-y-8">
+      {/* 구획을 **선이 아니라 면으로** 가른다.
+          가로줄을 그으면 서류처럼 보인다 — 이 서비스는 서류를 다루지만 서류처럼 보일
+          이유는 없다. 바탕이 stone-50(따뜻한 미색)이라 구획을 흰 기 도는 패널로 살짝
+          띄우면, 안쪽 흰 카드가 한 겹 더 밝게 얹혀 층이 생긴다.
+          테두리는 stone-200/70 — 있는 줄 알아볼 만큼만 두고 시선을 끌지 않는다. */}
+      <div className={SECTION_STACK}>
         {/* 두 문장을 각 줄에 둔다 — 대시로 이으면 좁은 화면에서 한 줄이 너무 길어진다 */}
         <p className="text-stone-500">
           남기신 것들이 시간이 지나도 관리됩니다.
@@ -221,7 +227,7 @@ export default function EstatePage() {
         {/* ── 남기신 마음 (FR-111 · FR-301) ──
             법적 서류가 아니다. 그래서 아래 약정 카드들과 같은 상자를 쓰되 도장·상태
             같은 서류 표시를 두지 않는다. 세지도 않는다 — 회상은 진도가 아니다 (P4·FR-111) */}
-        <section className="space-y-3">
+        <section className={SECTION_PANEL}>
           <SectionHeading
             title="남기신 마음"
             help={
@@ -258,7 +264,7 @@ export default function EstatePage() {
         </section>
 
         {/* ── 다가오는 약속 (FR-508) ── */}
-        <section className="space-y-3">
+        <section className={SECTION_PANEL}>
           <div className="flex items-center justify-between">
             <SectionHeading
             title="다가오는 약속"
@@ -308,7 +314,7 @@ export default function EstatePage() {
         </section>
 
         {/* ── 남긴 약정 ── */}
-        <section className="space-y-3">
+        <section className={SECTION_PANEL}>
           <SectionHeading
             title="남긴 약정"
             help={
@@ -358,7 +364,7 @@ export default function EstatePage() {
         <DigitalLegacy onChanged={() => void load()} />
 
         {/* ── 내 자산 (FR-402) ── */}
-        <section className="space-y-3">
+        <section className={SECTION_PANEL}>
           {/* "종이 문서로 등록"은 서류 서랍으로 옮겼다 — 여기서는 밑줄 링크라
               터치 영역이 44px에 못 미쳤고, 서류로 가는 문은 한곳에 모으는 편이 낫다 */}
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -472,7 +478,7 @@ export default function EstatePage() {
         </section>
 
         {/* ── 뜻이 바뀐 기록 (FR-553 · P5) ── */}
-        <section className="space-y-3">
+        <section className={SECTION_PANEL}>
           <SectionHeading
             title="뜻이 바뀐 기록"
             help={

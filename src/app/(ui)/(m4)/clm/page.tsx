@@ -14,6 +14,7 @@ import { ErrorNote, Notice, Shell } from "@/app/(ui)/_components/Shell";
 import { RevokeCell } from "./RevokeCell";
 import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
 import { DOC_LABEL as DOC_LABEL_MAP, docLabel } from "@/lib/docs/labels";
+import { SECTION_PANEL, SECTION_STACK } from "@/app/(ui)/_components/section";
 
 interface Row {
   draftId: string;
@@ -85,13 +86,14 @@ export default function ClmPage() {
 
       }}
     >
-      <div className="space-y-5">
+      <div className={SECTION_STACK}>
         <p className="text-stone-500">
           남기신 서류를 시간 순서로 모아 보여 드립니다 — 서명한 것과 손으로 남긴 것이
           한 줄에 섭니다.
         </p>
 
         {/* 필터 — 서버가 거른다. 모르는 값은 서버가 무시하므로 목록이 통째로 비지 않는다 */}
+        <section className={SECTION_PANEL}>
         <div className="flex flex-wrap gap-2">
           <select
             value={docType}
@@ -130,8 +132,11 @@ export default function ClmPage() {
           />
         </div>
 
+        </section>
+
         <ErrorNote error={error} />
 
+        <section className={SECTION_PANEL}>
         <SectionHeading
           title="남긴 서류"
           help={
@@ -220,6 +225,7 @@ export default function ClmPage() {
         {rows !== null && rows.length > 0 && (
           <p className="text-sm text-stone-500">{rows.length}건</p>
         )}
+        </section>
       </div>
     </Shell>
   );

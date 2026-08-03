@@ -14,6 +14,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { InlineHelp } from "./HelpTip";
 
 export const NAV_SIDEBAR_ID = "nav-sidebar-panel";
 
@@ -33,7 +34,9 @@ const LINKS: { href: string; label: string; hint: string }[] = [
 ];
 
 /** 계정 — 위의 "일"과 성격이 다르다. 그래서 카드가 아니라 작은 링크로 무게를 낮춘다 */
-const ACCOUNT = { href: "/mypage", label: "내 정보", hint: "약정서에 들어갈 성명·연락처" };
+/** 계정 자리. 설명은 곁에 붙는 물음표가 맡는다 —
+ *  줄에 길게 적으면 좁은 화면에서 두 줄로 접혀 다른 문들과 결이 달라진다 */
+const ACCOUNT = { href: "/mypage", label: "마이페이지" };
 
 export function NavSidebarToggle({
   open,
@@ -160,15 +163,24 @@ export function NavSidebarPanel({
             가리켜 성격이 다르고, 서랍을 열어야 뒤로 가는 건 두 단계라 뒤로가기의 장점을
             없앤다. 되돌아가야 하는 화면은 Shell의 back prop을 쓴다 */}
         <div className="mt-6 space-y-1 border-t border-stone-200 pt-4">
-          <Link
-            href={ACCOUNT.href}
-            onClick={onClose}
-            aria-current={pathname === ACCOUNT.href ? "page" : undefined}
-            className="flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm text-stone-600 hover:bg-stone-200/70"
-          >
-            <span>{ACCOUNT.label}</span>
-            <span className="text-stone-500">· {ACCOUNT.hint}</span>
-          </Link>
+          <div className="flex items-center gap-2 px-4">
+            <Link
+              href={ACCOUNT.href}
+              onClick={onClose}
+              aria-current={pathname === ACCOUNT.href ? "page" : undefined}
+              className="flex min-h-11 flex-1 items-center rounded-xl text-sm text-stone-600 hover:text-stone-900"
+            >
+              {ACCOUNT.label}
+            </Link>
+            {/* 물음표는 Link **바깥**에 둔다 — 링크 안에 버튼을 넣으면 눌렀을 때
+                둘 중 무엇이 동작할지가 브라우저마다 다르다 */}
+            <InlineHelp label="마이페이지">
+              약정서에 인쇄될 <strong>성명·연락처</strong>를 미리 정해 두는 곳입니다.
+              서명하실 때마다 다시 적지 않으셔도 됩니다.
+              <br />
+              무언가를 알려 드릴 <strong>주소록</strong>도 여기 있습니다.
+            </InlineHelp>
+          </div>
           <button
             type="button"
             onClick={() => void logout()}

@@ -127,7 +127,7 @@ export function DeliverySetting({ sessionId }: { sessionId: string }) {
         {people.length === 0 ? (
           // 왜 고를 수 없는지 말한다. 빈 목록만 있으면 고장인 줄 안다
           <p className="mt-1 text-sm text-stone-500">
-            <strong>내 정보 → 알릴 분</strong>에서 먼저 등록해 주세요.
+            <strong>마이페이지 → 알릴 분</strong>에서 먼저 등록해 주세요.
           </p>
         ) : (
           <div className="mt-1 space-y-2">
