@@ -9,6 +9,7 @@
 //  · 식별번호가 보이면 올리기 전에 경고한다
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ErrorNote, Notice, PrimaryButton, Shell } from "@/app/(ui)/_components/Shell";
@@ -55,7 +56,35 @@ function PaperScanUpload() {
     setParsed(ex.data.parsedText);
   }
 
-  if (!intentId) return <p className="text-stone-500">대화를 먼저 시작해 주세요.</p>;
+  // intentId가 없으면 읽은 값을 붙일 대상이 없다는 뜻이다.
+  // ⚠ 옛 문구는 "대화를 먼저 시작해 주세요" 한 줄이었다. 곁칸에서 바로 들어오면
+  //   업로드 칸도 없고 갈 곳도 없어 막다른 화면이 됐다 (P4 · NFR-705).
+  //   무엇을 하는 곳인지·왜 비었는지·다음에 할 일을 함께 준다.
+  if (!intentId) {
+    return (
+      <div className="space-y-5">
+        <p className="leading-relaxed text-stone-600">
+          종이로 받으신 약정서를 사진으로 올리시면, 읽어서 정리해 드릴게요. 손으로 쓰신
+          글씨도 읽습니다.
+        </p>
+        {/* 어떤 기능인지 알려주는 역할도 하므로 이 상태에서도 남긴다 (NFR-711) */}
+        <Notice>
+          올리신 사진은 글자를 읽기 위해 <strong>외부 판독 서비스로 전송</strong>됩니다.
+          주민등록번호·계좌번호가 보이는 부분은 가리고 올려 주세요.
+        </Notice>
+        <p className="leading-relaxed text-stone-700">
+          다만 읽은 내용을 담아 둘 서류가 아직 없습니다. 작성실에서 어떤 서류를 남기실지
+          먼저 골라 주시면, 그 서류에 종이에서 읽은 값을 채워 드립니다.
+        </p>
+        <Link
+          href="/write"
+          className="inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+        >
+          작성실로 가기
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
