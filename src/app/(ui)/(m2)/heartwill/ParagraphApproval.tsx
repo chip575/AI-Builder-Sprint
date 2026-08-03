@@ -157,13 +157,20 @@ export function ParagraphApproval({
           "같은 이야기를 근거로 새 문장을 승인하면 앞 문장을 대신한다" 하나뿐이다
           (store.applyHeartWill — 근거 발화가 같으면 옛 문단을 잇지 않는다).
           ⚠ "언제든 고칠 수 있다"고 적어 두면 없는 기능을 믿고 승인하게 된다 (P4) */}
-      {applied && (
-        <p className="text-sm text-stone-600">
-          {applied.diff.length === 0
-            ? "문서는 그대로입니다."
-            : `${applied.diff.length}개 문단이 반영되었습니다. 고쳐 남기고 싶으시면 아래 "직접 쓰실 문장"에서 같은 이야기를 골라 새로 남겨 주세요 — 앞의 문장을 대신합니다.`}
-        </p>
-      )}
+      {/* 방금 일어난 일과 나중에 필요한 정보는 성격이 다르다 — 줄과 무게를 나눈다 */}
+      {applied &&
+        (applied.diff.length === 0 ? (
+          <p className="text-sm text-stone-600">문서는 그대로입니다.</p>
+        ) : (
+          <div>
+            <p className="font-medium text-stone-800">
+              {applied.diff.length}개 문단이 반영되었습니다
+            </p>
+            <p className="mt-1 text-sm text-stone-500">
+              고쳐 남기고 싶으시면 아래에서 같은 이야기를 다시 골라 주세요
+            </p>
+          </div>
+        ))}
 
       <ErrorNote error={error} />
     </section>

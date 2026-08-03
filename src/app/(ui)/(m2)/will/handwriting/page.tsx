@@ -5,6 +5,7 @@
 //    "법이 인정하는 방식으로만"의 실물이다.
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import type { HandwritingGuideRes } from "@/lib/contracts";
@@ -39,7 +40,30 @@ function HandwritingGuide() {
     })();
   }, [intentId]);
 
-  if (!intentId) return <p className="text-stone-500">대화를 먼저 시작해 주세요.</p>;
+  // intentId가 없으면 옮겨 적을 초안이 아직 없다는 뜻이다.
+  // ⚠ 옛 문구는 "대화를 먼저 시작해 주세요"였는데, 그 대화(/chat)는 은퇴했고
+  //   무엇을 하라는 것인지도 말해 주지 않아 사용자가 갈 곳이 없었다 (P4 · NFR-705).
+  //   여기서는 왜 비었는지와 다음에 할 일을 함께 준다.
+  if (!intentId) {
+    return (
+      <section className="space-y-4">
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4 leading-relaxed text-amber-900">
+          {NOTICE}
+        </div>
+        <p className="leading-relaxed text-stone-700">
+          아직 옮겨 적을 내용이 없습니다. 작성실에서 무엇을 남기실지 이야기해 주시면,
+          유언으로 남겨야 하는 부분이 나올 때 이 화면으로 안내해 드립니다.
+        </p>
+        <Link
+          href="/write"
+          className="inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+        >
+          작성실로 가기
+        </Link>
+        <Notice>{NOT_LEGAL_ADVICE}</Notice>
+      </section>
+    );
+  }
   if (error) return <ErrorNote error={error} />;
   if (!guide) return <p className="text-stone-500">불러오는 중…</p>;
 
