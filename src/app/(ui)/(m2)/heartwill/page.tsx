@@ -157,9 +157,13 @@ export default async function HeartWillPage({
             <form action={addOwnSentence} className="space-y-3">
               <input type="hidden" name="sessionId" value={session.id} />
               <h3 className="text-base text-stone-900">직접 쓰실 문장</h3>
+              {/* required — 빈 채로 눌러도 서버 액션이 조용히 되돌아와 아무 일도
+                  일어나지 않았다. 무엇이 모자란지 브라우저가 말하게 한다 (NFR-705).
+                  ⚠ 아래 select에는 이미 required가 있었고 여기만 빠져 있었다 */}
               <textarea
                 name="body"
                 rows={4}
+                required
                 placeholder="하고 싶은 말씀을 그대로 적어 주세요."
                 className="w-full rounded-xl border border-stone-300 p-4 text-stone-900 outline-none focus:border-stone-500"
               />

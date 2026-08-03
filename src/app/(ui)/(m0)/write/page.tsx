@@ -303,6 +303,32 @@ function WriteWorkspace() {
           대화로 함께 작성하고, 법이 인정하는 방식으로만 서명합니다.
         </p>
 
+        {/* 상속 안내를 문서 진열보다 먼저 둔다 — 아래에 있으면 찾지 못한다.
+            못 만드는 것을 숨기지 않고, 지금 가능한 길을 먼저 말한다.
+            ⚠ 이 상자의 색은 그대로 둔다 (안내이지 문서 카드가 아니다) */}
+        <div className="mt-6 rounded-2xl border border-stone-200 bg-stone-100 p-5">
+          <div className="flex items-center justify-between">
+            <span className="font-serif text-lg font-semibold text-stone-700">
+              상속에 관하여
+            </span>
+            <span className="rounded bg-stone-200 px-2 py-0.5 text-xs text-stone-600">
+              안내
+            </span>
+          </div>
+          <p className="mt-2 leading-relaxed text-stone-600">
+            유언이나 약정이 없으면 재산은 법이 정한 순위대로 상속됩니다. 특정한 곳에
+            남기고 싶으시면 아래의 유산 기부 약정으로, 유언은 자필로 준비하실 수
+            있습니다. 상속인들 사이의 분할 협의 문서는 등기 실무상 서면·인감이 필요해
+            여기서 만들지 않습니다.
+          </p>
+          <Link
+            href="/guide"
+            className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+          >
+            상속이 궁금하면 물어보기
+          </Link>
+        </div>
+
         <div className="mt-6 space-y-6">
           {DOC_GROUPS.map((group) => (
             <div key={group.heading} className="space-y-3">
@@ -330,10 +356,12 @@ function WriteWorkspace() {
 
               {group.heading === "사후에 남기기" && (
                 <>
-                  {/* 유언장 — 서명 버튼이 존재하지 않는다. 못 하는 것을 문 앞에서 말한다 (P2) */}
-                  <div className="rounded-2xl border border-stone-200 bg-stone-100 p-5">
+                  {/* 유언장 — 다른 문서 카드와 같은 색이다. 흐리게 두면 "못 쓰는 기능"으로
+                      읽히는데, 실제로는 쓸 수 있고 **서명만** 전자로 안 되는 것이다.
+                      ⚠ 서명 버튼은 여기 없다. 그 부재가 곧 구분이다 (민법 §1066 · 절대규칙 4) */}
+                  <div className="rounded-2xl border border-stone-300 bg-white p-5">
                     <div className="flex items-center justify-between">
-                      <span className="font-serif text-lg font-semibold text-stone-700">
+                      <span className="font-serif text-lg font-semibold text-stone-900">
                         유언장
                       </span>
                       <span className="rounded bg-rose-100 px-2 py-0.5 text-xs text-rose-800">
@@ -348,37 +376,20 @@ function WriteWorkspace() {
                       {will.map((s) => `${s.id} ${s.title}`).join(" · ")} (
                       {will[0]!.verifiedAt} 확인)
                     </p>
+                    {/* 진행 중인 세션이 있으면 실어 보낸다 — 가이드는 intentId로 초안을
+                        불러오므로, 빈손으로 보내면 "옮겨 적을 내용이 없다"에 닿는다 */}
                     <Link
-                      href="/will/handwriting"
+                      href={
+                        sessionId
+                          ? `/will/handwriting?intentId=${sessionId}`
+                          : "/will/handwriting"
+                      }
                       className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
                     >
                       자필 필사 가이드 보기
                     </Link>
                   </div>
 
-                  {/* 상속 — 못 만드는 것을 숨기지 않는다. 지금 가능한 길만 정직하게 안내 */}
-                  <div className="rounded-2xl border border-stone-200 bg-stone-100 p-5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-serif text-lg font-semibold text-stone-700">
-                        상속에 관하여
-                      </span>
-                      <span className="rounded bg-stone-200 px-2 py-0.5 text-xs text-stone-600">
-                        안내
-                      </span>
-                    </div>
-                    <p className="mt-2 leading-relaxed text-stone-600">
-                      유언이나 약정이 없으면 재산은 법이 정한 순위대로 상속됩니다.
-                      특정한 곳에 남기고 싶으시면 위의 유산 기부 약정으로, 유언은
-                      자필로 준비하실 수 있습니다. 상속인들 사이의 분할 협의 문서는
-                      등기 실무상 서면·인감이 필요해 여기서 만들지 않습니다.
-                    </p>
-                    <Link
-                      href="/guide"
-                      className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
-                    >
-                      상속이 궁금하면 물어보기
-                    </Link>
-                  </div>
                 </>
               )}
             </div>
