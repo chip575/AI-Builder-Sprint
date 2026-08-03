@@ -4,6 +4,7 @@
 import { FactPatch, FactPatchRes, type Recalc } from "@/lib/contracts";
 import { findFact, patchFactValue } from "@/lib/ai/session/store";
 import { computeTaxDeduction } from "@/lib/rules/hometown-donation";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 
 /** recalc가 도는 조건 — 이 둘뿐. 그 외 필드는 recalc: undefined */
 const RECALC_KEYS = new Set(["amount", "isDisasterZone"]);
@@ -29,7 +30,12 @@ export async function PATCH(
     );
   }
 
-  const found = await findFact(id);
+  // 소유 확인 (2026-08-03) — fact id만 알면 **남의 확정값을 고칠 수 있었다.**
+  // 값이 바뀌면 확정이 풀리므로(P1) 남의 서류 준비를 되돌리는 경로이기도 했다
+  const ownerId = await getCurrentUserId(req);
+  if (!ownerId) return loginRequired();
+  const hit = await findFact(id);
+  const found = hit && hit.session.userId === ownerId ? hit : undefined;
   if (!found) {
     return Response.json(
       {

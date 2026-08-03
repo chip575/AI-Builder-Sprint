@@ -7,6 +7,7 @@
 import { HeartWillApplyReq, HeartWillVersionRes } from "@/lib/contracts";
 import { store } from "@/lib/store";
 import { diffParagraphs } from "../diff";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 
 function err(status: number, code: string, message: string, nextAction: string) {
   return Response.json({ ok: false, error: { code, message, nextAction } }, { status });
@@ -24,6 +25,18 @@ export async function POST(req: Request) {
     );
   }
   const { sessionId, acceptedParagraphIds } = parsed.data;
+
+  // 소유 확인 (2026-08-03) — 세션 id만 알면 **남의 마음 유언에 문단을 반영**할 수 있었다.
+  // 승인은 P1의 핵심 행위라 더더욱 본인만 할 수 있어야 한다
+  const ownerId = await getCurrentUserId(req);
+  if (!ownerId) return loginRequired();
+  const owner = await store.getSession(sessionId);
+  if (!owner || owner.userId !== ownerId) {
+    return Response.json(
+      { ok: false, error: { code: "NOT_FOUND", message: "해당 기록을 찾을 수 없습니다.", nextAction: "목록에서 다시 골라 주세요." } },
+      { status: 404 },
+    );
+  }
 
   try {
     const head = await store.getHeartWillHead(sessionId);

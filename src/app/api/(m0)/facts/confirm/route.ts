@@ -4,6 +4,7 @@
 import { FactsConfirmReq, FactsConfirmRes } from "@/lib/contracts";
 import { confirmFacts, getSession } from "@/lib/ai/session/store";
 import { requiredSlotsFor } from "@/lib/ai/extract/mock-extractor";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -22,7 +23,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const session = await getSession(parsed.data.intentId);
+  // 소유 확인 (2026-08-03) — 세션 id만 알면 남의 대화를 다룰 수 있었다.
+  // 없는 것과 남의 것을 같은 응답으로 돌려준다: 구분해 주면 id를 탐색할 수 있다
+  const ownerId = await getCurrentUserId(req);
+  if (!ownerId) return loginRequired();
+  const foundSession = await getSession(parsed.data.intentId);
+  const session = foundSession && foundSession.userId === ownerId ? foundSession : undefined;
   if (!session) {
     return Response.json(
       {

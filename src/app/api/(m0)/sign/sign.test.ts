@@ -5,6 +5,8 @@ import { evaluateGate } from "@/lib/rules/validity-gate";
 import { createDraft, getDraft } from "@/app/api/(m0)/documents/store";
 import { POST as signPost } from "./[draftId]/route";
 import { GET as statusGet } from "./[draftId]/status/route";
+import { store } from "@/lib/store";
+import { DEV_USER_ID } from "@/lib/store/types";
 
 function sign(draftId: string, mode: "LINK" | "EMBED" = "LINK") {
   return signPost(
@@ -23,9 +25,16 @@ function status(draftId: string) {
   });
 }
 
-const okDraft = () =>
-  createDraft(crypto.randomUUID(), "DONATION_PLEDGE", evaluateGate("DONATION_PLEDGE"));
+const okDraft = async () =>
+  createDraft(await ownedIntent(), "DONATION_PLEDGE", evaluateGate("DONATION_PLEDGE"));
 const freshDraft = (id: string) => getDraft(id);
+
+/** 소유자가 있는 draft를 만든다.
+ *  draft는 intent에 매달리고 **소유자는 intent가 안다** — 임의 uuid를 intentId로 쓰면
+ *  주인 없는 문서가 되어 소유 확인이 붙은 라우트에서 404가 된다 (2026-08-03). */
+async function ownedIntent() {
+  return (await store.getOrCreateSession(null, DEV_USER_ID)).id;
+}
 
 describe("M-SIGN — 서명 요청 (FR-501)", () => {
   it("LINK 요청 → signUrl + 만료시각, draft REQUESTED, 역참조 저장", async () => {
@@ -59,7 +68,7 @@ describe("M-SIGN — 서명 요청 (FR-501)", () => {
 
   it("ESIGN_OK가 아닌 draft → 403 (P2 — 어떤 경로로든 서버가 차단)", async () => {
     const draft = await createDraft(
-      crypto.randomUUID(),
+    await ownedIntent(),
       "HANDWRITTEN_WILL",
       evaluateGate("HANDWRITTEN_WILL"),
     );

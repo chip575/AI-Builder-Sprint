@@ -4,13 +4,19 @@
 import { SignStatusRes } from "@/lib/contracts";
 import { signer } from "@/lib/signer";
 import { getDraft, syncDraftStatus } from "../../../documents/store";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
+import { store } from "@/lib/store";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ draftId: string }> },
 ) {
   const { draftId } = await ctx.params;
-  const draft = await getDraft(draftId);
+  // 소유 확인 (2026-08-03) — draftId만 알면 남의 서명 진행 상태가 보였다
+  const ownerId = await getCurrentUserId(req);
+  if (!ownerId) return loginRequired();
+  const owned = new Set((await store.listDocumentsByUser(ownerId)).map((d) => d.draftId));
+  const draft = owned.has(draftId) ? await getDraft(draftId) : undefined;
   if (!draft) {
     return Response.json(
       {
