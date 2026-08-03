@@ -92,7 +92,7 @@ export default function VaultPage() {
         {evidence && !spineDismissed && (
           <div className="rounded-xl border border-stone-300 bg-white p-4">
             <p className="leading-relaxed">
-              오늘 남기신 마음을 이야기로도 정리해 볼 수 있어요. 언제 시작하셔도 되고,
+              오늘 남기신 마음을 이야기로도 정리해 볼 수 있어요. 언제든 시작하셔도 되고,
               하지 않으셔도 괜찮습니다.
             </p>
             <div className="mt-3 flex gap-2">
