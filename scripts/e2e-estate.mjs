@@ -1,6 +1,7 @@
 // 새 기능 E2E — 알릴 분 · 마음 유언 서류화 · 철회 · 지킴이
-// 실행 중인 dev 서버(3000)를 그대로 쓴다. 서명은 mock이라 과금 없음.
-const BASE = "http://localhost:3000";
+// 실행 중인 dev 서버를 그대로 쓴다. 서명은 mock이라 과금 없음.
+// 포트가 점유돼 있을 수 있어 E2E_BASE로 바꿔 쓴다 (e2e-mock.mjs와 같은 규약)
+const BASE = process.env.E2E_BASE ?? "http://localhost:3000";
 let cookie = "";
 
 async function api(path, init = {}) {
@@ -18,8 +19,13 @@ const ok = (m) => console.log("✓", m);
 
 // 0. 로그인 — .env의 E2E 자격을 쓴다 (e2e-mock.mjs와 같은 방식)
 {
-  const { readFileSync } = await import("node:fs");
-  const read = (k) => readFileSync(".env", "utf8").match(new RegExp(`^[ \t]*${k}[ \t]*=[ \t]*([^\r\n]*)`, "m"))?.[1]?.trim();
+  // ⚠ **.env가 없어도 죽지 않는다.** 새로 받은 사람은 .env가 없고, 그때 크래시하면
+  //   "이 저장소는 안 돌아간다"로 읽힌다. 키 없이도 도는 것이 전제다 (NFR-707)
+  const { readFileSync, existsSync } = await import("node:fs");
+  const read = (k) =>
+    existsSync(".env")
+      ? readFileSync(".env", "utf8").match(new RegExp(`^[ \t]*${k}[ \t]*=[ \t]*([^\r\n]*)`, "m"))?.[1]?.trim()
+      : undefined;
   const email = process.env.E2E_EMAIL ?? read("E2E_EMAIL");
   const password = process.env.E2E_PASSWORD ?? read("E2E_PASSWORD");
   const res = await fetch(`${BASE}/api/auth/login`, {
@@ -32,6 +38,10 @@ const ok = (m) => console.log("✓", m);
     ok("0. LOGIN");
   } else if (res.status === 503) {
     ok("0. LOGIN 생략 — 인증 비활성 (NFR-707)");
+  } else if (!email || !password) {
+    // 자격이 없으면 인증이 켜진 서버에서 아래 첫 단계가 401로 막힌다.
+    // 그때 무엇을 해야 하는지 이 문장이 알려 준다
+    ok("0. LOGIN 생략 — .env에 E2E_EMAIL·E2E_PASSWORD가 없습니다");
   } else {
     fail(`로그인 실패 ${res.status}`);
   }
