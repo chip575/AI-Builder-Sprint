@@ -25,6 +25,7 @@ import {
   type FamilyAckTarget,
   type HeartWillApplyResult,
   type HeartWillParagraph,
+  type HeartWillDelivery,
   type HeartWillParagraphDraft,
   type HeartWillVersion,
   type LedgerAppendInput,
@@ -520,6 +521,36 @@ export class InMemoryStore implements StorePort {
   async getHeartWillHead(sessionId: string): Promise<HeartWillVersion | undefined> {
     const hw = this.heartWills.get(sessionId);
     return hw ? this.heartWillView(hw) : undefined;
+  }
+
+  /** 전달 설정 — 문서(=intent)당 한 벌. Supabase의 heart_will_delivery와 같은 규칙 */
+  private deliveries = new Map<string, HeartWillDelivery>();
+
+  async getHeartWillDelivery(sessionId: string): Promise<HeartWillDelivery | undefined> {
+    const hw = this.heartWills.get(sessionId);
+    if (!hw) return undefined; // 문서가 없으면 전할 글도 없다
+    const saved = this.deliveries.get(hw.documentId);
+    // 없으면 기본값을 돌려준다 — "아직 안 정했다"도 상태이고, 그 기본은 사후 공개다
+    return saved
+      ? { ...saved }
+      : { documentId: hw.documentId, revealPolicy: "POSTHUMOUS", revealAt: null, recipientIds: [] };
+  }
+
+  async saveHeartWillDelivery(
+    sessionId: string,
+    patch: { revealPolicy: HeartWillDelivery["revealPolicy"]; revealAt?: string | null; recipientIds: string[] },
+  ): Promise<HeartWillDelivery | undefined> {
+    const hw = this.heartWills.get(sessionId);
+    if (!hw) return undefined;
+    const row: HeartWillDelivery = {
+      documentId: hw.documentId,
+      revealPolicy: patch.revealPolicy,
+      // 예약이 아니면 날짜를 비운다 — 남겨 두면 "언제 가는 거지"가 화면마다 갈린다
+      revealAt: patch.revealPolicy === "SCHEDULED" ? (patch.revealAt ?? null) : null,
+      recipientIds: [...patch.recipientIds],
+    };
+    this.deliveries.set(hw.documentId, row);
+    return { ...row };
   }
 
   async applyHeartWill(

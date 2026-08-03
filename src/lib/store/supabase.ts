@@ -27,6 +27,7 @@ import {
   type HeartWillApplyResult,
   type HeartWillOrigin,
   type HeartWillParagraph,
+  type HeartWillDelivery,
   type HeartWillParagraphDraft,
   type HeartWillVersion,
   type LedgerAppendInput,
@@ -883,6 +884,49 @@ export class SupabaseStore implements StorePort {
     const head = await this.heartWillHeadRow(documentId);
     if (!head) return undefined;
     return this.heartWillVersion(documentId, head);
+  }
+
+  async getHeartWillDelivery(sessionId: string): Promise<HeartWillDelivery | undefined> {
+    const documentId = await this.heartWillDocId(sessionId, false);
+    if (documentId == null) return undefined; // 문서가 없으면 전할 글도 없다
+    const { data, error } = await this.db
+      .from("heart_will_delivery")
+      .select("document_id, reveal_policy, reveal_at, recipient_ids")
+      .eq("document_id", documentId)
+      .maybeSingle();
+    if (error) this.fail("heart_will_delivery.select", error);
+    // 없으면 기본값 — "아직 안 정했다"도 상태이고 그 기본은 사후 공개다
+    return data
+      ? {
+          documentId: data.document_id,
+          revealPolicy: data.reveal_policy,
+          revealAt: iso(data.reveal_at) ?? null,
+          recipientIds: (data.recipient_ids ?? []) as string[],
+        }
+      : { documentId, revealPolicy: "POSTHUMOUS", revealAt: null, recipientIds: [] };
+  }
+
+  async saveHeartWillDelivery(
+    sessionId: string,
+    patch: { revealPolicy: HeartWillDelivery["revealPolicy"]; revealAt?: string | null; recipientIds: string[] },
+  ): Promise<HeartWillDelivery | undefined> {
+    const documentId = await this.heartWillDocId(sessionId, false);
+    if (documentId == null) return undefined;
+    const row = {
+      document_id: documentId,
+      reveal_policy: patch.revealPolicy,
+      // 예약이 아니면 날짜를 비운다 — 남겨 두면 "언제 가는 거지"가 화면마다 갈린다
+      reveal_at: patch.revealPolicy === "SCHEDULED" ? (patch.revealAt ?? null) : null,
+      recipient_ids: patch.recipientIds,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await this.db
+      .from("heart_will_delivery")
+      .upsert(row, { onConflict: "document_id" });
+    if (error) this.fail("heart_will_delivery.upsert", error);
+    // ⚠ 받는 분 id만 남긴다 — 이름·주소는 audit에 넣지 않는다 (보안 1조)
+    await this.audit("heartwill.delivery", documentId, { policy: patch.revealPolicy });
+    return this.getHeartWillDelivery(sessionId);
   }
 
   async applyHeartWill(

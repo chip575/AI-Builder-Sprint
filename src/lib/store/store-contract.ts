@@ -368,6 +368,38 @@ export function storeContractTests(
       expect(kept?.category === "DIGITAL" && kept.disposition.action).toBe("DELETE");
     });
 
+    it("마음 유언 전달 설정 — 예약이 아니면 날짜를 비운다 (FR-112)", async () => {
+      const s = await makeStore();
+      const session = await s.getOrCreateSession(null, randomUUID());
+      // 문서가 없으면 전할 글도 없다
+      expect(await s.getHeartWillDelivery(session.id)).toBeUndefined();
+
+      const u = await s.addUtterance(session.id, "아이들에게 미안했다고 전하고 싶어요");
+      await s.draftHeartWillParagraphs(session.id, [
+        { body: "미안했다고 전하고 싶습니다.", origin: "AI_DRAFT", sourceUtteranceId: u.id },
+      ]);
+      const head = await s.getHeartWillHead(session.id);
+      await s.applyHeartWill(session.id, head!.paragraphs.map((p) => p.id));
+
+      // 정하지 않았어도 상태는 있다 — 기본은 사후 공개다
+      expect((await s.getHeartWillDelivery(session.id))?.revealPolicy).toBe("POSTHUMOUS");
+
+      const scheduled = await s.saveHeartWillDelivery(session.id, {
+        revealPolicy: "SCHEDULED",
+        revealAt: "2027-01-01T00:00:00.000Z",
+        recipientIds: [],
+      });
+      expect(scheduled?.revealAt).not.toBeNull();
+
+      // 🔴 예약이 아니게 되면 날짜가 남지 않는다 — 남으면 "언제 가는지"가 갈린다
+      const back = await s.saveHeartWillDelivery(session.id, {
+        revealPolicy: "POSTHUMOUS",
+        revealAt: "2027-01-01T00:00:00.000Z",
+        recipientIds: [],
+      });
+      expect(back?.revealAt).toBeNull();
+    });
+
     it("mock 슬롯: 마지막으로 쓴 상태가 읽힌다 (인스턴스 교체 대비)", async () => {
       const s = await makeStore();
       const docId = `mock-${randomUUID()}`;

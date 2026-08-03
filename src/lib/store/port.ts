@@ -22,6 +22,7 @@ import type {
   ProfileRecord,
   EvidenceRecord,
   HeartWillApplyResult,
+  HeartWillDelivery,
   HeartWillParagraphDraft,
   HeartWillVersion,
   SessionRecord,
@@ -150,6 +151,16 @@ export interface StorePort {
       story?: string | null;
     },
   ): Promise<Asset | undefined>;
+
+  /** 마음 유언 전달 설정 (FR-112). 문서가 없으면 undefined —
+   *  문단을 승인한 적이 없으면 전할 글도 없다 */
+  getHeartWillDelivery(sessionId: string): Promise<HeartWillDelivery | undefined>;
+  /** 설정을 남긴다. **보관까지가 지금 할 수 있는 일이다** — 실제 발송 경로는
+   *  정책마다 준비 상태가 다르고, 무엇이 아직 안 되는지는 화면이 말한다 */
+  saveHeartWillDelivery(
+    sessionId: string,
+    patch: { revealPolicy: HeartWillDelivery["revealPolicy"]; revealAt?: string | null; recipientIds: string[] },
+  ): Promise<HeartWillDelivery | undefined>;
 
   listCustodians(userId: string): Promise<Custodian[]>;
   /** 같은 상대를 두 번 지정하지 않는다 — 재초대는 상태 갱신이다 (DB unique) */

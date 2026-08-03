@@ -119,6 +119,16 @@ export interface HeartWillVersion {
   createdAt: string;
 }
 
+/** 전달 설정 (FR-112) — "언제, 누구에게".
+ *  ⚠ 보관과 발송은 다른 층이다. 이 값이 있다고 전달이 일어나는 것이 아니다 */
+export interface HeartWillDelivery {
+  documentId: string;
+  revealPolicy: "IMMEDIATE" | "SCHEDULED" | "POSTHUMOUS";
+  /** SCHEDULED일 때만 의미가 있다 */
+  revealAt: string | null;
+  recipientIds: string[];
+}
+
 /** 새 버전 + 직전 버전의 **본문**(승인 문단만).
  *  diff 계산은 두 어댑터에 같은 로직을 심지 않으려고 호출부(라우트)로 뺐다 */
 export interface HeartWillApplyResult {
