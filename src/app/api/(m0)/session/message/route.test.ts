@@ -175,3 +175,43 @@ describe("M-SESSION-MSG — 프로토콜 규칙", () => {
     expect(body.error.nextAction).toBeTruthy();
   });
 });
+
+describe("🔴 M-SESSION-MSG — 작성실 대화는 가지를 고르지 않는다 (2026-08-03)", () => {
+  // 실사용에서 기부 약정서를 쓰는 중에 "고향에 기부하고 싶으신가요?"가 떴다.
+  // 서류가 이미 정해진 대화에 가지 제안이 끼어든 것 — 도우미가 아니라 방해다.
+  it("가지는 **고른 서류**가 정한다 — 발화 문장이 정하지 않는다", async () => {
+    // 세금을 물었다고 해서 다른 가지로 끌려가지 않는다. 확인 카드도 뜨지 않는다
+    const { proposals, meta } = await parseSse(
+      await post({ text: "기부금에 따른 세금 계산을 하고 싶은데", docType: "DONATION_PLEDGE" }),
+    );
+    expect(proposals).toHaveLength(0); // "혹시 다른 걸 하시겠어요?"가 없다
+    expect(meta.expressBranch?.branchType).toBe("DONATION_NOW"); // 서류가 정한 그 가지
+
+    const heavy = await parseSse(
+      await post({ text: "안녕하세요", docType: "LEGACY_GIFT_AGREEMENT" }),
+    );
+    // 무거운 가지의 숙려 제안은 살아 있어야 한다 (FR-115B)
+    expect(heavy.meta.expressBranch?.branchType).toBe("LEGACY_GIFT");
+  });
+
+  it("작성실 대화에 회상 질문이 새지 않는다 — 서류가 가지를 정한다", async () => {
+    const { text } = await parseSse(
+      await post({ text: "안녕하세요", docType: "DONATION_PLEDGE" }),
+    );
+    // 축(회상) 질문은 질문은행의 문장이다. 하나라도 나오면 축 대화로 샜다는 뜻
+    for (const q of QUESTIONS) expect(text).not.toContain(q.text);
+  });
+
+  it("서류를 안 알리는 대화(/chat)는 지금까지처럼 가지를 고른다", async () => {
+    // 통과해야 할 것도 함께 잰다 — 막는 것만 보면 "전부 막는 검사"와 구별이 안 된다
+    const { meta } = await parseSse(await post({ text: "부산에 기부하고 싶어요" }));
+    expect(meta.expressBranch?.branchType).toBe("DONATION_NOW");
+  });
+
+  it("작성실에서도 법률·세무 질문은 안내가 답한다 — 가지만 끈 것이다", async () => {
+    const { text } = await parseSse(
+      await post({ text: "상속세가 얼마나 나오는지 알고 싶은데", docType: "DONATION_PLEDGE" }),
+    );
+    expect(text).toContain("계산해 드리지 않습니다");
+  });
+});

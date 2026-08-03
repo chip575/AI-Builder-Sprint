@@ -260,9 +260,12 @@ console.log(
   pipe.totalRecords + "건 · 첫 토큰 p95",
   conv.p95Ms + "ms",
 );
-// 정책 거부는 장애가 아니다 — 게이트 차단·미확정 403이 fail로 새면 안 된다
+// 정책 거부는 장애가 아니다 — 게이트 차단·미확정 403이 fail로 새면 안 된다.
+// ⚠ **같기를 요구하지 않는다.** 지표는 최근 1000건 창이라(PostgREST db-max-rows)
+//   새 기록이 쌓이면 옛 기록이 창 밖으로 밀려 fail이 **줄어들 수 있다.**
+//   우리가 잡으려는 것은 "이번 실행에서 정책 거부가 fail로 샜는가" = 증가 여부다.
 const draftStage = pipe.stages.find((s) => s.stage === "DRAFT");
-if (draftStage.fail !== draftFailBefore)
+if (draftStage.fail > draftFailBefore)
   fail(`정책 거부가 장애(fail)로 집계됨: +${draftStage.fail - draftFailBefore}`);
 
 // 16. 리컨실러 (FR-504) — 응답 형식 + 멱등. 상태 대조가 실제로 도는지

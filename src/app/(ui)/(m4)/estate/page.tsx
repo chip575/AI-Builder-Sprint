@@ -15,8 +15,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
+import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
+import { ScrollList } from "@/app/(ui)/_components/ScrollList";
+import { SECTION_PANEL, SECTION_STACK } from "@/app/(ui)/_components/section";
 import { AssetStatus } from "./AssetStatus";
-import { CustodianBook } from "./CustodianBook";
 import { DigitalLegacy } from "./DigitalLegacy";
 import type { InventorySummary } from "@/lib/contracts";
 
@@ -209,7 +211,12 @@ export default function EstatePage() {
         </div>
       }
     >
-      <div className="space-y-8">
+      {/* 구획을 **선이 아니라 면으로** 가른다.
+          가로줄을 그으면 서류처럼 보인다 — 이 서비스는 서류를 다루지만 서류처럼 보일
+          이유는 없다. 바탕이 stone-50(따뜻한 미색)이라 구획을 흰 기 도는 패널로 살짝
+          띄우면, 안쪽 흰 카드가 한 겹 더 밝게 얹혀 층이 생긴다.
+          테두리는 stone-200/70 — 있는 줄 알아볼 만큼만 두고 시선을 끌지 않는다. */}
+      <div className={SECTION_STACK}>
         {/* 두 문장을 각 줄에 둔다 — 대시로 이으면 좁은 화면에서 한 줄이 너무 길어진다 */}
         <p className="text-stone-500">
           남기신 것들이 시간이 지나도 관리됩니다.
@@ -220,8 +227,17 @@ export default function EstatePage() {
         {/* ── 남기신 마음 (FR-111 · FR-301) ──
             법적 서류가 아니다. 그래서 아래 약정 카드들과 같은 상자를 쓰되 도장·상태
             같은 서류 표시를 두지 않는다. 세지도 않는다 — 회상은 진도가 아니다 (P4·FR-111) */}
-        <section className="space-y-3">
-          <h2 className="font-serif text-lg font-semibold text-stone-900">남기신 마음</h2>
+        <section className={SECTION_PANEL}>
+          <SectionHeading
+            title="남기신 마음"
+            help={
+              <>
+                법적 효력이 있는 서류와는 별개로, 하고 싶은 말씀을 그대로 남겨 두는 자리입니다.
+            재산을 옮기거나 유언의 효력을 갖지 않습니다 — 그래서 서명하지 않고 보관만 합니다.
+            법적 효력이 필요한 유언장은 손으로 직접 쓰셔야 합니다 (민법 제1066조).
+              </>
+            }
+          />
           <div className="rounded-xl border border-stone-200 bg-white p-4">
             <p className="leading-relaxed text-stone-700">
               법적 효력이 있는 서류와는 별개로, 하고 싶은 말씀을 그대로 남겨 두는
@@ -248,9 +264,18 @@ export default function EstatePage() {
         </section>
 
         {/* ── 다가오는 약속 (FR-508) ── */}
-        <section className="space-y-3">
+        <section className={SECTION_PANEL}>
           <div className="flex items-center justify-between">
-            <h2 className="font-serif text-lg font-semibold text-stone-900">다가오는 약속</h2>
+            <SectionHeading
+            title="다가오는 약속"
+            help={
+              <>
+                서류를 맺으면 “언제 다시 여쭐지”가 함께 정해집니다. 정기후원은 계속하실지,
+            남기신 뜻은 그대로인지 — 그날이 오면 이곳에 뜹니다.
+            체결이 끝이 아니라 시작이라는 뜻이고, 재촉이 아니라 초대입니다.
+              </>
+            }
+          />
             {/* 데모 장치 — 실 모드에서는 서버가 거부한다 (advance-time 라우트) */}
             <button
               type="button"
@@ -264,6 +289,7 @@ export default function EstatePage() {
           {/* 기한 도래는 경고가 아니라 "이제 여쭐 때가 됐다"는 안내다.
               amber는 Notice(법적 고지), rose는 ErrorNote가 이미 쓰고 있어 신호가 겹친다 —
               sky로 두면 흰 카드(아직 안 된 것)와도, 경고·오류와도 구분된다 */}
+          {/* 여쭐 때가 된 것은 굴림 밖에 둔다 — 지금 할 일이라 접히면 안 된다 */}
           {due.map((o) => (
             <div key={o.id} className="rounded-xl border border-sky-200 bg-sky-50 p-4">
               <p className="text-stone-800">{KIND_LABEL[o.kind]}</p>
@@ -272,12 +298,14 @@ export default function EstatePage() {
               </p>
             </div>
           ))}
-          {upcoming.map((o) => (
-            <div key={o.id} className="rounded-xl border border-stone-200 bg-white p-4">
-              <p className="text-stone-800">{KIND_LABEL[o.kind]}</p>
-              <p className="mt-1 text-sm text-stone-500">{dateOf(o.dueAt)}</p>
-            </div>
-          ))}
+          <ScrollList count={upcoming.length}>
+            {upcoming.map((o) => (
+              <div key={o.id} className="rounded-xl border border-stone-200 bg-white p-4">
+                <p className="text-stone-800">{KIND_LABEL[o.kind]}</p>
+                <p className="mt-1 text-sm text-stone-500">{dateOf(o.dueAt)}</p>
+              </div>
+            ))}
+          </ScrollList>
           {loaded && obligations.length === 0 && (
             <p className="text-sm text-stone-500">
               아직 예정된 약속이 없습니다. 약정을 맺으면 되짚을 날이 여기에 생깁니다.
@@ -286,31 +314,41 @@ export default function EstatePage() {
         </section>
 
         {/* ── 남긴 약정 ── */}
-        <section className="space-y-3">
-          <h2 className="font-serif text-lg font-semibold text-stone-900">남긴 약정</h2>
-          {pledges.map((p) => (
-            <div
-              key={p.draftId}
-              className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4"
-            >
-              <div>
-                <p className="text-stone-800">{STATUS_LABEL[p.status] ?? p.status}</p>
-                {p.completedAt && (
-                  <p className="mt-1 text-sm text-stone-500">{dateOf(p.completedAt)} 체결</p>
-                )}
-              </div>
-              <div className="flex gap-2 text-sm">
-                <Link href={`/doc/${p.draftId}`} className="underline underline-offset-4">
-                  문서
-                </Link>
-                {p.status === "COMPLETED" && (
-                  <Link href={`/vault/${p.draftId}`} className="underline underline-offset-4">
-                    증빙
+        <section className={SECTION_PANEL}>
+          <SectionHeading
+            title="남긴 약정"
+            help={
+              <>
+                서명까지 끝난 서류와 진행 중인 서류를 함께 보여드립니다.
+            자세한 내용과 그만두기는 <strong>서류 이력</strong> 화면에서 하실 수 있습니다.
+              </>
+            }
+          />
+          <ScrollList count={pledges.length}>
+  {pledges.map((p) => (
+              <div
+                key={p.draftId}
+                className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4"
+              >
+                <div>
+                  <p className="text-stone-800">{STATUS_LABEL[p.status] ?? p.status}</p>
+                  {p.completedAt && (
+                    <p className="mt-1 text-sm text-stone-500">{dateOf(p.completedAt)} 체결</p>
+                  )}
+                </div>
+                <div className="flex gap-2 text-sm">
+                  <Link href={`/doc/${p.draftId}`} className="underline underline-offset-4">
+                    문서
                   </Link>
-                )}
+                  {p.status === "COMPLETED" && (
+                    <Link href={`/vault/${p.draftId}`} className="underline underline-offset-4">
+                      증빙
+                    </Link>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </ScrollList>
           {loaded && pledges.length === 0 && (
             <p className="text-sm text-stone-500">
               아직 맺은 약정이 없습니다.{" "}
@@ -325,15 +363,21 @@ export default function EstatePage() {
         {/* ── 디지털 유산 (FR-403) ── */}
         <DigitalLegacy onChanged={() => void load()} />
 
-        {/* ── 지킴이 (FR-405 · NFR-713) ── */}
-        <CustodianBook />
-
         {/* ── 내 자산 (FR-402) ── */}
-        <section className="space-y-3">
+        <section className={SECTION_PANEL}>
           {/* "종이 문서로 등록"은 서류 서랍으로 옮겼다 — 여기서는 밑줄 링크라
               터치 영역이 44px에 못 미쳤고, 서류로 가는 문은 한곳에 모으는 편이 낫다 */}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-serif text-lg font-semibold text-stone-900">내 자산</h2>
+            <SectionHeading
+            title="내 자산"
+            help={
+              <>
+                저희가 아는 재산은 <strong>직접 적어 주신 것</strong>뿐입니다. 그래서 여기 있는 것이
+            전부가 아닐 수 있고, 화면도 그렇게 말합니다 — “확인한 자산”이라고 쓰는 이유입니다.
+            금액을 적지 않으신 항목이 섞이면 합계를 내지 않습니다.
+              </>
+            }
+          />
             {/* 점검은 **접어 둔다.** 펴 두면 화면을 열 때마다 총액이 먼저 눈에 들어오고,
                 이 화면은 관리하러 오는 곳이지 재산을 확인하러 오는 곳이 아니다.
                 누른 사람에게만 보이는 편이 P4(재촉하지 않는다)와도 맞는다 */}
@@ -361,28 +405,30 @@ export default function EstatePage() {
             )}
           </div>
 
-          {assets.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white p-4"
-            >
-              <div className="min-w-0">
-                <p className="text-stone-800">{a.label}</p>
-                <p className="mt-1 text-sm text-stone-500">
-                  {CATEGORY_LABEL[a.category] ?? a.category}
-                  {won(a.estimatedValueKrw) ? ` · ${won(a.estimatedValueKrw)}` : ""}
-                </p>
-              </div>
-              {/* 자산에서 약정으로 — "무엇을 남기는가"가 대화의 출발점이 된다.
-                  작성실이 이 자산을 첫 문장에 실어 유산 기부 흐름을 연다 */}
-              <Link
-                href={`/write?asset=${encodeURIComponent(a.label)}`}
-                className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-stone-300 px-3 text-sm text-stone-700 transition hover:bg-stone-100"
+          <ScrollList count={assets.length}>
+  {assets.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white p-4"
               >
-                이 자산 남기기
-              </Link>
-            </div>
-          ))}
+                <div className="min-w-0">
+                  <p className="text-stone-800">{a.label}</p>
+                  <p className="mt-1 text-sm text-stone-500">
+                    {CATEGORY_LABEL[a.category] ?? a.category}
+                    {won(a.estimatedValueKrw) ? ` · ${won(a.estimatedValueKrw)}` : ""}
+                  </p>
+                </div>
+                {/* 자산에서 약정으로 — "무엇을 남기는가"가 대화의 출발점이 된다.
+                    작성실이 이 자산을 첫 문장에 실어 유산 기부 흐름을 연다 */}
+                <Link
+                  href={`/write?asset=${encodeURIComponent(a.label)}`}
+                  className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-stone-300 px-3 text-sm text-stone-700 transition hover:bg-stone-100"
+                >
+                  이 자산 남기기
+                </Link>
+              </div>
+            ))}
+          </ScrollList>
           {loaded && assets.length === 0 && (
             <p className="text-sm text-stone-500">
               아직 정리한 자산이 없습니다. 아래에서 하나씩 적어 두실 수 있어요.
@@ -432,16 +478,27 @@ export default function EstatePage() {
         </section>
 
         {/* ── 뜻이 바뀐 기록 (FR-553 · P5) ── */}
-        <section className="space-y-3">
-          <h2 className="font-serif text-lg font-semibold text-stone-900">뜻이 바뀐 기록</h2>
-          {ledger.map((n) => (
-            <div key={n.id} className="rounded-xl border border-stone-200 bg-white p-4">
-              <p className="text-stone-800">{n.changeReason}</p>
-              <p className="mt-1 text-sm text-stone-500">
-                {n.materiality === "MATERIAL" ? "재서명으로 봉인되는 변경" : "기록으로 남는 변경"}
-              </p>
-            </div>
-          ))}
+        <section className={SECTION_PANEL}>
+          <SectionHeading
+            title="뜻이 바뀐 기록"
+            help={
+              <>
+                마음이 바뀌신 과정을 시간 순서로 남깁니다. 각 기록은 앞의 기록과 사슬처럼
+            묶여 있어서, 한 글자만 바뀌어도 그 뒤가 전부 어긋납니다 —
+            나중에 “이게 정말 본인 뜻이었나”를 물었을 때 답이 되는 자리입니다.
+              </>
+            }
+          />
+          <ScrollList count={ledger.length}>
+  {ledger.map((n) => (
+              <div key={n.id} className="rounded-xl border border-stone-200 bg-white p-4">
+                <p className="text-stone-800">{n.changeReason}</p>
+                <p className="mt-1 text-sm text-stone-500">
+                  {n.materiality === "MATERIAL" ? "재서명으로 봉인되는 변경" : "기록으로 남는 변경"}
+                </p>
+              </div>
+            ))}
+          </ScrollList>
           {loaded && ledger.length === 0 && (
             <p className="text-sm text-stone-500">
               아직 바뀐 기록이 없습니다. 뜻이 바뀌면 그 과정도 서명으로 남습니다.

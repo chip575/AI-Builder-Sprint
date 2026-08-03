@@ -1,4 +1,4 @@
-// S-MYPAGE · 내 정보 (FR-501 · NFR-714)
+// S-MYPAGE · 마이페이지 (FR-501 · NFR-714)
 //
 // 여기 값은 **계약서에 인쇄된다.** 그래서 화면이 두 가지를 분명히 해야 한다:
 //   ① 비워 두면 무엇이 대신 들어가는지 — 빈칸으로 서명되는 일은 없다는 것
@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Notice, PrimaryButton, Shell } from "@/app/(ui)/_components/Shell";
 import { RecipientBook } from "./RecipientBook";
+import { SECTION_PANEL, SECTION_STACK } from "@/app/(ui)/_components/section";
 
 interface Profile {
   email: string;
@@ -63,7 +64,7 @@ export default function MyPage() {
     // back은 한쪽에만 맞다. 관리의 집인 /estate를 기본으로 두고, 서명하던 문서로 정확히
     // 돌아가는 길은 곁칸의 "← 이전 화면으로"(router.back)가 맡는다
     <Shell
-      title="내 정보"
+      title="마이페이지"
       fr={["FR-501"]}
       back={{ href: "/estate", label: "내 유산으로" }}
       headerBar={{
@@ -71,11 +72,13 @@ export default function MyPage() {
       }}
     >
 
-      <div className="space-y-5">
+      <div className={SECTION_STACK}>
         <p className="text-stone-500">
           약정서에 들어갈 내용입니다. 서명하실 때마다 다시 적지 않으셔도 됩니다.
         </p>
 
+        {/* 약정서에 인쇄될 값 — 한 구획으로 묶는다 */}
+        <section className={SECTION_PANEL}>
         <div className="rounded-xl border border-stone-200 bg-white p-4">
           <p className="text-sm text-stone-500">로그인 계정</p>
           <p className="mt-1 text-stone-900">{profile?.email ?? "불러오는 중…"}</p>
@@ -136,12 +139,14 @@ export default function MyPage() {
         <PrimaryButton onClick={() => void save()} disabled={busy}>
           {busy ? "저장 중…" : "저장하기"}
         </PrimaryButton>
+        </section>
 
-        {/* 알릴 분 — 저장소가 하나다. CLM 화면도 같은 API를 본다 (/api/recipients).
-            화면마다 상태를 따로 들고 있으면 한쪽에서 고친 것이 다른 쪽에 안 보인다 */}
-        <div className="border-t border-stone-200 pt-5">
+        {/* 알릴 분 — 저장소가 하나다. 다른 화면도 같은 API를 본다 (/api/recipients).
+            화면마다 상태를 따로 들고 있으면 한쪽에서 고친 것이 다른 쪽에 안 보인다.
+            위 구획(약정서에 인쇄될 값)과 성격이 달라 따로 묶는다 */}
+        <section className={SECTION_PANEL}>
           <RecipientBook />
-        </div>
+        </section>
 
         <Notice>
           이미 서명이 끝난 문서는 바뀌지 않습니다. 여기서 고치신 내용은 앞으로 만드실

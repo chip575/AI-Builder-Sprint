@@ -12,7 +12,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorNote, Notice, Shell } from "@/app/(ui)/_components/Shell";
 import { RevokeCell } from "./RevokeCell";
+import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
 import { DOC_LABEL as DOC_LABEL_MAP, docLabel } from "@/lib/docs/labels";
+import { SECTION_PANEL, SECTION_STACK } from "@/app/(ui)/_components/section";
 
 interface Row {
   draftId: string;
@@ -84,13 +86,14 @@ export default function ClmPage() {
 
       }}
     >
-      <div className="space-y-5">
+      <div className={SECTION_STACK}>
         <p className="text-stone-500">
           남기신 서류를 시간 순서로 모아 보여 드립니다 — 서명한 것과 손으로 남긴 것이
           한 줄에 섭니다.
         </p>
 
         {/* 필터 — 서버가 거른다. 모르는 값은 서버가 무시하므로 목록이 통째로 비지 않는다 */}
+        <section className={SECTION_PANEL}>
         <div className="flex flex-wrap gap-2">
           <select
             value={docType}
@@ -129,9 +132,27 @@ export default function ClmPage() {
           />
         </div>
 
+        </section>
+
         <ErrorNote error={error} />
 
-        <h2 className="font-serif text-lg font-semibold text-stone-900">남긴 서류</h2>
+        <section className={SECTION_PANEL}>
+        <SectionHeading
+          title="남긴 서류"
+          help={
+            <>
+              지금까지 만드신 서류를 시간 순서로 보여드립니다.
+              <br />
+              <strong>효력</strong> 칸이 중요합니다 — 같은 “서류”라도 전자서명으로 효력이
+              생기는 것(기부·유산 약정), 전자서명으로는 효력이 없는 것(자필 유언),
+              서명 없이 보관하는 것(마음 편지)이 다릅니다. 법이 정한 방식이 서류마다
+              달라서, 저희가 그 판정을 화면에 그대로 적습니다.
+              <br />
+              <strong>그만두기</strong>도 서류마다 부르는 말이 다릅니다 — 사인증여는 철회,
+              정기후원은 해지입니다. 되돌아오는 것이 다르기 때문입니다.
+            </>
+          }
+        />
 
         {rows === null ? (
           <p className="text-sm text-stone-500">불러오는 중…</p>
@@ -139,9 +160,12 @@ export default function ClmPage() {
           // 빈 것도 상태다. 말하지 않으면 화면이 고장 난 것과 구분되지 않는다
           <Notice>아직 남기신 서류가 없습니다. 대화로 정리하시면 여기에 쌓입니다.</Notice>
         ) : (
-          <div className="overflow-x-auto">
+          /* 가로는 좁은 화면 때문에, 세로는 서류가 쌓이기 때문에 굴린다.
+             **잘라내지 않는다** — 상위 몇 건만 그리면 사용자는 없어진 줄 안다 (P4).
+             머리줄은 붙여 둔다: 굴리는 중에 어느 칸이 무엇인지 잃으면 표가 아니라 나열이 된다 */
+          <div className="max-h-[26rem] overflow-auto">
             <table className="w-full min-w-[36rem] border-collapse text-sm">
-              <thead>
+              <thead className="sticky top-0 bg-stone-50">
                 <tr className="border-b border-stone-300 text-left text-stone-500">
                   <th className="py-2 pr-3 font-normal">남긴 날</th>
                   <th className="py-2 pr-3 font-normal">서류</th>
@@ -201,6 +225,7 @@ export default function ClmPage() {
         {rows !== null && rows.length > 0 && (
           <p className="text-sm text-stone-500">{rows.length}건</p>
         )}
+        </section>
       </div>
     </Shell>
   );

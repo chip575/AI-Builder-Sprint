@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
+import { docLabel } from "@/lib/docs/labels";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
 import { AssetPeek } from "@/app/(ui)/_components/AssetPeek";
 import { suggestionTexts } from "@/lib/ai/session/suggested";
@@ -53,6 +54,8 @@ export default function ChatPage() {
   const [covered, setCovered] = useState<number | null>(null);
   /** 아직 사용자가 답하지 않은 가지 제안 — 답하면 목록에서 뺀다 */
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  /** 안내가 권한 서류 — 말로만 권하고 끝나지 않게 문을 함께 연다 (2026-08-03) */
+  const [suggestedDoc, setSuggestedDoc] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   /** 제안에 대한 사용자의 결정을 서버에 남긴다. 여는 것도 닫는 것도 사용자다 (FR-115A) */
@@ -120,7 +123,10 @@ export default function ChatPage() {
               sessionId: string;
               expressBranch?: { branchType: string } | null;
               axisCoverage?: { answered: number }[];
+              suggestedDoc?: string | null;
             };
+            // null이면 지운다 — 지난 턴의 권유가 화면에 남아 있으면 지금 대화와 어긋난다
+            setSuggestedDoc(m.suggestedDoc ?? null);
             if (m.axisCoverage) {
               setCovered(m.axisCoverage.reduce((n, c) => n + c.answered, 0));
             }
@@ -362,6 +368,35 @@ export default function ChatPage() {
             </div>
           </div>
         ))}
+
+        {/* 안내가 서류를 권했다 — 그 서류의 작성실로 바로 들어가는 문.
+            안내가 길만 알려 주고 문은 안 열어 주면 사용자가 직접 찾아가야 한다 */}
+        {suggestedDoc && (
+          <div className="rounded-xl border border-stone-300 bg-white p-4">
+            <p className="text-sm text-stone-600">
+              말씀하신 상황에는 <strong className="text-stone-900">{docLabel(suggestedDoc)}</strong>가
+              맞습니다.
+            </p>
+            <Link
+              // 작성실이 여는 서류는 셋뿐이다. 자필 유언은 서명 화면이 없어(절대규칙 4)
+              // 안내 대화로 보낸다 — 없는 문을 가리키면 눌러도 아무 일이 없다
+              href={
+                ["DONATION_PLEDGE", "HERITAGE_SUPPORT_PLEDGE", "LEGACY_GIFT_AGREEMENT"].includes(
+                  suggestedDoc,
+                )
+                  ? `/write?doc=${suggestedDoc}`
+                  : "/guide"
+              }
+              className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-ink px-4 text-sm text-stone-50"
+            >
+              {["DONATION_PLEDGE", "HERITAGE_SUPPORT_PLEDGE", "LEGACY_GIFT_AGREEMENT"].includes(
+                suggestedDoc,
+              )
+                ? `${docLabel(suggestedDoc)} 쓰러 가기`
+                : `${docLabel(suggestedDoc)} 안내 보기`}
+            </Link>
+          </div>
+        )}
 
         <ErrorNote error={error} />
       </div>

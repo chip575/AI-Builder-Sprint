@@ -14,6 +14,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { InlineHelp } from "./HelpTip";
 
 export const NAV_SIDEBAR_ID = "nav-sidebar-panel";
 
@@ -24,13 +25,18 @@ const LINKS: { href: string; label: string; hint: string }[] = [
   { href: "/estate", label: "내 유산", hint: "자산과 다가오는 약속" },
   { href: "/write", label: "새 약정 준비하기", hint: "대화로 서류를 채웁니다" },
   { href: "/clm", label: "서류 이력", hint: "남긴 서류를 시간 순서로" },
-  // 종이로 받은 서류도 같은 서랍에서 들어온다 — "내 자산" 섹션 머리에 있던 밑줄 링크를
-  // 여기로 옮겼다. 거기서는 터치 영역이 44px에 못 미쳤다 (P2)
-  { href: "/branch/paper-scan", label: "종이 문서로 등록", hint: "찍어서 올리면 읽어 드립니다" },
+  // ⚠ "종이 문서로 등록"(/branch/paper-scan)을 뺐다 (2026-08-03).
+  //   그 화면은 intentId가 있어야 업로드 칸이 뜨는데, **거기로 intentId를 달고 가는
+  //   경로가 하나도 없다.** 곁칸으로 들어가면 언제나 "작성실에서 먼저 고르세요"만 보이고,
+  //   작성실은 돌아오는 길을 만들어 주지 않는다 — 누구도 끝까지 갈 수 없는 문이었다.
+  //   화면과 API(paper-scan/upload·extract)는 남아 있다. 작성실에서 그 문서로 이어지는
+  //   길이 생기면 그때 다시 연다.
 ];
 
 /** 계정 — 위의 "일"과 성격이 다르다. 그래서 카드가 아니라 작은 링크로 무게를 낮춘다 */
-const ACCOUNT = { href: "/mypage", label: "내 정보", hint: "약정서에 들어갈 성명·연락처" };
+/** 계정 자리. 설명은 곁에 붙는 물음표가 맡는다 —
+ *  줄에 길게 적으면 좁은 화면에서 두 줄로 접혀 다른 문들과 결이 달라진다 */
+const ACCOUNT = { href: "/mypage", label: "마이페이지" };
 
 export function NavSidebarToggle({
   open,
@@ -157,15 +163,24 @@ export function NavSidebarPanel({
             가리켜 성격이 다르고, 서랍을 열어야 뒤로 가는 건 두 단계라 뒤로가기의 장점을
             없앤다. 되돌아가야 하는 화면은 Shell의 back prop을 쓴다 */}
         <div className="mt-6 space-y-1 border-t border-stone-200 pt-4">
-          <Link
-            href={ACCOUNT.href}
-            onClick={onClose}
-            aria-current={pathname === ACCOUNT.href ? "page" : undefined}
-            className="flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm text-stone-600 hover:bg-stone-200/70"
-          >
-            <span>{ACCOUNT.label}</span>
-            <span className="text-stone-500">· {ACCOUNT.hint}</span>
-          </Link>
+          <div className="flex items-center gap-2 px-4">
+            <Link
+              href={ACCOUNT.href}
+              onClick={onClose}
+              aria-current={pathname === ACCOUNT.href ? "page" : undefined}
+              className="flex min-h-11 flex-1 items-center rounded-xl text-sm text-stone-600 hover:text-stone-900"
+            >
+              {ACCOUNT.label}
+            </Link>
+            {/* 물음표는 Link **바깥**에 둔다 — 링크 안에 버튼을 넣으면 눌렀을 때
+                둘 중 무엇이 동작할지가 브라우저마다 다르다 */}
+            <InlineHelp label="마이페이지">
+              약정서에 인쇄될 <strong>성명·연락처</strong>를 미리 정해 두는 곳입니다.
+              서명하실 때마다 다시 적지 않으셔도 됩니다.
+              <br />
+              무언가를 알려 드릴 <strong>주소록</strong>도 여기 있습니다.
+            </InlineHelp>
+          </div>
           <button
             type="button"
             onClick={() => void logout()}

@@ -2,7 +2,7 @@
 //
 // ⚠ 소유: 화면은 FE 경로다. BE-2가 사람 승인 하에 **새 파일로만** 추가 — 병합 전 FE 리뷰.
 //
-// 기관·유가족·지킴이를 한 목록에 둔다. 역할은 다르지만 하는 일이 같다 —
+// 기관과 유족을 한 목록에 둔다. 역할은 다르지만 하는 일이 같다 —
 // 이름과 이메일을 적어 두고, 나중에 무언가를 보낸다.
 //
 // ⚠ 목록에서는 이메일을 **마스킹**한다. 전체는 발송 직전 확인 화면에서만 보여준다
@@ -12,21 +12,25 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Recipient, RecipientKind } from "@/lib/contracts";
+import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
+import { ScrollList } from "@/app/(ui)/_components/ScrollList";
 
 /** 역할 이름은 **하는 일**로 짓는다. 코드명(CUSTODIAN)을 화면에 노출하지 않는다 */
-const KIND_LABEL: Record<RecipientKind, string> = {
+/** 화면에 내놓는 역할 — **기관과 유족 둘뿐이다.**
+ *  ⚠ 계약(RecipientKind)에는 CUSTODIAN도 있지만 화면에서 뺐다 (2026-08-03 결정):
+ *    "지킴이"라는 말이 직관적이지 않아 사용자가 무엇을 맡기는 것인지 알기 어려웠다.
+ *    배선(API·테이블)은 남아 있어 필요해지면 되살릴 수 있다. */
+const KIND_LABEL: Partial<Record<RecipientKind, string>> = {
   ORG: "받으실 곳",
-  FAMILY: "유가족",
-  CUSTODIAN: "지킴이",
+  FAMILY: "유족",
 };
 
-const KIND_HINT: Record<RecipientKind, string> = {
+const KIND_HINT: Partial<Record<RecipientKind, string>> = {
   ORG: "약정을 맺는 기관입니다. 약정을 그만두실 때 이곳으로 알려 드립니다.",
   FAMILY: "떠나신 뒤에 남기신 말씀을 받으실 분입니다.",
-  CUSTODIAN: "정해 주신 범위만 열람하실 수 있습니다. 유언집행자는 아닙니다.",
 };
 
-const KINDS: RecipientKind[] = ["ORG", "FAMILY", "CUSTODIAN"];
+const KINDS: RecipientKind[] = ["ORG", "FAMILY"];
 
 /** 화면 표시용 가림. 오타를 잡을 만큼은 남기고, 어깨너머로 읽히지는 않게 한다 */
 export function maskEmail(email: string): string {
@@ -89,7 +93,19 @@ export function RecipientBook() {
 
   return (
     <section className="space-y-3">
-      <h2 className="font-serif text-lg font-semibold text-stone-900">알릴 분</h2>
+      <SectionHeading
+        title="알릴 분"
+        help={
+          <>
+            무언가를 알려 드려야 할 때 쓰는 주소록입니다. 약정을 그만두시면
+            <strong> 받으실 곳</strong>에 통지가 나가고, 떠나신 뒤에 남기신 말씀은
+            <strong> 유족</strong>께 전해집니다.
+            <br />
+            여기 적으신 주소는 알려 드릴 일이 있을 때만 쓰고, 보내기 전에 반드시 한 번 더
+            여쭙니다.
+          </>
+        }
+      />
       <p className="text-sm text-stone-500">
         약정을 맺거나 그만두실 때, 그리고 남기신 말씀을 전할 때 이곳의 주소를 씁니다.
       </p>
@@ -101,7 +117,8 @@ export function RecipientBook() {
             <p className="text-stone-900">{KIND_LABEL[k]}</p>
             <p className="mt-0.5 text-sm text-stone-500">{KIND_HINT[k]}</p>
 
-            <ul className="mt-3 space-y-2">
+            <ScrollList count={mine.length} rows={4}>
+              <ul className="space-y-2">
               {mine.map((r) => (
                 <li key={r.id} className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -127,7 +144,8 @@ export function RecipientBook() {
                 // "0명"이라고 쓰지 않는다 — 빈칸을 사실처럼 읽게 된다
                 <li className="text-sm text-stone-500">아직 적어 두신 분이 없습니다.</li>
               )}
-            </ul>
+              </ul>
+            </ScrollList>
           </div>
         );
       })}
