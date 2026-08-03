@@ -260,6 +260,11 @@ export function storeContractTests(
 
         expect(await s.listRecipients(me)).toHaveLength(2);
         expect(await s.listRecipients(me, "ORG")).toHaveLength(1);
+        // 🔴 시각 형식이 두 구현에서 같아야 한다. PostgREST는 '+00:00' 오프셋으로 주고
+        //    계약은 Z만 받는다 — 어긋나면 라우트의 parse가 500으로 던진다
+        for (const r of await s.listRecipients(me)) {
+          expect(r.createdAt, r.name).toMatch(/Z$/);
+        }
         // 소유 격리 — 남의 것이 섞이면 통지가 엉뚱한 곳으로 간다
         expect((await s.listRecipients(other)).every((r) => r.name === "남의 기관")).toBe(true);
       });

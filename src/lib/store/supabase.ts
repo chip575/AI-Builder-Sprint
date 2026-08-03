@@ -91,6 +91,19 @@ const toAsset = (r: Row): Asset => {
     : { ...base, category: r.category };
 };
 
+/** ⚠ createdAt에 iso()를 **반드시** 통과시킨다. PostgREST는 '+00:00' 오프셋으로 주는데
+ *  계약(z.string().datetime())은 Z 표기만 허용해서, 빼먹으면 라우트의 parse가 던진다.
+ *  증상은 DB 오류가 아니라 **500 + "Cannot set property message"** 라 원인이 안 보인다
+ *  (2026-08-03 실측). 인메모리는 처음부터 Z라 이 경로에서만 터진다. */
+const toRecipient = (r: Row): Recipient => ({
+  id: r.id,
+  kind: r.kind as RecipientKind,
+  name: r.name,
+  email: r.email,
+  relation: r.relation ?? null,
+  createdAt: iso(r.created_at),
+});
+
 const toCustodian = (r: Row): Custodian => ({
   id: r.id,
   recipientId: r.recipient_id,
@@ -606,14 +619,7 @@ export class SupabaseStore implements StorePort {
     if (kind) q = q.eq("kind", kind);
     const { data, error } = await q.order("created_at", { ascending: true });
     if (error) this.fail("recipients.list", error);
-    return (data ?? []).map((r) => ({
-      id: r.id as string,
-      kind: r.kind as RecipientKind,
-      name: r.name as string,
-      email: r.email as string,
-      relation: (r.relation as string | null) ?? null,
-      createdAt: r.created_at as string,
-    }));
+    return (data ?? []).map(toRecipient);
   }
 
   async upsertRecipient(userId: string, input: RecipientUpsertReq): Promise<Recipient> {
@@ -650,14 +656,7 @@ export class SupabaseStore implements StorePort {
     if (error) this.fail("recipients.upsert", error);
     // ⚠ 이메일을 audit에 남기지 않는다 (보안 1조) — 무엇을 했는지와 역할까지만
     await this.audit("recipient.save", userId, { kind: input.kind });
-    return {
-      id: data!.id as string,
-      kind: data!.kind as RecipientKind,
-      name: data!.name as string,
-      email: data!.email as string,
-      relation: (data!.relation as string | null) ?? null,
-      createdAt: data!.created_at as string,
-    };
+    return toRecipient(data!);
   }
 
   async deleteRecipient(userId: string, id: string): Promise<boolean> {
