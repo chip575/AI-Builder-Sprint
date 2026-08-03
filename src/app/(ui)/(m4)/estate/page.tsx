@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
 import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
+import { ScrollList } from "@/app/(ui)/_components/ScrollList";
 import { AssetStatus } from "./AssetStatus";
 import { DigitalLegacy } from "./DigitalLegacy";
 import type { InventorySummary } from "@/lib/contracts";
@@ -282,6 +283,7 @@ export default function EstatePage() {
           {/* 기한 도래는 경고가 아니라 "이제 여쭐 때가 됐다"는 안내다.
               amber는 Notice(법적 고지), rose는 ErrorNote가 이미 쓰고 있어 신호가 겹친다 —
               sky로 두면 흰 카드(아직 안 된 것)와도, 경고·오류와도 구분된다 */}
+          {/* 여쭐 때가 된 것은 굴림 밖에 둔다 — 지금 할 일이라 접히면 안 된다 */}
           {due.map((o) => (
             <div key={o.id} className="rounded-xl border border-sky-200 bg-sky-50 p-4">
               <p className="text-stone-800">{KIND_LABEL[o.kind]}</p>
@@ -290,12 +292,14 @@ export default function EstatePage() {
               </p>
             </div>
           ))}
-          {upcoming.map((o) => (
-            <div key={o.id} className="rounded-xl border border-stone-200 bg-white p-4">
-              <p className="text-stone-800">{KIND_LABEL[o.kind]}</p>
-              <p className="mt-1 text-sm text-stone-500">{dateOf(o.dueAt)}</p>
-            </div>
-          ))}
+          <ScrollList count={upcoming.length}>
+            {upcoming.map((o) => (
+              <div key={o.id} className="rounded-xl border border-stone-200 bg-white p-4">
+                <p className="text-stone-800">{KIND_LABEL[o.kind]}</p>
+                <p className="mt-1 text-sm text-stone-500">{dateOf(o.dueAt)}</p>
+              </div>
+            ))}
+          </ScrollList>
           {loaded && obligations.length === 0 && (
             <p className="text-sm text-stone-500">
               아직 예정된 약속이 없습니다. 약정을 맺으면 되짚을 날이 여기에 생깁니다.
@@ -314,29 +318,31 @@ export default function EstatePage() {
               </>
             }
           />
-          {pledges.map((p) => (
-            <div
-              key={p.draftId}
-              className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4"
-            >
-              <div>
-                <p className="text-stone-800">{STATUS_LABEL[p.status] ?? p.status}</p>
-                {p.completedAt && (
-                  <p className="mt-1 text-sm text-stone-500">{dateOf(p.completedAt)} 체결</p>
-                )}
-              </div>
-              <div className="flex gap-2 text-sm">
-                <Link href={`/doc/${p.draftId}`} className="underline underline-offset-4">
-                  문서
-                </Link>
-                {p.status === "COMPLETED" && (
-                  <Link href={`/vault/${p.draftId}`} className="underline underline-offset-4">
-                    증빙
+          <ScrollList count={pledges.length}>
+  {pledges.map((p) => (
+              <div
+                key={p.draftId}
+                className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4"
+              >
+                <div>
+                  <p className="text-stone-800">{STATUS_LABEL[p.status] ?? p.status}</p>
+                  {p.completedAt && (
+                    <p className="mt-1 text-sm text-stone-500">{dateOf(p.completedAt)} 체결</p>
+                  )}
+                </div>
+                <div className="flex gap-2 text-sm">
+                  <Link href={`/doc/${p.draftId}`} className="underline underline-offset-4">
+                    문서
                   </Link>
-                )}
+                  {p.status === "COMPLETED" && (
+                    <Link href={`/vault/${p.draftId}`} className="underline underline-offset-4">
+                      증빙
+                    </Link>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </ScrollList>
           {loaded && pledges.length === 0 && (
             <p className="text-sm text-stone-500">
               아직 맺은 약정이 없습니다.{" "}
@@ -393,28 +399,30 @@ export default function EstatePage() {
             )}
           </div>
 
-          {assets.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white p-4"
-            >
-              <div className="min-w-0">
-                <p className="text-stone-800">{a.label}</p>
-                <p className="mt-1 text-sm text-stone-500">
-                  {CATEGORY_LABEL[a.category] ?? a.category}
-                  {won(a.estimatedValueKrw) ? ` · ${won(a.estimatedValueKrw)}` : ""}
-                </p>
-              </div>
-              {/* 자산에서 약정으로 — "무엇을 남기는가"가 대화의 출발점이 된다.
-                  작성실이 이 자산을 첫 문장에 실어 유산 기부 흐름을 연다 */}
-              <Link
-                href={`/write?asset=${encodeURIComponent(a.label)}`}
-                className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-stone-300 px-3 text-sm text-stone-700 transition hover:bg-stone-100"
+          <ScrollList count={assets.length}>
+  {assets.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white p-4"
               >
-                이 자산 남기기
-              </Link>
-            </div>
-          ))}
+                <div className="min-w-0">
+                  <p className="text-stone-800">{a.label}</p>
+                  <p className="mt-1 text-sm text-stone-500">
+                    {CATEGORY_LABEL[a.category] ?? a.category}
+                    {won(a.estimatedValueKrw) ? ` · ${won(a.estimatedValueKrw)}` : ""}
+                  </p>
+                </div>
+                {/* 자산에서 약정으로 — "무엇을 남기는가"가 대화의 출발점이 된다.
+                    작성실이 이 자산을 첫 문장에 실어 유산 기부 흐름을 연다 */}
+                <Link
+                  href={`/write?asset=${encodeURIComponent(a.label)}`}
+                  className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-stone-300 px-3 text-sm text-stone-700 transition hover:bg-stone-100"
+                >
+                  이 자산 남기기
+                </Link>
+              </div>
+            ))}
+          </ScrollList>
           {loaded && assets.length === 0 && (
             <p className="text-sm text-stone-500">
               아직 정리한 자산이 없습니다. 아래에서 하나씩 적어 두실 수 있어요.
@@ -475,14 +483,16 @@ export default function EstatePage() {
               </>
             }
           />
-          {ledger.map((n) => (
-            <div key={n.id} className="rounded-xl border border-stone-200 bg-white p-4">
-              <p className="text-stone-800">{n.changeReason}</p>
-              <p className="mt-1 text-sm text-stone-500">
-                {n.materiality === "MATERIAL" ? "재서명으로 봉인되는 변경" : "기록으로 남는 변경"}
-              </p>
-            </div>
-          ))}
+          <ScrollList count={ledger.length}>
+  {ledger.map((n) => (
+              <div key={n.id} className="rounded-xl border border-stone-200 bg-white p-4">
+                <p className="text-stone-800">{n.changeReason}</p>
+                <p className="mt-1 text-sm text-stone-500">
+                  {n.materiality === "MATERIAL" ? "재서명으로 봉인되는 변경" : "기록으로 남는 변경"}
+                </p>
+              </div>
+            ))}
+          </ScrollList>
           {loaded && ledger.length === 0 && (
             <p className="text-sm text-stone-500">
               아직 바뀐 기록이 없습니다. 뜻이 바뀌면 그 과정도 서명으로 남습니다.

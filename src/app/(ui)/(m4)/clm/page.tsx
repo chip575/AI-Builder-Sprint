@@ -155,9 +155,12 @@ export default function ClmPage() {
           // 빈 것도 상태다. 말하지 않으면 화면이 고장 난 것과 구분되지 않는다
           <Notice>아직 남기신 서류가 없습니다. 대화로 정리하시면 여기에 쌓입니다.</Notice>
         ) : (
-          <div className="overflow-x-auto">
+          /* 가로는 좁은 화면 때문에, 세로는 서류가 쌓이기 때문에 굴린다.
+             **잘라내지 않는다** — 상위 몇 건만 그리면 사용자는 없어진 줄 안다 (P4).
+             머리줄은 붙여 둔다: 굴리는 중에 어느 칸이 무엇인지 잃으면 표가 아니라 나열이 된다 */
+          <div className="max-h-[26rem] overflow-auto">
             <table className="w-full min-w-[36rem] border-collapse text-sm">
-              <thead>
+              <thead className="sticky top-0 bg-stone-50">
                 <tr className="border-b border-stone-300 text-left text-stone-500">
                   <th className="py-2 pr-3 font-normal">남긴 날</th>
                   <th className="py-2 pr-3 font-normal">서류</th>

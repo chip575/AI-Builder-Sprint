@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Recipient, RecipientKind } from "@/lib/contracts";
 import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
+import { ScrollList } from "@/app/(ui)/_components/ScrollList";
 
 /** 역할 이름은 **하는 일**로 짓는다. 코드명(CUSTODIAN)을 화면에 노출하지 않는다 */
 /** 화면에 내놓는 역할 — **기관과 유족 둘뿐이다.**
@@ -116,7 +117,8 @@ export function RecipientBook() {
             <p className="text-stone-900">{KIND_LABEL[k]}</p>
             <p className="mt-0.5 text-sm text-stone-500">{KIND_HINT[k]}</p>
 
-            <ul className="mt-3 space-y-2">
+            <ScrollList count={mine.length} rows={4}>
+              <ul className="space-y-2">
               {mine.map((r) => (
                 <li key={r.id} className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -142,7 +144,8 @@ export function RecipientBook() {
                 // "0명"이라고 쓰지 않는다 — 빈칸을 사실처럼 읽게 된다
                 <li className="text-sm text-stone-500">아직 적어 두신 분이 없습니다.</li>
               )}
-            </ul>
+              </ul>
+            </ScrollList>
           </div>
         );
       })}
