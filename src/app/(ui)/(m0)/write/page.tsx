@@ -18,6 +18,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
 import { AssetPeek } from "@/app/(ui)/_components/AssetPeek";
+import { ChatGuidelines } from "@/app/(ui)/_components/ChatGuidelines";
 import { STATUTES } from "@/lib/rules/validity-gate";
 import { DocPreview, type PreviewFacts } from "./DocPreview";
 
@@ -456,6 +457,10 @@ function WriteWorkspace() {
               ⚠ 한 줄을 통째로 쓴다: 펼친 표를 flex 안에 두면 눌려서 못 읽는다.
               접혀 있는 이유는 /chat과 같다 — 펴 두면 총액이 먼저 눈에 들어오고,
               그건 금액 제안이 된다 (system-prompt의 assetSection과 같은 판단) */}
+          {/* 이 대화가 무엇을 하고 무엇을 하지 않는지 — 경계를 미리 말해 두면
+              "문의처로 가세요"가 고장이 아니라 안내로 읽힌다 */}
+          <ChatGuidelines surface="write" />
+
           <AssetPeek />
 
           <div className="flex items-center justify-end">

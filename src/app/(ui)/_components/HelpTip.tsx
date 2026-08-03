@@ -25,12 +25,21 @@ export function SectionHeading({
   as?: "h2" | "h3";
 }) {
   const [open, setOpen] = useState(false);
+  /** 눌러서 연 것인가 — 그러면 마우스가 떠나도 닫지 않는다 */
+  const [sticky, setSticky] = useState(false);
   const id = useId();
   const Tag = as;
 
   return (
     <div>
-      <div className="flex items-center gap-2">
+      {/* 가져다 대도 열린다 — 누르는 것만으로는 "설명이 있다"는 사실을 알아채기 어렵다.
+          다만 호버로만 만들지 않는다: 터치 기기에는 호버가 없고 키보드에는 포인터가 없다.
+          클릭으로 연 것은 마우스가 떠나도 닫지 않는다(sticky) — 읽는 중에 사라지면 안 된다 */}
+      <div
+        className="flex items-center gap-2"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen((v) => (sticky ? v : false))}
+      >
         <Tag
           className={
             as === "h2"
@@ -42,7 +51,14 @@ export function SectionHeading({
         </Tag>
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() =>
+            setOpen((v) => {
+              setSticky(!v);
+              return !v;
+            })
+          }
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen((v) => (sticky ? v : false))}
           aria-expanded={open}
           aria-controls={id}
           aria-label={`${title} 설명`}

@@ -9,6 +9,7 @@ import { postSse } from "@/lib/sse";
 import { docLabel } from "@/lib/docs/labels";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
 import { AssetPeek } from "@/app/(ui)/_components/AssetPeek";
+import { ChatGuidelines } from "@/app/(ui)/_components/ChatGuidelines";
 import { suggestionTexts } from "@/lib/ai/session/suggested";
 
 interface Turn {
@@ -227,6 +228,10 @@ export default function ChatPage() {
               나중에 생각할래요
             </Link>
           </div>
+
+          {/* 이 대화가 무엇을 하고 무엇을 하지 않는지 — 경계를 미리 말해 두면
+              "문의처로 가세요"가 고장이 아니라 안내로 읽힌다 */}
+          <ChatGuidelines surface="chat" />
 
           {/* 자산 확인 — 유산·기부를 정리하는 중에 "내가 뭘 가지고 있더라"를
               여기서 본다. 나가면 쓰던 내용이 사라지므로 화면 안에서 편다 */}

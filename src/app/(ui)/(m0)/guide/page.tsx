@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
+import { ChatGuidelines } from "@/app/(ui)/_components/ChatGuidelines";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
 
 interface Turn {
@@ -207,12 +208,12 @@ export default function GuidePage() {
       }
     >
       <div className="space-y-4">
+        {/* 이 대화가 무엇을 하고 무엇을 하지 않는지 — 경계를 미리 말해 두면
+            "문의처로 가세요"가 고장이 아니라 안내로 읽힌다 */}
+        <ChatGuidelines surface="guide" />
+
         {turns.length === 0 && (
           <div className="space-y-3">
-            <p className="text-stone-500">
-              기부·유산·유언 서류를 법이 인정하는 방식으로만 안내해 드립니다.
-              답마다 근거 조문이 함께 붙습니다.
-            </p>
             {/* 질문 예시 — 누르면 그 문장을 그대로 보낸다. 문 앞의 분류가 아니라 예시다 */}
             <div className="flex flex-wrap gap-2">
               {STARTERS.map((q) => (
