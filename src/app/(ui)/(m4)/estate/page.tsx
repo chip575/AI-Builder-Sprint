@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
 import { AssetStatus } from "./AssetStatus";
 import { CustodianBook } from "./CustodianBook";
+import { DigitalLegacy } from "./DigitalLegacy";
 import type { InventorySummary } from "@/lib/contracts";
 
 interface Obligation {
@@ -320,6 +321,9 @@ export default function EstatePage() {
             </p>
           )}
         </section>
+
+        {/* ── 디지털 유산 (FR-403) ── */}
+        <DigitalLegacy onChanged={() => void load()} />
 
         {/* ── 지킴이 (FR-405 · NFR-713) ── */}
         <CustodianBook />

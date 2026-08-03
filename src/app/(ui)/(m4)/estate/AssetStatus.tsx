@@ -27,7 +27,15 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
-export function AssetStatus({ summary }: { summary: InventorySummary }) {
+export function AssetStatus({
+  summary,
+  onConfirm,
+}: {
+  summary: InventorySummary;
+  /** 있으면 "어디서 확인하나"를 안내한다. 없으면 그 문장을 내지 않는다 —
+   *  갈 곳 없는 안내는 사용자를 헤매게 한다 */
+  onConfirm?: boolean;
+}) {
   // 채무 분리·합계 규칙은 lib/estate/rollup이 갖는다 — 대화(asset-readback)와 **같은 함수**다.
   // 화면이 따로 세면 사용자가 같은 재산에 대해 두 개의 합계를 보게 된다
   const { owned, debt, ownedCount, total } = ownedRollup(summary);
@@ -94,10 +102,19 @@ export function AssetStatus({ summary }: { summary: InventorySummary }) {
       {/* 확인 유도 (P1) — 판독해 넣은 값은 사용자가 볼 때까지 미확인이다.
           0건이면 이 줄을 아예 그리지 않는다: "미확인 0건"은 사실이 아니라 빈칸이다 */}
       {summary.unconfirmedCount > 0 && (
-        <p className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-700">
-          아직 확인하지 않으신 항목이 {summary.unconfirmedCount}건 있습니다. 내용을 살펴보고
-          맞으면 확인해 주세요.
-        </p>
+        <div className="rounded-lg bg-stone-50 px-3 py-2">
+          <p className="text-sm text-stone-700">
+            아직 확인하지 않으신 항목이 {summary.unconfirmedCount}건 있습니다. 내용을 살펴보고
+            맞으면 확인해 주세요.
+          </p>
+          {/* 말만 하고 누를 곳이 없으면 안 된다 — 확인은 사용자의 행위이지
+              우리가 대신 할 수 있는 일이 아니다 (P1). 목록에서 한 건씩 누른다 */}
+          {onConfirm && (
+            <p className="mt-1 text-sm text-stone-500">
+              아래 자산 목록에서 항목마다 확인하실 수 있습니다.
+            </p>
+          )}
+        </div>
       )}
 
       {debt && (

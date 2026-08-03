@@ -43,11 +43,13 @@ HIT=$(grep -rn 'confirmed[_a-zA-Z]*:[[:space:]]*true' --include='*.ts' src/ 2>/d
             (*) echo "$file:$line:$rest" ;;
           esac
         done)
+# store-contract.ts는 위 두 어댑터를 **검사하는** 공유 스위트라 같은 가족으로 본다.
+# 이름에 .test.가 없어 위 제외에 안 걸린다 (2026-08-03 — 자산 확정 경로가 생기며 필요해짐).
 # 마커는 만능 열쇠가 아니다 — 확정 연산이 실제로 사는 곳(confirm 라우트 + store 어댑터)에서만 유효.
 # 잔여 리스크: 면허 파일 안에서 confirmFacts 외의 함수가 confirmed:true를 쓰면 통과한다.
 # 어댑터에 confirmed 쓰기가 늘어나는 순간 마커를 함수 단위로 좁힐 것.
 M=$(grep -rln 'P1-CONFIRM-PATH' --include='*.ts' src/ 2>/dev/null \
-    | grep -vE 'app/api/.*facts/confirm/|lib/store/(supabase|memory)\.ts')
+    | grep -vE 'app/api/.*facts/confirm/|lib/store/(supabase|memory|store-contract)\.ts')
 [ -n "$M" ] && { red "P1-CONFIRM-PATH 마커 허용 경로 밖 사용"; echo "$M" | head -3; }
 [ -n "$HIT" ] && { red "confirmed=true 기본값 (P1 위반 의심)"; echo "$HIT" | head -5; } || grn "confirmed 기본값 정상"
 

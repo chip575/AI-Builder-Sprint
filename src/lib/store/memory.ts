@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { cosine } from "../ai/embed/port";
 import type { Obligation, ObligationKind } from "../contracts/obligations";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
-import type { Asset, AssetCategory, Beneficiary, Custodian } from "../contracts/estate";
+import type { Asset, AssetCategory, Beneficiary, Custodian, DigitalDisposition } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
@@ -803,6 +803,37 @@ export class InMemoryStore implements StorePort {
    *  응답으로 새어 나가는 경로가 생긴다 */
   private assets: { userId: string; asset: Asset }[] = [];
   private beneficiaries: { userId: string; beneficiary: Beneficiary }[] = [];
+
+  async updateAsset(
+    userId: string,
+    assetId: string,
+    patch: {
+      disposition?: DigitalDisposition | null;
+      confirmed?: true;
+      beneficiaryId?: string | null;
+      story?: string | null;
+    },
+  ): Promise<Asset | undefined> {
+    const found = this.assets.find((a) => a.asset.id === assetId && a.userId === userId);
+    if (!found) return undefined;
+    const row = found.asset as Asset & {
+      beneficiaryId?: string | null;
+      story?: string | null;
+      disposition?: DigitalDisposition;
+      confirmed: boolean;
+    };
+    // undefined는 "안 건드림", null은 "지움" — 둘을 섞으면 폼에서 비운 칸과
+    // 아예 안 보낸 칸이 같은 뜻이 되어 값을 잃는다 (profiles와 같은 규약)
+    if (patch.beneficiaryId !== undefined) row.beneficiaryId = patch.beneficiaryId;
+    if (patch.story !== undefined) row.story = patch.story;
+    // 처리 방식은 디지털 자산에만 있다 — 다른 종류에 붙이면 계약이 깨진다
+    if (patch.disposition != null && row.category === "DIGITAL") {
+      row.disposition = patch.disposition;
+    }
+    // 확정은 **올리기만** 한다. 내리는 것은 값이 바뀔 때 서버가 하는 일이다 (P1)
+    if (patch.confirmed === true) row.confirmed = true; // P1-CONFIRM-PATH: 사용자 확인
+    return { ...row } as Asset;
+  }
 
   async createAsset(input: AssetWriteInput): Promise<Asset> {
     const base = {

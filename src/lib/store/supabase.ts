@@ -1225,6 +1225,40 @@ export class SupabaseStore implements StorePort {
     return row ? toFamilyAck(row) : undefined;
   }
 
+  async updateAsset(
+    userId: string,
+    assetId: string,
+    patch: {
+      disposition?: DigitalDisposition | null;
+      confirmed?: true;
+      beneficiaryId?: string | null;
+      story?: string | null;
+    },
+  ): Promise<Asset | undefined> {
+    const row: Row = {};
+    if (patch.beneficiaryId !== undefined) row.beneficiary_id = patch.beneficiaryId;
+    if (patch.story !== undefined) row.story = patch.story;
+    if (patch.disposition !== undefined) row.disposition = patch.disposition;
+    // 확정은 올리기만 한다 (P1) — 내리는 값은 아예 받지 않는다
+    if (patch.confirmed === true) row.confirmed = true; // P1-CONFIRM-PATH: 사용자 확인
+    if (Object.keys(row).length === 0) {
+      // 바꿀 것이 없으면 쓰지 않는다. 빈 update는 updated_at만 흔들어 이력을 더럽힌다
+      const { data } = await this.db.from("assets").select("*").eq("id", assetId).eq("user_id", userId).maybeSingle();
+      return data ? toAsset(data as Row) : undefined;
+    }
+    // user_id를 조건에 함께 건다 — id만 걸면 남의 자산이 바뀐다 (D-18과 같은 정신)
+    const { data, error } = await this.db
+      .from("assets")
+      .update(row)
+      .eq("id", assetId)
+      .eq("user_id", userId)
+      .select()
+      .maybeSingle();
+    if (error) this.fail("assets.update", error);
+    if (data) await this.audit("asset.update", userId, { fields: Object.keys(row) });
+    return data ? toAsset(data as Row) : undefined;
+  }
+
   async createAsset(input: AssetWriteInput): Promise<Asset> {
     const row = {
       id: randomUUID(),

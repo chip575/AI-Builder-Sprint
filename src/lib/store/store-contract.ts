@@ -338,6 +338,36 @@ export function storeContractTests(
       });
     });
 
+    it("자산 고치기 — 확정은 올리기만, 남의 것은 못 고친다 (P1 · D-18)", async () => {
+      const s = await makeStore();
+      const me = randomUUID();
+      const other = randomUUID();
+      const a = await s.createAsset({
+        userId: me,
+        category: "DIGITAL",
+        label: "구독 서비스",
+        origin: "OCR",
+        confidence: 0.4,
+        disposition: { action: "PRESERVE" },
+      });
+      expect(a.confirmed).toBe(false); // 판독 산출물은 미확인으로 시작한다 (P1)
+
+      const changed = await s.updateAsset(me, a.id, {
+        disposition: { action: "DELETE" },
+        // P1-CONFIRM-PATH: 사용자가 직접 확인하는 정당한 경로를 재는 검사다
+        confirmed: true,
+      });
+      expect(changed?.confirmed).toBe(true);
+      expect(changed?.category === "DIGITAL" && changed.disposition.action).toBe("DELETE");
+
+      // 🔴 남의 자산은 못 고친다 — id만 걸면 남의 것이 바뀐다
+      // P1-CONFIRM-PATH: 남이 확인하려 들면 막히는지를 재는 검사다
+      expect(await s.updateAsset(other, a.id, { confirmed: true })).toBeUndefined();
+      // 안 보낸 항목은 그대로 둔다 (undefined = 안 건드림)
+      const kept = await s.updateAsset(me, a.id, { story: "오래 쓰던 계정입니다" });
+      expect(kept?.category === "DIGITAL" && kept.disposition.action).toBe("DELETE");
+    });
+
     it("mock 슬롯: 마지막으로 쓴 상태가 읽힌다 (인스턴스 교체 대비)", async () => {
       const s = await makeStore();
       const docId = `mock-${randomUUID()}`;

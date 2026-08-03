@@ -1,7 +1,7 @@
 // StorePort — 영속화 어댑터 경계 (D-18). 인메모리·Supabase가 같은 규칙을 구현한다.
 // "같은 규칙"의 증명은 문서가 아니라 store-contract.ts 공유 스위트다 — 한 스위트, 두 구현.
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
-import type { Asset, AssetCategory, Beneficiary, Custodian } from "../contracts/estate";
+import type { Asset, AssetCategory, Beneficiary, Custodian, DigitalDisposition } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
@@ -137,6 +137,20 @@ export interface StorePort {
   /** 지킴이 (FR-405 · NFR-713).
    *  ⚠ 열람 권한의 기준은 `grantedAt`이지 status가 아니다 — 서명 완료 웹훅만 채운다.
    *    PENDING = 열람 0건이고, 그것이 기본값이라 조용히 열리는 경로가 없다 */
+  /** 이미 있는 자산 고치기 (FR-401 · FR-403).
+   *  남의 것을 고치지 않도록 userId를 함께 받는다. 없으면 undefined.
+   *  ⚠ confirmed는 **올리기만** 한다 — 내리는 것은 값이 바뀔 때 서버가 하는 일이다 (P1) */
+  updateAsset(
+    userId: string,
+    assetId: string,
+    patch: {
+      disposition?: DigitalDisposition | null;
+      confirmed?: true;
+      beneficiaryId?: string | null;
+      story?: string | null;
+    },
+  ): Promise<Asset | undefined>;
+
   listCustodians(userId: string): Promise<Custodian[]>;
   /** 같은 상대를 두 번 지정하지 않는다 — 재초대는 상태 갱신이다 (DB unique) */
   upsertCustodian(
