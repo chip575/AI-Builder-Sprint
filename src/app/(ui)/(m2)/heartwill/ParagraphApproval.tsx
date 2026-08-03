@@ -153,11 +153,15 @@ export function ParagraphApproval({
             : `고른 ${checked.size}문장을 문서에 남기기`}
       </PrimaryButton>
 
+      {/* 실제 동작만 말한다. 문단을 지우거나 직접 편집하는 기능은 없고, 고치는 길은
+          "같은 이야기를 근거로 새 문장을 승인하면 앞 문장을 대신한다" 하나뿐이다
+          (store.applyHeartWill — 근거 발화가 같으면 옛 문단을 잇지 않는다).
+          ⚠ "언제든 고칠 수 있다"고 적어 두면 없는 기능을 믿고 승인하게 된다 (P4) */}
       {applied && (
         <p className="text-sm text-stone-600">
           {applied.diff.length === 0
             ? "문서는 그대로입니다."
-            : `${applied.diff.length}개 문단이 반영되었습니다. 언제든 다시 고치실 수 있습니다.`}
+            : `${applied.diff.length}개 문단이 반영되었습니다. 고쳐 남기고 싶으시면 아래 "직접 쓰실 문장"에서 같은 이야기를 골라 새로 남겨 주세요 — 앞의 문장을 대신합니다.`}
         </p>
       )}
 

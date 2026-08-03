@@ -17,17 +17,20 @@ import { useEffect } from "react";
 
 export const NAV_SIDEBAR_ID = "nav-sidebar-panel";
 
-/** 문 목록 — 이름은 하는 일로 짓는다. 코드명(CLM)을 화면에 노출하지 않는다 */
+/** 일 — 하는 일로 이름을 짓는다. 코드명(CLM)을 화면에 노출하지 않는다.
+ *  ⚠ 화면마다 목록을 달리하지 않는다. 곁칸은 "어디로든 가는 지도"라서 열 때마다
+ *  내용이 바뀌면 사용자가 무엇이 있을지 예측할 수 없다 (그래서 숨김 기능을 없앴다) */
 const LINKS: { href: string; label: string; hint: string }[] = [
   { href: "/estate", label: "내 유산", hint: "자산과 다가오는 약속" },
-  { href: "/clm", label: "서류 이력", hint: "남긴 서류를 시간 순서로" },
   { href: "/write", label: "새 약정 준비하기", hint: "대화로 서류를 채웁니다" },
+  { href: "/clm", label: "서류 이력", hint: "남긴 서류를 시간 순서로" },
   // 종이로 받은 서류도 같은 서랍에서 들어온다 — "내 자산" 섹션 머리에 있던 밑줄 링크를
   // 여기로 옮겼다. 거기서는 터치 영역이 44px에 못 미쳤다 (P2)
   { href: "/branch/paper-scan", label: "종이 문서로 등록", hint: "찍어서 올리면 읽어 드립니다" },
-  // 약정서에 인쇄될 값을 미리 정해 두는 곳. 서명 확인 화면에서도 여기로 보낸다
-  { href: "/mypage", label: "내 정보", hint: "약정서에 들어갈 성명·연락처" },
 ];
+
+/** 계정 — 위의 "일"과 성격이 다르다. 그래서 카드가 아니라 작은 링크로 무게를 낮춘다 */
+const ACCOUNT = { href: "/mypage", label: "내 정보", hint: "약정서에 들어갈 성명·연락처" };
 
 export function NavSidebarToggle({
   open,
@@ -70,13 +73,9 @@ export function NavSidebarToggle({
 export function NavSidebarPanel({
   open,
   onClose,
-  hideHrefs = [],
 }: {
   open: boolean;
   onClose: () => void;
-  /** 이 화면이 헤더에 이미 내놓은 문은 서랍에서 뺀다 — 같은 버튼을 두 곳에 두지 않는다.
-   *  컴포넌트에서 지우지 않는 이유: 다른 화면(/clm)에는 그 문이 필요하다 */
-  hideHrefs?: string[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -130,7 +129,7 @@ export function NavSidebarPanel({
         </div>
 
         <nav className="space-y-2">
-          {LINKS.filter((l) => !hideHrefs.includes(l.href)).map((l) => {
+          {LINKS.map((l) => {
             const here = pathname === l.href;
             return (
               <Link
@@ -153,17 +152,20 @@ export function NavSidebarPanel({
           })}
         </nav>
 
-        <div className="mt-6 space-y-2 border-t border-stone-200 pt-4">
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              router.back();
-            }}
-            className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-4 text-left text-sm text-stone-700 hover:bg-stone-100"
+        {/* 계정 — 위의 "일"과 성격이 다르므로 구분선 아래에, 카드가 아닌 작은 링크로 둔다.
+            ⚠ "이전 화면으로"는 뺐다: 곁칸은 어디로든 가는 지도인데 뒤로가기는 직전 한 곳만
+            가리켜 성격이 다르고, 서랍을 열어야 뒤로 가는 건 두 단계라 뒤로가기의 장점을
+            없앤다. 되돌아가야 하는 화면은 Shell의 back prop을 쓴다 */}
+        <div className="mt-6 space-y-1 border-t border-stone-200 pt-4">
+          <Link
+            href={ACCOUNT.href}
+            onClick={onClose}
+            aria-current={pathname === ACCOUNT.href ? "page" : undefined}
+            className="flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm text-stone-600 hover:bg-stone-200/70"
           >
-            ← 이전 화면으로
-          </button>
+            <span>{ACCOUNT.label}</span>
+            <span className="text-stone-500">· {ACCOUNT.hint}</span>
+          </Link>
           <button
             type="button"
             onClick={() => void logout()}

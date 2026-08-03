@@ -139,7 +139,9 @@ function RewardPicker() {
 
 export default function RewardsPage() {
   return (
-    <Shell title="답례품 선택" fr={["FR-203"]}>
+    // 곁칸에서 뒤로가기를 뺐으므로 서명 흐름 중간인 이 화면은 앞 단계로 가는 문을 직접 단다.
+    // /doc·/vault에는 달지 않는다 — 문서가 만들어진 뒤라 되돌아가는 게 정상 흐름이 아니다
+    <Shell title="답례품 선택" fr={["FR-203"]} back={{ href: "/confirm", label: "확인 화면으로" }}>
       <Suspense fallback={<p className="text-stone-500">불러오는 중…</p>}>
         <RewardPicker />
       </Suspense>
