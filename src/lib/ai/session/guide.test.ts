@@ -114,3 +114,44 @@ describe("detectGuide — 넘겨야 할 발화 (안내가 삼키면 안 된다)"
     expect(detectGuide("오늘 날씨는 어떤가요?")).toBeNull();
   });
 });
+
+describe("실사용에서 새어 나갔던 말들 (2026-08-03)", () => {
+  // 쌍으로 잰다 — 잡아야 할 것과 **잡으면 안 되는 것**을 함께 본다 (AGENTS.md 테스트 절)
+  it("물음표 없는 세금 질문을 세법 안내가 받는다", () => {
+    // 이게 null이라 LLM으로 넘어갔고, 모델은 회상 질문으로 답했다
+    expect(detectGuide("기부금에 따른 세금 계산을 하고 싶은데")?.topic).toBe("TAX");
+    expect(detectGuide("상속세가 얼마나 나올지 알고 싶은데")?.topic).toBe("TAX");
+  });
+
+  it("세법 안내는 답을 만들지 않고 문의처로 보낸다", () => {
+    const reply = detectGuide("세금 계산을 하고 싶은데")!.reply;
+    expect(reply).toContain("계산해 드리지 않습니다");
+    expect(reply).toMatch(/126|국세/); // 문의처가 실제로 실려 나간다
+    expect(reply).not.toMatch(/\d+\s*%/); // 세율을 흘리지 않는다 (P3)
+  });
+
+  it("의사 표현은 여전히 안내가 가져가지 않는다 — 가지 몫이다", () => {
+    // 질문형을 넓히면서 여기까지 삼키면 작성실 진입 발화가 안내로 끝난다
+    expect(detectGuide("고향에 기부하고 싶어요")).toBeNull();
+    expect(detectGuide("유산 기부를 하고 싶어요")).toBeNull();
+    expect(detectGuide("문화유산을 후원하고 싶어요")).toBeNull();
+  });
+});
+
+describe("범위 밖 법률 질문 — 못 들은 척하지 않는다 (2026-08-03)", () => {
+  it("우리 서류와 무관한 법률 질문은 문의처로 보낸다", () => {
+    // 없을 때는 회상 질문("가장 고마운 사람은?")이 돌아왔다
+    expect(detectGuide("이혼 재산분할은 어떻게 되나요?")?.topic).toBe("LEGAL_OTHER");
+    expect(detectGuide("빚이 있으면 어떻게 되는지 알고 싶은데")?.topic).toBe("LEGAL_OTHER");
+    const reply = detectGuide("이혼 재산분할은 어떻게 되나요?")!.reply;
+    expect(reply).toContain("범위를 넘습니다");
+    expect(reply).toMatch(/132|법률구조/);
+  });
+
+  it("우리 주제를 이 그물이 가로채지 않는다 — 순서가 규칙이다", () => {
+    expect(detectGuide("유언장은 어떻게 쓰나요?")?.topic).toBe("WILL");
+    expect(detectGuide("상속세는 얼마나 나오나요?")?.topic).toBe("TAX");
+    expect(detectGuide("상속 포기는 언제까지 하나요?")?.topic).toBe("DEADLINE");
+    expect(detectGuide("기부는 어떻게 하나요?")?.topic).toBe("DONATION");
+  });
+});

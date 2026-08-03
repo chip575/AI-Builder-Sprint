@@ -160,7 +160,14 @@ function WriteWorkspace() {
     try {
       await postSse(
         "/api/session/message",
-        { sessionId: opts?.forSession !== undefined ? opts.forSession : sessionId, text },
+        {
+          sessionId: opts?.forSession !== undefined ? opts.forSession : sessionId,
+          text,
+          // **여기가 어느 서류의 작성실인지 알린다.** 안 알리면 서버는 이 대화를
+          // "아직 어디로 갈지 모르는 대화"로 보고 다른 가지를 제안한다 —
+          // 기부 약정서를 쓰는 중에 "고향에 기부하고 싶으신가요?"가 뜬 원인이다
+          docType,
+        },
         {
           onToken: (chunk) =>
             setTurns((t) => {

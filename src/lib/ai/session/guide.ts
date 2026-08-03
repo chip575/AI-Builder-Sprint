@@ -10,6 +10,7 @@
 // 안내 끝의 다음 행동 제안은 사용자가 그 문장을 직접 말해야 진행된다 —
 // 안내가 가지를 대신 열지 않는다.
 import type { Statute } from "../../contracts/gate";
+import type { DocType } from "../../contracts/common";
 import { STATUTES } from "../../rules/validity-gate";
 import { debtNoticeStatutes } from "../../rules/inheritance";
 import { referralText } from "../../referral/registry";
@@ -20,7 +21,8 @@ export type GuideTopic =
   | "LEGACY_GIFT"  // 사인증여(유산기부) — 전자서명 가능 + 유류분 고지
   | "DEADLINE"     // 상속 승인·포기 기간
   | "INHERITANCE"  // 법정상속 일반
-  | "DONATION";    // 생전 기부 절차
+  | "DONATION"     // 생전 기부 절차
+  | "LEGAL_OTHER"; // 우리 범위 밖 법률 — **답하지 않는다.** 문의처로 보낸다
 
 export interface GuideReply {
   topic: GuideTopic;
@@ -30,9 +32,27 @@ export interface GuideReply {
   statutes: Statute[];
 }
 
+/** **지금 쓰는 이 서류**에 대한 질문인가. "이 약정서는 언제 효력이 생기나요?"
+ *  주제어(기부·상속·유언)가 없어서 아래 표에 안 걸리는데, 작성실은 어느 서류인지
+ *  이미 알고 있다. 그 앎을 안 쓰면 모델이 답하고 — 실제로 사인증여 약정을 두고
+ *  **"공증 절차를 마친 후부터 효력이 발생합니다"**라는 틀린 말을 했다 (2026-08-03).
+ *  법률 효력은 코드가 말한다 (P3). */
+const ABOUT_THIS_DOC = /(약정서|이\s*서류|이\s*문서|이\s*계약|서명하고\s*나면|서명\s*(하면|후|뒤))/;
+
+/** 서류 → 그 서류를 설명하는 안내 주제. 표는 위의 REPLIES를 그대로 쓴다 */
+const DOC_TOPIC: Partial<Record<DocType, GuideTopic>> = {
+  LEGACY_GIFT_AGREEMENT: "LEGACY_GIFT",
+  DONATION_PLEDGE: "DONATION",
+  HERITAGE_SUPPORT_PLEDGE: "DONATION",
+  HANDWRITTEN_WILL: "WILL",
+};
+
 /** 질문형 신호 — 이게 없으면 안내가 아니라 회상·의사 표현이다 */
 const QUESTION =
-  /(어떻게|어떡|무엇|뭐예요|뭔가요|궁금|알려\s*주|가능한|가능해|되나요|할\s*수\s*있|인가요|차이|절차|방법|언제까지|얼마나)/;
+  // ⚠ **묻는 말이 늘 물음표로 오지 않는다.** "세금 계산을 하고 싶은데"는 질문인데
+  //   예전 패턴은 못 잡았고, 그래서 안내층을 그냥 통과해 LLM이 회상 질문으로 답했다
+  //   (2026-08-03 실사용). "~하고 싶은데"·"~인데"·"~좀"은 한국어에서 요청·질문의 꼴이다.
+  /(어떻게|어떡|무엇|뭐예요|뭔가요|궁금|알려\s*주|가능한|가능해|되나요|할\s*수\s*있|인가요|차이|절차|방법|언제까지|얼마나|하고\s*싶은데|싶은데|알고\s*싶|좀\s*알|계산|물어|여쭤|나요|까요|는지|맞나|맞는|\?)/;
 
 /** 주제 규칙 — 구체적인 것 먼저 (express-detect와 같은 원칙) */
 const TOPIC_RULES: { topic: GuideTopic; pattern: RegExp }[] = [
@@ -40,7 +60,14 @@ const TOPIC_RULES: { topic: GuideTopic; pattern: RegExp }[] = [
   // 되고, 묻지도 않은 상속 포기 기간을 세금 질문의 답인 양 내놓는다.
   // ⚠ 여기에 "공제"를 넣지 않는다 — 우리 서식의 기부 공제는 확인 화면이 계산하는
   //   우리 일이다. 넣으면 기부 대화가 통째로 "문의하세요"로 끝난다
-  { topic: "TAX", pattern: /(상속세|증여세|양도소득세|취득세|세무|절세|세율|세금이\s*얼마|세금\s*얼마)/ },
+  // ⚠ "세금 계산"·"세액공제 얼마"가 빠져 있어 실사용에서 통째로 새어 나갔다 (2026-08-03).
+  //   다만 **우리 서식이 계산하는 기부 공제**는 여기로 보내지 않는다 — 아래 DONATION이
+  //   받아 "확인 화면에서 계산해 드린다"고 답한다. 그 경계가 이 두 줄이다.
+  {
+    topic: "TAX",
+    pattern:
+      /(상속세|증여세|양도소득세|취득세|세무|절세|세율|세금[이은는]?\s*(얼마|계산|어떻게)|세금\s*계산|세액\s*계산)/,
+  },
   // "상속 포기는 언제까지"가 INHERITANCE에 먼저 걸리면 기한 답을 못 준다
   { topic: "DEADLINE", pattern: /(포기|한정승인|기한|기간|언제까지)/ },
   { topic: "WILL", pattern: /유언/ },
@@ -48,6 +75,15 @@ const TOPIC_RULES: { topic: GuideTopic; pattern: RegExp }[] = [
   { topic: "LEGACY_GIFT", pattern: /(사인\s*증여|유산\s*기부|사후\s*기부|(떠나|떠난|떠날|죽|사망)[^.]{0,12}기부)/ },
   { topic: "INHERITANCE", pattern: /상속/ },
   { topic: "DONATION", pattern: /기부/ },
+  // **맨 마지막 그물.** 위 주제에 안 걸린 법률 질문이 여기서 걸린다.
+  // 없을 때는 "이혼 재산분할은 어떻게 되나요?"에 회상 질문("가장 고마운 사람은?")이
+  // 돌아왔다 (2026-08-03 실측). 우리 일이 아니라고 말하는 것과 못 들은 척하는 것은 다르다.
+  // 순서가 곧 규칙이다 — 우리 서류의 주제가 먼저 걸러진 뒤에만 여기 온다
+  {
+    topic: "LEGAL_OTHER",
+    pattern:
+      /(이혼|재산\s*분할|위자료|소송|고소|고발|재판|변호사|등기|후견|친권|양육권|채무|빚|파산|회생|명의\s*신탁|법[적으로]|합법|불법|권리)/,
+  },
 ];
 
 function statuteLines(statutes: Statute[]): string {
@@ -144,6 +180,17 @@ const REPLIES: Record<GuideTopic, () => GuideReply> = {
       `${referralText("TAX")} ` +
       "다만 이 서비스에서 만드시는 기부 약정의 예상 공제액은 확인 화면에서 계산해 보여 드립니다.",
   }),
+  // 우리 범위 밖 법률 — **답을 만들지 않는다.** 조문도 붙이지 않는다(근거를 달면 답처럼 읽힌다).
+  // 변호사법 §109의 선을 넘지 않으려면 "우리 서류에 관한 안내"에서 멈춰야 한다.
+  LEGAL_OTHER: () => ({
+    topic: "LEGAL_OTHER",
+    statutes: [],
+    reply:
+      "죄송합니다. 그 문제는 저희가 안내해 드릴 수 있는 범위를 넘습니다. " +
+      "저희는 이곳에서 만드시는 서류(기부·유산 약정, 유언장 준비)에 관한 것만 " +
+      `안내해 드리고 있습니다. ${referralText("INHERITANCE_LAW")} ` +
+      "이곳에서 남기고 싶은 것이 있으시면 그건 언제든 함께 정리해 드릴게요.",
+  }),
   DONATION: () => ({
     topic: "DONATION",
     statutes: [],
@@ -164,10 +211,14 @@ export function isQuestionShaped(text: string): boolean {
   return QUESTION.test(text);
 }
 
-export function detectGuide(text: string): GuideReply | null {
+export function detectGuide(text: string, docType?: DocType | null): GuideReply | null {
   if (!QUESTION.test(text)) return null;
   for (const rule of TOPIC_RULES) {
     if (rule.pattern.test(text)) return REPLIES[rule.topic]();
   }
+  // 주제어가 없어도 **"이 서류"를 묻는 것**이면 작성실이 아는 서류로 답한다.
+  // 마지막에 두는 이유: "이 약정서 말고 상속세는요?"는 위에서 세법이 먼저 가져가야 한다
+  const topic = docType ? DOC_TOPIC[docType] : undefined;
+  if (topic && ABOUT_THIS_DOC.test(text)) return REPLIES[topic]();
   return null;
 }
