@@ -88,6 +88,11 @@ const SYSTEM = [
   "doc 후보: DONATION_PLEDGE(지금 기부), HERITAGE_SUPPORT_PLEDGE(문화유산 후원),",
   "LEGACY_GIFT_AGREEMENT(사후에 재산 남김), HANDWRITTEN_WILL(가족에게 상속·유언),",
   "HEART_LETTER(마음·편지). 상황을 못 읽으면 null.",
+  "",
+  "⚠ label이 WHICH_DOC일 때 doc은 **무엇을 누구에게 남기려는지가 드러날 때만** 고른다.",
+  "  · 고른다: \"재산을 사회에 남기고 싶다\", \"손주에게 편지\", \"떠난 뒤에 기부\"",
+  "  · null: \"혼자 산다\", \"암 진단을 받았다\" 처럼 처지만 말한 경우 —",
+  "    무엇을 남기고 싶은지가 없으면 되묻는 편이 낫다. 잘못 권하는 것이 더 나쁘다.",
 ].join("\n");
 
 export interface SolarGuideClassifierOptions {

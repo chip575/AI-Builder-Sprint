@@ -105,14 +105,28 @@ export async function POST(req: Request) {
   // ⚠ 분류기는 **라벨만** 고른다. 문장은 guideForLabel이 코드 표에서 꺼낸다 —
   //   법령 문장이 프롬프트에도 모델 출력에도 없으므로 환각이 낄 자리가 없다.
   let guide = detectGuide(parsed.data.text, parsed.data.docType);
-  if (!guide && isQuestionShaped(parsed.data.text)) {
+  // 서류를 못 고른 "어떤 걸 쓸까요"는 **미완성 안내**다 — 되묻기로 끝내기 전에
+  // 분류기에게 한 번 더 기회를 준다. 규칙이 되묻기로 답해 버리면 분류기가 낄 자리가
+  // 없어서, "암 진단을 받았는데 재산 일부를 사회에 남기고 싶어요"가 되묻기로 끝났다
+  const incomplete = guide?.topic === "WHICH_DOC" && !guide.suggestedDoc;
+  if ((!guide || incomplete) && isQuestionShaped(parsed.data.text)) {
     const label = await guideClassifier
       .classify(parsed.data.text, parsed.data.docType ?? null)
       // 분류 실패가 대화를 죽이지 않는다 — 규칙만으로 진행한다
       .catch(() => null);
     if (label) {
-      guide = guideForLabel(label.label, parsed.data.text, parsed.data.docType, label.doc);
-      if (guide) console.info(`[guide] CLASSIFIED label=${label.label}`);
+      const fromLabel = guideForLabel(
+        label.label,
+        parsed.data.text,
+        parsed.data.docType,
+        label.doc,
+      );
+      // ⚠ 분류기가 또 되묻기를 내면 원래 답을 지키지 않는다 — 둘 다 되묻기라 같다.
+      //   서류를 골라 왔을 때만 갈아탄다 (미완성 → 완성인 경우만)
+      if (fromLabel && (!incomplete || fromLabel.suggestedDoc)) {
+        guide = fromLabel;
+        console.info(`[guide] CLASSIFIED label=${label.label}`);
+      }
     }
   }
 

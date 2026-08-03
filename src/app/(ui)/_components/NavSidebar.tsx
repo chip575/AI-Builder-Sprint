@@ -179,6 +179,9 @@ export function NavSidebarPanel({
               서명하실 때마다 다시 적지 않으셔도 됩니다.
               <br />
               무언가를 알려 드릴 <strong>주소록</strong>도 여기 있습니다.
+              <br />
+              <strong>쓰는 법</strong> — 한 번 적어 두시면 이후 서류에 자동으로 실립니다.
+              비워 두셔도 서류를 만드실 수 있고, 서명 전에 다시 여쭙니다.
             </InlineHelp>
           </div>
           <button
