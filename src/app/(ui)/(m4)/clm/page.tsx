@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorNote, Notice, Shell } from "@/app/(ui)/_components/Shell";
 import { RevokeCell } from "./RevokeCell";
+import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
 import { DOC_LABEL as DOC_LABEL_MAP, docLabel } from "@/lib/docs/labels";
 
 interface Row {
@@ -131,7 +132,22 @@ export default function ClmPage() {
 
         <ErrorNote error={error} />
 
-        <h2 className="font-serif text-lg font-semibold text-stone-900">남긴 서류</h2>
+        <SectionHeading
+          title="남긴 서류"
+          help={
+            <>
+              지금까지 만드신 서류를 시간 순서로 보여드립니다.
+              <br />
+              <strong>효력</strong> 칸이 중요합니다 — 같은 “서류”라도 전자서명으로 효력이
+              생기는 것(기부·유산 약정), 전자서명으로는 효력이 없는 것(자필 유언),
+              서명 없이 보관하는 것(마음 편지)이 다릅니다. 법이 정한 방식이 서류마다
+              달라서, 저희가 그 판정을 화면에 그대로 적습니다.
+              <br />
+              <strong>그만두기</strong>도 서류마다 부르는 말이 다릅니다 — 사인증여는 철회,
+              정기후원은 해지입니다. 되돌아오는 것이 다르기 때문입니다.
+            </>
+          }
+        />
 
         {rows === null ? (
           <p className="text-sm text-stone-500">불러오는 중…</p>

@@ -433,6 +433,13 @@ function WriteWorkspace() {
       }}
       bottomBar={
         <div className="space-y-2">
+          {/* 약정서를 채우는 대화다 — "얼마를 남길까"를 정하려면 가진 것을 볼 수
+              있어야 한다. 나가면 쓰던 내용이 사라지므로 화면 안에서 편다.
+              ⚠ 한 줄을 통째로 쓴다: 펼친 표를 flex 안에 두면 눌려서 못 읽는다.
+              접혀 있는 이유는 /chat과 같다 — 펴 두면 총액이 먼저 눈에 들어오고,
+              그건 금액 제안이 된다 (system-prompt의 assetSection과 같은 판단) */}
+          <AssetPeek />
+
           <div className="flex items-center justify-end">
             {/* P4 — 전 화면 필수 */}
             <Link

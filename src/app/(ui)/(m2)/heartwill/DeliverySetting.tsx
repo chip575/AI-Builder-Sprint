@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Recipient } from "@/lib/contracts";
+import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
 
 type Policy = "IMMEDIATE" | "SCHEDULED" | "POSTHUMOUS";
 
@@ -73,11 +74,19 @@ export function DeliverySetting({ sessionId }: { sessionId: string }) {
 
   return (
     <section className="space-y-3 border-t border-stone-200 pt-8">
-      <h2 className="text-lg text-stone-900">언제, 누구에게</h2>
-      <p className="text-sm text-stone-500">
-        남기신 글을 언제 어느 분께 전할지 정해 두실 수 있습니다. 언제든 다시 바꾸셔도 됩니다.
-      </p>
-
+      <SectionHeading
+        as="h3"
+        title="언제, 누구에게"
+        help={
+          <>
+            남기신 글을 언제 어느 분께 전할지 정해 두시는 곳입니다. 언제든 바꾸실 수 있습니다.
+            <br />
+            정해 두시는 것과 실제로 전해 드리는 것은 다른 단계입니다 — 어떤 방식이 아직
+            준비 중인지는 고르시면 화면이 알려 드립니다. 준비 중이어도 정해 두신 내용은
+            그대로 남습니다.
+          </>
+        }
+      />
       <fieldset>
         <legend className="sr-only">언제 전할까요</legend>
         <div className="space-y-2">

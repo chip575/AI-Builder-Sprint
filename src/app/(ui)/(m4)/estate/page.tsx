@@ -15,8 +15,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
+import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
 import { AssetStatus } from "./AssetStatus";
-import { CustodianBook } from "./CustodianBook";
 import { DigitalLegacy } from "./DigitalLegacy";
 import type { InventorySummary } from "@/lib/contracts";
 
@@ -221,7 +221,16 @@ export default function EstatePage() {
             법적 서류가 아니다. 그래서 아래 약정 카드들과 같은 상자를 쓰되 도장·상태
             같은 서류 표시를 두지 않는다. 세지도 않는다 — 회상은 진도가 아니다 (P4·FR-111) */}
         <section className="space-y-3">
-          <h2 className="font-serif text-lg font-semibold text-stone-900">남기신 마음</h2>
+          <SectionHeading
+            title="남기신 마음"
+            help={
+              <>
+                법적 효력이 있는 서류와는 별개로, 하고 싶은 말씀을 그대로 남겨 두는 자리입니다.
+            재산을 옮기거나 유언의 효력을 갖지 않습니다 — 그래서 서명하지 않고 보관만 합니다.
+            법적 효력이 필요한 유언장은 손으로 직접 쓰셔야 합니다 (민법 제1066조).
+              </>
+            }
+          />
           <div className="rounded-xl border border-stone-200 bg-white p-4">
             <p className="leading-relaxed text-stone-700">
               법적 효력이 있는 서류와는 별개로, 하고 싶은 말씀을 그대로 남겨 두는
@@ -250,7 +259,16 @@ export default function EstatePage() {
         {/* ── 다가오는 약속 (FR-508) ── */}
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-serif text-lg font-semibold text-stone-900">다가오는 약속</h2>
+            <SectionHeading
+            title="다가오는 약속"
+            help={
+              <>
+                서류를 맺으면 “언제 다시 여쭐지”가 함께 정해집니다. 정기후원은 계속하실지,
+            남기신 뜻은 그대로인지 — 그날이 오면 이곳에 뜹니다.
+            체결이 끝이 아니라 시작이라는 뜻이고, 재촉이 아니라 초대입니다.
+              </>
+            }
+          />
             {/* 데모 장치 — 실 모드에서는 서버가 거부한다 (advance-time 라우트) */}
             <button
               type="button"
@@ -287,7 +305,15 @@ export default function EstatePage() {
 
         {/* ── 남긴 약정 ── */}
         <section className="space-y-3">
-          <h2 className="font-serif text-lg font-semibold text-stone-900">남긴 약정</h2>
+          <SectionHeading
+            title="남긴 약정"
+            help={
+              <>
+                서명까지 끝난 서류와 진행 중인 서류를 함께 보여드립니다.
+            자세한 내용과 그만두기는 <strong>서류 이력</strong> 화면에서 하실 수 있습니다.
+              </>
+            }
+          />
           {pledges.map((p) => (
             <div
               key={p.draftId}
@@ -325,15 +351,21 @@ export default function EstatePage() {
         {/* ── 디지털 유산 (FR-403) ── */}
         <DigitalLegacy onChanged={() => void load()} />
 
-        {/* ── 지킴이 (FR-405 · NFR-713) ── */}
-        <CustodianBook />
-
         {/* ── 내 자산 (FR-402) ── */}
         <section className="space-y-3">
           {/* "종이 문서로 등록"은 서류 서랍으로 옮겼다 — 여기서는 밑줄 링크라
               터치 영역이 44px에 못 미쳤고, 서류로 가는 문은 한곳에 모으는 편이 낫다 */}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-serif text-lg font-semibold text-stone-900">내 자산</h2>
+            <SectionHeading
+            title="내 자산"
+            help={
+              <>
+                저희가 아는 재산은 두 가지 경로로만 들어옵니다 — 직접 적어 주신 것과
+            올려 주신 종이 서류를 읽은 것. 그래서 여기 있는 것이 전부가 아닐 수 있고,
+            화면도 그렇게 말합니다. 금액을 적지 않으신 항목이 섞이면 합계를 내지 않습니다.
+              </>
+            }
+          />
             {/* 점검은 **접어 둔다.** 펴 두면 화면을 열 때마다 총액이 먼저 눈에 들어오고,
                 이 화면은 관리하러 오는 곳이지 재산을 확인하러 오는 곳이 아니다.
                 누른 사람에게만 보이는 편이 P4(재촉하지 않는다)와도 맞는다 */}
@@ -433,7 +465,16 @@ export default function EstatePage() {
 
         {/* ── 뜻이 바뀐 기록 (FR-553 · P5) ── */}
         <section className="space-y-3">
-          <h2 className="font-serif text-lg font-semibold text-stone-900">뜻이 바뀐 기록</h2>
+          <SectionHeading
+            title="뜻이 바뀐 기록"
+            help={
+              <>
+                마음이 바뀌신 과정을 시간 순서로 남깁니다. 각 기록은 앞의 기록과 사슬처럼
+            묶여 있어서, 한 글자만 바뀌어도 그 뒤가 전부 어긋납니다 —
+            나중에 “이게 정말 본인 뜻이었나”를 물었을 때 답이 되는 자리입니다.
+              </>
+            }
+          />
           {ledger.map((n) => (
             <div key={n.id} className="rounded-xl border border-stone-200 bg-white p-4">
               <p className="text-stone-800">{n.changeReason}</p>

@@ -11,6 +11,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
 
 export function SaveAsDocument({
   sessionId,
@@ -51,11 +52,19 @@ export function SaveAsDocument({
 
   return (
     <section className="space-y-2 border-t border-stone-200 pt-8">
-      <h2 className="text-lg text-stone-900">서류로 남기기</h2>
-      <p className="text-sm text-stone-500">
-        고르신 문장을 서류 이력에 넣어 둡니다. 남기신 날짜와 함께 언제든 다시 찾아보실 수
-        있습니다. 서명하지 않는 문서라 서명란은 없습니다.
-      </p>
+      <SectionHeading
+        as="h3"
+        title="서류로 남기기"
+        help={
+          <>
+            고르신 문장을 <strong>서류 이력</strong>에 넣어 둡니다. 남기신 날짜와 함께
+            언제든 다시 찾아보실 수 있습니다.
+            <br />
+            서명하지 않는 문서라 서명란이 없습니다 — 마음을 남겨 두는 기록이지 법적 효력이
+            있는 서류가 아닙니다.
+          </>
+        }
+      />
       <button
         type="button"
         onClick={() => void save()}

@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Asset, Beneficiary, DigitalDisposition } from "@/lib/contracts";
+import { SectionHeading } from "@/app/(ui)/_components/HelpTip";
 
 /** 화면이 다루는 것은 디지털 자산뿐이다 — 계약의 판별 유니온에서 그 갈래만 좁혀 쓴다 */
 type DigitalAssetRow = Extract<Asset, { category: "DIGITAL" }>;
@@ -87,12 +88,18 @@ export function DigitalLegacy({ onChanged }: { onChanged?: () => void }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="font-serif text-lg font-semibold text-stone-900">디지털 유산</h2>
-      <p className="text-sm text-stone-500">
-        구독이나 계정을 어떻게 할지 남겨 두시는 곳입니다. 법적 효력이 있는 서류가 아니라,
-        남은 분들이 참고할 지시입니다. 서비스 회사가 이 문서만으로 계정을 지워 주지는
-        않습니다.
-      </p>
+      <SectionHeading
+        title="디지털 유산"
+        help={
+          <>
+            구독·클라우드·SNS 같은 계정을 어떻게 할지 남겨 두는 곳입니다.
+            <br />
+            <strong>법적 효력이 있는 서류가 아닙니다.</strong> 서비스 회사가 이 문서만으로
+            계정을 지워 주지는 않습니다 — 남은 분들이 “무엇을 원하셨는지” 알 수 있게 하는
+            기록입니다. 그래서 서명란도 없습니다.
+          </>
+        }
+      />
 
       {undecided.length > 0 && (
         <div className="rounded-xl border border-stone-300 bg-white p-4">
