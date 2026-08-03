@@ -17,7 +17,6 @@ export function Shell({
   headerBar,
   bottomBar,
   nav = true,
-  navHideHrefs,
 }: {
   title: string;
   /** 이 화면이 구현하는 FR — 우상단 배지 */
@@ -42,8 +41,6 @@ export function Shell({
    *  매번 찾아야 한다. 끄는 자리는 로그인 전 화면뿐이다(/auth): 갈 곳이 전부
    *  로그인 뒤에 있고 로그아웃 항목은 뜻이 없다 */
   nav?: boolean;
-  /** 이 화면이 헤더에 이미 내놓은 문은 곁칸에서 뺀다 (같은 버튼을 두 곳에 두지 않는다) */
-  navHideHrefs?: string[];
 }) {
   const [navOpen, setNavOpen] = useState(false);
   // 곁칸을 켜면 머리가 2행이 된다 — 토글이 설 자리가 1행이기 때문이다.
@@ -116,11 +113,7 @@ export function Shell({
       )}
 
       {nav && (
-        <NavSidebarPanel
-          open={navOpen}
-          onClose={() => setNavOpen(false)}
-          hideHrefs={navHideHrefs}
-        />
+        <NavSidebarPanel open={navOpen} onClose={() => setNavOpen(false)} />
       )}
 
       <div className="flex-1">{children}</div>

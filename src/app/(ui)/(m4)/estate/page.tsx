@@ -198,8 +198,6 @@ export default function EstatePage() {
           </Link>
         </div>
       }
-      // 헤더에 이미 있는 "새 약정 준비하기"는 곁칸에서 뺀다 — /clm에는 그대로 남는다
-      navHideHrefs={["/write"]}
     >
       <div className="space-y-8">
         {/* 두 문장을 각 줄에 둔다 — 대시로 이으면 좁은 화면에서 한 줄이 너무 길어진다 */}
@@ -217,7 +215,7 @@ export default function EstatePage() {
           <div className="rounded-xl border border-stone-200 bg-white p-4">
             <p className="leading-relaxed text-stone-700">
               법적 효력이 있는 서류와는 별개로, 하고 싶은 말씀을 그대로 남겨 두는
-              자리입니다. 언제 시작하셔도 되고, 하지 않으셔도 괜찮습니다.
+              자리입니다. 언제든 시작하셔도 되고, 하지 않으셔도 괜찮습니다.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link
@@ -377,12 +375,14 @@ export default function EstatePage() {
               아직 정리한 자산이 없습니다. 아래에서 하나씩 적어 두실 수 있어요.
             </p>
           )}
-          <div className="flex flex-wrap gap-2 rounded-xl border border-stone-200 bg-white p-3">
+          {/* 좁은 화면에서는 세로로 쌓는다 — 넷을 한 줄에 두면 375px에서 이름 칸이
+              "부산은행 정기예금"도 못 담을 만큼 좁아진다 (P2). sm부터 한 줄로 돌아온다 */}
+          <div className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
             <select
               value={assetCategory}
               onChange={(e) => setAssetCategory(e.target.value)}
               aria-label="자산 종류"
-              className="min-h-11 rounded-xl border border-stone-300 bg-white px-2 text-sm"
+              className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-2 text-sm sm:w-auto"
             >
               {Object.entries(CATEGORY_LABEL)
                 .filter(([k]) => k !== "DIGITAL") // 디지털은 처리 지시가 필수 — 전용 화면(M4)의 몫
@@ -397,7 +397,7 @@ export default function EstatePage() {
               onChange={(e) => setAssetLabel(e.target.value)}
               placeholder="예: ○○은행 예금"
               aria-label="자산 이름"
-              className="min-h-11 min-w-0 flex-1 rounded-xl border border-stone-300 px-3 text-sm outline-none focus:border-stone-500"
+              className="min-h-11 w-full min-w-0 rounded-xl border border-stone-300 px-3 text-sm outline-none focus:border-stone-500 sm:flex-1"
             />
             <input
               value={assetValue}
@@ -405,13 +405,13 @@ export default function EstatePage() {
               placeholder="금액(선택)"
               aria-label="예상 금액"
               inputMode="numeric"
-              className="min-h-11 w-28 rounded-xl border border-stone-300 px-3 text-sm outline-none focus:border-stone-500"
+              className="min-h-11 w-full rounded-xl border border-stone-300 px-3 text-sm outline-none focus:border-stone-500 sm:w-28"
             />
             <button
               type="button"
               onClick={() => void addAsset()}
               disabled={busy || !assetLabel.trim()}
-              className="min-h-11 rounded-xl bg-ink px-4 text-sm text-stone-50 disabled:bg-stone-300 disabled:text-stone-600"
+              className="min-h-11 w-full rounded-xl bg-ink px-4 text-sm text-stone-50 disabled:bg-stone-300 disabled:text-stone-600 sm:w-auto"
             >
               적어두기
             </button>
