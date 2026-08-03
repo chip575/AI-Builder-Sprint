@@ -10,6 +10,7 @@
 // ⚠ 기관이 서명하지 않아도 철회는 성립한다 (서식 제2조). 그래서 이 문서가 미완료로
 //   남는 것은 결함이 아니다 — 화면이 그렇게 말해야 한다.
 import { canRevoke } from "@/lib/rules/revocation";
+import { docLabel } from "@/lib/docs/labels";
 import { evaluateGate } from "@/lib/rules/validity-gate";
 import { effectiveProfile } from "@/app/api/(m0)/me/route";
 import { getCurrentUser, loginRequired } from "@/lib/auth/session";
@@ -91,7 +92,9 @@ export async function POST(
         revoker_name: eff.displayName,
         revoker_contact: eff.contact,
         org_name: to.name,
-        original_agreement: `${origin.docType} · ${origin.createdAt.slice(0, 10)} 체결`,
+        // 코드값이 아니라 사람이 읽는 이름을 싣는다 — 화면에서 "유산 기부 약정서"로
+        // 보던 것을 서면에서 LEGACY_GIFT_AGREEMENT로 만나면 같은 것인 줄 모른다
+        original_agreement: `${docLabel(origin.docType)} · ${origin.createdAt.slice(0, 10)} 체결`,
         revocation_reason: revokeNode.changeReason,
         // 서명일이 아니라 **의사표시일**이다 — 기관이 사흘 뒤 서명해도 철회일은 그날이다
         revocation_date: revokeNode.createdAt.slice(0, 10),

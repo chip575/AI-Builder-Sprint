@@ -40,6 +40,8 @@ export function CustodianBook() {
   const [scope, setScope] = useState<Set<AssetCategory>>(new Set());
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  /** 범위를 고치는 중인 지킴이. null이면 아무도 안 고치는 중 */
+  const [editing, setEditing] = useState<{ id: string; scope: Set<AssetCategory> } | null>(null);
 
   const load = useCallback(async () => {
     const [c, r] = await Promise.all([
@@ -72,6 +74,28 @@ export function CustodianBook() {
     setDisplayName("");
     setScope(new Set());
     setRecipientId("");
+    void load();
+  }
+
+  /** 범위 변경은 재서명이다 — 무엇이 일어나는지 먼저 말하고 시작한다 */
+  async function changeScope(id: string, current: AssetCategory[]) {
+    setEditing({ id, scope: new Set(current) });
+    setMsg(null);
+  }
+
+  async function submitScope() {
+    if (!editing) return;
+    setBusy(true);
+    setMsg(null);
+    const body = await fetch(`/api/estate/custodians?id=${encodeURIComponent(editing.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ viewScope: [...editing.scope] }),
+    }).then((r) => r.json());
+    setBusy(false);
+    if (!body.ok) return setMsg(`${body.error.message} ${body.error.nextAction}`);
+    setEditing(null);
+    setMsg("범위를 바꿨습니다. 그분이 새 약정서에 서명하시면 다시 열립니다.");
     void load();
   }
 
@@ -116,17 +140,79 @@ export function CustodianBook() {
               </p>
             </div>
             {c.status !== "REVOKED" && (
-              <button
-                type="button"
-                onClick={() => void revoke(c.id)}
-                className="min-h-11 shrink-0 rounded-xl border border-stone-300 px-3 text-sm text-stone-600 transition hover:bg-stone-100"
-              >
-                권한 회수
-              </button>
+              <div className="flex shrink-0 gap-2">
+                {/* 범위를 바꾸면 약정서 본문이 바뀐다 → 재서명이고, 그 사이 열람은 닫힌다
+                    (NFR-713). 그래서 "조용히 고치기"가 아니라 버튼으로 분명히 둔다 */}
+                <button
+                  type="button"
+                  onClick={() => void changeScope(c.id, c.viewScope)}
+                  className="min-h-11 rounded-xl border border-stone-300 px-3 text-sm text-stone-600 transition hover:bg-stone-100"
+                >
+                  범위 바꾸기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void revoke(c.id)}
+                  className="min-h-11 rounded-xl border border-stone-300 px-3 text-sm text-stone-600 transition hover:bg-stone-100"
+                >
+                  권한 회수
+                </button>
+              </div>
             )}
           </div>
         );
       })}
+
+      {editing && (
+        <div className="space-y-2 rounded-xl border border-stone-400 bg-white p-4">
+          <p className="text-stone-900">열람 범위 바꾸기</p>
+          {/* 무엇이 일어나는지 누르기 전에 말한다 — 누른 뒤에 알면 늦다 */}
+          <p className="text-sm text-stone-500">
+            범위를 바꾸면 약정서 내용이 달라져서 그분께 다시 확인을 받습니다. 그동안에는
+            열람이 닫힙니다. 좁히실 때도 마찬가지입니다.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {SCOPES.map((sc) => (
+              <label
+                key={sc}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-stone-300 px-3 text-sm text-stone-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={editing.scope.has(sc)}
+                  onChange={(e) =>
+                    setEditing((prev) => {
+                      if (!prev) return prev;
+                      const next = new Set(prev.scope);
+                      if (e.target.checked) next.add(sc);
+                      else next.delete(sc);
+                      return { ...prev, scope: next };
+                    })
+                  }
+                />
+                {CATEGORY_LABEL[sc]}
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void submitScope()}
+              disabled={busy}
+              className="min-h-11 rounded-xl bg-ink px-4 text-sm text-stone-50 disabled:bg-stone-300 disabled:text-stone-600"
+            >
+              {busy ? "처리 중…" : "바꾸고 다시 확인받기"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="min-h-11 rounded-xl border border-stone-300 bg-white px-4 text-sm text-stone-600"
+            >
+              아직요
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2 rounded-xl border border-stone-200 bg-white p-3">
         {people.length === 0 ? (

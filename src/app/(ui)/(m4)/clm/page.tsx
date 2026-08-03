@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorNote, Notice, Shell } from "@/app/(ui)/_components/Shell";
 import { RevokeCell } from "./RevokeCell";
+import { DOC_LABEL as DOC_LABEL_MAP, docLabel } from "@/lib/docs/labels";
 
 interface Row {
   draftId: string;
@@ -25,20 +26,7 @@ interface Row {
 }
 
 /** 표시명 — 코드값을 그대로 보여주지 않는다 (NFR-705) */
-const DOC_LABEL: Record<string, string> = {
-  DONATION_PLEDGE: "기부 약정서",
-  RECURRING_CONSENT: "정기후원 약정서",
-  PRIVACY_TAX_CONSENT: "개인정보 동의서",
-  VOLUNTEER_PLEDGE: "봉사 약정서",
-  HERITAGE_SUPPORT_PLEDGE: "문화유산 후원 약정서",
-  LEGACY_GIFT_AGREEMENT: "유산 기부 약정서",
-  CUSTODIAN_AGREEMENT: "보관·집행 협조 약정서",
-  INTENT_AFFIRMATION: "의사 확인서",
-  HANDWRITTEN_WILL: "자필 유언",
-  HEART_LETTER: "마음 편지",
-  DIGITAL_LEGACY_INSTRUCTION: "디지털 유산 지시서",
-  REVOCATION_NOTICE: "철회 통지서",
-};
+// 표시명은 lib/docs/labels가 갖는다 — 서버(철회 통지서)도 같은 이름을 쓴다
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "초안",
@@ -111,7 +99,7 @@ export default function ClmPage() {
             aria-label="서류 종류"
           >
             <option value="">모든 종류</option>
-            {Object.entries(DOC_LABEL).map(([v, label]) => (
+            {Object.entries(DOC_LABEL_MAP).map(([v, label]) => (
               <option key={v} value={v}>
                 {label}
               </option>
@@ -170,7 +158,7 @@ export default function ClmPage() {
                       {new Date(r.createdAt).toLocaleDateString("ko-KR")}
                     </td>
                     <td className="py-3 pr-3 text-stone-900">
-                      {DOC_LABEL[r.docType] ?? r.docType}
+                      {docLabel(r.docType)}
                     </td>
                     <td className="py-3 pr-3 text-stone-700">
                       {STATUS_LABEL[r.status] ?? r.status}

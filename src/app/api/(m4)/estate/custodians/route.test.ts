@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { DEV_USER_ID } from "@/lib/store/types";
 import { store } from "@/lib/store";
-import { DELETE, GET, POST } from "./route";
+import { DELETE, GET, PATCH, POST } from "./route";
 
 const invite = (body: unknown) =>
   POST(
@@ -67,6 +67,65 @@ describe("초대", () => {
       await invite({ recipientId: p.id, displayName: "이가상", viewScope: [] })
     ).json();
     expect(data.custodian.viewScope).toEqual([]);
+  });
+});
+
+describe("🔴 열람 범위 변경 — 넓히든 좁히든 재서명이다 (NFR-713)", () => {
+  const patch = (id: string, viewScope: string[]) =>
+    PATCH(
+      new Request(`http://localhost/api/estate/custodians?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ viewScope }),
+      }),
+    );
+
+  it("범위를 바꾸면 열람이 닫히고 다시 서명을 받는다", async () => {
+    const p = await person("sc1@example.org");
+    const { data } = await (
+      await invite({ recipientId: p.id, displayName: "이가상", viewScope: ["FINANCIAL"] })
+    ).json();
+    // 한 번 열어 둔다 — 닫히는지 보려면 열려 있어야 한다
+    await store.grantCustodian(data.draftId);
+    expect((await store.listCustodians(DEV_USER_ID)).find((c) => c.id === data.custodian.id)?.status).toBe("ACTIVE");
+
+    const res = await patch(data.custodian.id, ["FINANCIAL", "REAL_ESTATE"]);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.requiresResign).toBe(true);
+    // 🔴 그 사이 열람은 닫힌다 — 동의한 적 없는 범위를 보게 두지 않는다
+    expect(body.data.custodian.status).toBe("PENDING");
+    expect(body.data.custodian.grantedAt).toBeNull();
+    expect(body.data.custodian.viewScope).toEqual(["FINANCIAL", "REAL_ESTATE"]);
+  });
+
+  it("좁히는 것도 재서명이다 — 새 약정서가 정본이다", async () => {
+    const p = await person("sc2@example.org");
+    const { data } = await (
+      await invite({ recipientId: p.id, displayName: "이가상", viewScope: ["FINANCIAL", "DEBT"] })
+    ).json();
+    const body = await (await patch(data.custodian.id, [])).json();
+    expect(body.data.requiresResign).toBe(true);
+    expect(body.data.custodian.viewScope).toEqual([]);
+  });
+
+  it("거둔 권한은 범위 변경으로 되살아나지 않는다", async () => {
+    const p = await person("sc3@example.org");
+    const { data } = await (
+      await invite({ recipientId: p.id, displayName: "이가상", viewScope: ["FINANCIAL"] })
+    ).json();
+    await DELETE(
+      new Request(`http://localhost/api/estate/custodians?id=${data.custodian.id}`, { method: "DELETE" }),
+    );
+    const res = await patch(data.custodian.id, ["REAL_ESTATE"]);
+    expect(res.status).toBe(409);
+  });
+
+  it("남의 지킴이 범위는 못 바꾼다", async () => {
+    const other = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const p = await person("sc4@example.org", other);
+    const c = await store.upsertCustodian(other, { recipientId: p.id, displayName: "남의 지킴이", viewScope: [] });
+    expect((await patch(c.id, ["FINANCIAL"])).status).toBe(404);
   });
 });
 
