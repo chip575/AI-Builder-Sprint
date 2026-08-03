@@ -27,3 +27,24 @@ export const DOC_LABEL: Record<DocType, string> = {
 export function docLabel(docType: string): string {
   return DOC_LABEL[docType as DocType] ?? docType;
 }
+
+/**
+ * 목적격 조사 — 받침이 있으면 "을", 없으면 "를".
+ *
+ * 서류 이름을 문장에 끼우면서 "를"로 고정했더니 **"자필 유언를 쓰시면 됩니다"**가
+ * 나왔다 (2026-08-03 실측). 이름이 표에서 오는 이상 조사도 표에서 나와야 한다.
+ */
+export function objectParticle(word: string): string {
+  const last = word.trim().at(-1);
+  if (!last) return "를";
+  const code = last.charCodeAt(0);
+  // 한글 음절 영역이 아니면 판정하지 않는다 — 영문·숫자 이름은 "를"로 둔다
+  if (code < 0xac00 || code > 0xd7a3) return "를";
+  return (code - 0xac00) % 28 === 0 ? "를" : "을";
+}
+
+/** "자필 유언을" 처럼 이름과 조사를 붙여 준다 */
+export function docLabelWithObject(docType: DocType): string {
+  const label = DOC_LABEL[docType];
+  return `${label}${objectParticle(label)}`;
+}

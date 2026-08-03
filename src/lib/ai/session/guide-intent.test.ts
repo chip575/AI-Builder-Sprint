@@ -111,3 +111,17 @@ describe("안내층 전체 — 실사용 문장으로 확인", () => {
     expect(detectGuide("이 약정서 나중에 취소할 수 있나요?")?.topic).not.toBe("DOC_REVOKE");
   });
 });
+
+describe("조사 — 이름이 표에서 오면 조사도 표에서 나와야 한다", () => {
+  it("받침 있는 이름에 '을'이 붙는다", () => {
+    // "자필 유언를 쓰시면 됩니다"가 실제로 나왔다 (2026-08-03)
+    const r = recommendDoc("딸에게 집을 물려주려면 뭘 써야 해요?");
+    expect(r?.reply).toContain("자필 유언을");
+    expect(r?.reply).not.toContain("자필 유언를");
+  });
+
+  it("받침 없는 이름에 '를'이 붙는다", () => {
+    const r = recommendDoc("고향에 기부하려는데 무슨 서류가 필요해요?");
+    expect(r?.reply).toContain("기부 약정서를");
+  });
+});

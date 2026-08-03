@@ -8,7 +8,7 @@
 // 여기서 만드는 문장에는 **수치가 없다** (P3). 공제율·한도·기한은 lib/rules의 몫이고,
 // 이 층은 "어디서 그 값을 보실 수 있는지"까지만 말한다.
 import type { DocType } from "../../contracts/common";
-import { DOC_LABEL } from "../../docs/labels";
+import { DOC_LABEL, docLabelWithObject } from "../../docs/labels";
 import { revocationRule } from "../../rules/revocation";
 import { referralText } from "../../referral/registry";
 
@@ -65,7 +65,10 @@ const SITUATION: { pattern: RegExp; doc: DocType; why: string }[] = [
     why: "가족에게 재산을 물려주시려는 뜻은 유언으로 남기셔야 효력이 생깁니다. 이곳에서는 자필로 옮겨 쓰시도록 필사 가이드를 준비해 드립니다.",
   },
   {
-    pattern: /(기부|후원|보태|나누고)/,
+    // "사회에 환원"·"사회에 남기다"는 실사용에서 되묻기로 끝났다 (2026-08-03).
+    // 사후를 뜻하면 위의 첫 규칙("떠난 뒤")이 이미 가져갔으므로, 여기 오는 것은
+    // 지금 하려는 뜻으로 읽는다 — 그래도 화면에서 서류를 바꿀 수 있다
+    pattern: /(사회에\s*(환원|남기|돌려|기여)|사회\s*환원|기부|후원|보태|나누고)/,
     doc: "DONATION_PLEDGE",
     why: "지금 마음이 향하는 곳에 지역과 금액을 정해 바로 체결하는 약정입니다.",
   },
@@ -98,13 +101,26 @@ export function recommendDocByType(doc: DocType): string {
   const hit = SITUATION.find((s) => s.doc === doc);
   const why = hit?.why ?? "";
   const label = DOC_LABEL[doc];
-  // 자필 유언만 다르게 끝난다 — 여기서 서명할 수 없다는 사실을 문 앞에서 말한다 (절대규칙 4)
-  const next =
-    doc === "HANDWRITTEN_WILL"
-      ? "유언장은 이곳에서 전자서명으로 만들 수 없습니다. 준비를 도와드릴까요?"
-      : `“새 약정 준비하기”에서 ${label}를 고르시면 대화로 채워 나가실 수 있습니다.`;
-  return `${label}를 쓰시면 됩니다. ${why} ${next}`.replace(/\s+/g, " ").trim();
+  // **서류마다 다음에 갈 곳이 다르다.** "새 약정 준비하기"로 뭉뚱그렸더니
+  // 거기서 고를 수 없는 마음 편지까지 "새 약정 준비하기에서 고르시면"이라고 안내했다
+  // (2026-08-03 실측). 없는 문을 가리키는 안내는 안 하느니만 못하다.
+  const next = NEXT_DOOR[doc] ?? "";
+  return `${docLabelWithObject(doc)} 쓰시면 됩니다. ${why} ${next}`.replace(/\s+/g, " ").trim();
 }
+
+/** 서류 → 다음에 갈 곳. 화면에 실제로 있는 문만 가리킨다 */
+const NEXT_DOOR: Partial<Record<DocType, string>> = {
+  DONATION_PLEDGE: "“새 약정 준비하기”에서 기부 약정서를 고르시면 대화로 채워 나가실 수 있습니다.",
+  HERITAGE_SUPPORT_PLEDGE:
+    "“새 약정 준비하기”에서 문화유산 후원 약정서를 고르시면 대화로 채워 나가실 수 있습니다.",
+  LEGACY_GIFT_AGREEMENT:
+    "“새 약정 준비하기”에서 유산 기부 약정서를 고르시면 대화로 채워 나가실 수 있습니다.",
+  // 유언은 여기서 서명할 수 없다는 사실을 문 앞에서 말한다 (절대규칙 4 · 민법 §1066)
+  HANDWRITTEN_WILL: "유언장은 이곳에서 전자서명으로 만들 수 없습니다. 준비를 도와드릴까요?",
+  // 마음 편지는 작성실에 없다 — 회상 대화를 하고 나서 남기는 것이다
+  HEART_LETTER:
+    "이 대화에서 하고 싶은 말씀을 들려주시면 편지로 남겨 드립니다. 법적인 절차는 필요하지 않습니다.",
+};
 
 /** 상황을 못 읽었을 때 — 되묻는다. 서류 이름을 나열해 고르라고 하지 않는다 */
 export const WHICH_DOC_UNKNOWN =

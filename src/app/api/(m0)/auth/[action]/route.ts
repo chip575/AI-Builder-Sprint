@@ -55,6 +55,24 @@ export async function POST(
       ? await auth.signUp(parsed.data)
       : await auth.signInWithPassword(parsed.data);
 
+  // **가입은 됐는데 세션이 없는 경우**가 있다 — 프로젝트에 이메일 확인이 켜져 있으면
+  // signUp은 사용자를 만들고 세션은 주지 않는다. 이걸 실패로 뭉뚱그렸더니 화면에
+  // "가입을 완료하지 못했습니다"가 떠서, 실제로는 만들어진 계정을 두고 사용자가
+  // 몇 번이나 다시 가입을 시도했다 (2026-08-03). 사실대로 알려야 다음 행동을 할 수 있다.
+  if (action === "signup" && !error && data.user && !data.session) {
+    return Response.json(
+      {
+        ok: false,
+        error: {
+          code: "EMAIL_CONFIRM_REQUIRED",
+          message: "가입 확인 메일을 보냈습니다.",
+          nextAction: "메일함에서 링크를 눌러 확인하신 뒤 로그인해 주세요.",
+        },
+      },
+      { status: 202 },
+    );
+  }
+
   // 인증 실패 사유를 그대로 노출하지 않는다 (계정 존재 여부 유출 방지, NFR-705)
   if (error || !data.session || !data.user) {
     return envelopeError(

@@ -14,6 +14,10 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
+  /** 실패가 아닌 안내 — 가입은 됐고 메일 확인만 남은 경우.
+   *  ErrorNote로 띄우면 붉은 오류로 읽혀서, 사용자가 가입이 안 된 줄 알고
+   *  같은 가입을 반복한다 (2026-08-03 실제로 그랬다) */
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function submit() {
     // 버튼을 조용히 죽이지 않는다 — 눌렀는데 아무 일도 없으면 사용자는 원인을 모른다.
@@ -35,6 +39,7 @@ function LoginForm() {
     }
     setBusy(true);
     setError(null);
+    setNotice(null);
     const res = await fetch(`/api/auth/${mode}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -46,6 +51,13 @@ function LoginForm() {
     // 인증 비활성(키 없음) — 로그인 없이 그대로 진행한다
     if (!body.ok && body.error.code === "AUTH_DISABLED") {
       router.push(next);
+      return;
+    }
+    // 가입은 됐고 메일 확인만 남았다 — 오류가 아니라 안내다.
+    // 로그인 탭으로 옮겨 둔다: 확인을 마치면 바로 여기서 들어오시면 된다
+    if (!body.ok && body.error.code === "EMAIL_CONFIRM_REQUIRED") {
+      setMode("login");
+      setNotice(`${body.error.message} ${body.error.nextAction}`);
       return;
     }
     if (!body.ok) return setError(body.error);
@@ -91,6 +103,12 @@ function LoginForm() {
           className="mt-1 min-h-11 w-full rounded-xl border border-stone-300 px-4 py-3 outline-none focus:border-stone-500"
         />
       </div>
+
+      {notice && (
+        <p className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-stone-700">
+          {notice}
+        </p>
+      )}
 
       <ErrorNote error={error} />
 
