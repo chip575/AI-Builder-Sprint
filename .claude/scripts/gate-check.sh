@@ -43,11 +43,18 @@ HIT=$(grep -rn 'confirmed[_a-zA-Z]*:[[:space:]]*true' --include='*.ts' src/ 2>/d
             (*) echo "$file:$line:$rest" ;;
           esac
         done)
+# store-contract.ts는 위 두 어댑터를 **검사하는** 공유 스위트라 같은 가족으로 본다.
+# 이름에 .test.가 없어 위 제외에 안 걸린다 (2026-08-03 — 자산 확정 경로가 생기며 필요해짐).
+#
+# 사람 승인 2026-08-03. 근거: **확정 경로가 더 늘지 않는다.** 확정 지점은 설계상
+# 하나여야 하고(P1), 지금 facts·assets 둘로 닫혔다. 목록이 계속 자란다면 이 예외가
+# 위험해지지만 자라지 않기로 한 것이므로 여기서 멈춘다.
+# ⚠ 셋째가 생기려 하면 그건 예외를 넓힐 신호가 아니라 **확정 지점이 흩어지는 신호**다.
 # 마커는 만능 열쇠가 아니다 — 확정 연산이 실제로 사는 곳(confirm 라우트 + store 어댑터)에서만 유효.
 # 잔여 리스크: 면허 파일 안에서 confirmFacts 외의 함수가 confirmed:true를 쓰면 통과한다.
 # 어댑터에 confirmed 쓰기가 늘어나는 순간 마커를 함수 단위로 좁힐 것.
 M=$(grep -rln 'P1-CONFIRM-PATH' --include='*.ts' src/ 2>/dev/null \
-    | grep -vE 'app/api/.*facts/confirm/|lib/store/(supabase|memory)\.ts')
+    | grep -vE 'app/api/.*facts/confirm/|lib/store/(supabase|memory|store-contract)\.ts')
 [ -n "$M" ] && { red "P1-CONFIRM-PATH 마커 허용 경로 밖 사용"; echo "$M" | head -3; }
 [ -n "$HIT" ] && { red "confirmed=true 기본값 (P1 위반 의심)"; echo "$HIT" | head -5; } || grn "confirmed 기본값 정상"
 
@@ -75,6 +82,28 @@ fi
 echo "── 7. 폐기 용어 ──"
 HIT=$(grep -rnE "\b(Track|why_record)\b|트랙 [ABC]|갈래 후보|민감도 등급" --include='*.ts' --include='*.tsx' src/ 2>/dev/null)
 [ -n "$HIT" ] && { red "폐기 용어 사용 (decisions.md D-01)"; echo "$HIT" | head -5; } || grn "용어 정상"
+
+echo "── 8.5. 법령 근거 신선도 ──"
+# 조문은 바뀐다. §1112 형제자매 유류분이 위헌으로 죽은 것을 6개월 뒤에야 알았다
+# (2026-08-03) — 그때 증상은 에러가 아니라 **조용히 틀린 안내**였다.
+# verifiedAt이 오래된 항목을 경고한다. 실패로 만들지 않는 이유: 확인이 늦었다고
+# 배포를 막을 일은 아니고, 보이는 것이 목적이다.
+STALE_DAYS=180
+NOW=$(date +%s)
+FOUND=0
+while IFS= read -r line; do
+  d=$(printf '%s' "$line" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
+  [ -z "$d" ] && continue
+  ts=$(date -d "$d" +%s 2>/dev/null) || continue
+  age=$(( (NOW - ts) / 86400 ))
+  if [ "$age" -gt "$STALE_DAYS" ]; then
+    printf '  [33m! %s일 경과: %s[0m
+' "$age" "$(printf '%s' "$line" | cut -c1-90)"
+    FOUND=1
+  fi
+done < <(grep -rn 'verifiedAt' --include='*.ts' src/lib/rules src/lib/referral 2>/dev/null | grep -v '\.test\.')
+[ "$FOUND" -eq 1 ] && printf '[33m! 법령 근거 재확인 필요 (경고)[0m
+' || grn "법령 근거 신선도"
 
 echo "── 8. 아카이브 참조 ──"
 # 코드만 본다. 문서가 아카이브를 "언급"하는 정상 문장은 위반이 아니다.

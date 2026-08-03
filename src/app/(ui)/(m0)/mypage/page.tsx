@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Notice, PrimaryButton, Shell } from "@/app/(ui)/_components/Shell";
+import { RecipientBook } from "./RecipientBook";
 
 interface Profile {
   email: string;
@@ -135,6 +136,12 @@ export default function MyPage() {
         <PrimaryButton onClick={() => void save()} disabled={busy}>
           {busy ? "저장 중…" : "저장하기"}
         </PrimaryButton>
+
+        {/* 알릴 분 — 저장소가 하나다. CLM 화면도 같은 API를 본다 (/api/recipients).
+            화면마다 상태를 따로 들고 있으면 한쪽에서 고친 것이 다른 쪽에 안 보인다 */}
+        <div className="border-t border-stone-200 pt-5">
+          <RecipientBook />
+        </div>
 
         <Notice>
           이미 서명이 끝난 문서는 바뀌지 않습니다. 여기서 고치신 내용은 앞으로 만드실

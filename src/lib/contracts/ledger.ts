@@ -41,3 +41,26 @@ export const LedgerRes = z.object({
   chainValid: z.boolean(),
 });
 export type LedgerRes = z.infer<typeof LedgerRes>;
+
+/** 철회 요청 (FR-405 · 민법 §1108①).
+ *  ⚠ 문서 상태(DocStatus)를 바꾸지 않는다 — COMPLETED → CANCELED는 역행 전이라
+ *  canTransition이 막고, 서명된 증빙은 남아야 한다 (P5). 철회는 삭제가 아니라
+ *  **그 위에 얹는 새로운 사실**이다: 그때 약정했고 나중에 철회했다, 둘 다 참이다. */
+export const RevokeReq = z.object({
+  /** 왜 철회하시는지 — 본인 진술. 정황 봉인의 핵심이라 필수다 (FR-553).
+   *  철회는 사유의 당부와 무관하게 효력이 있으므로 내용을 검사하지 않는다 (서식 제4조) */
+  changeReason: z.string().min(1).max(500),
+  /** 통지할 상대. 없으면 철회만 하고 알리지 않는다 —
+   *  알리지 않아도 철회는 성립하지만 상대가 모른다 (서식 제2조) */
+  notifyRecipientId: z.string().uuid().nullish(),
+});
+export type RevokeReq = z.infer<typeof RevokeReq>;
+
+export const RevokeRes = z.object({
+  /** 철회 뒤의 이력 한 벌. 화면이 목록을 따로 계산하지 않게 한다 */
+  nodes: z.array(LedgerNode),
+  chainValid: z.boolean(),
+  /** 통지 대상이 정해졌는가. 실제 발송은 사용자가 확인 화면에서 한 번 더 누른다 */
+  notifyRecipientId: z.string().uuid().nullish(),
+});
+export type RevokeRes = z.infer<typeof RevokeRes>;

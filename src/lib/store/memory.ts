@@ -4,10 +4,11 @@ import { randomUUID } from "node:crypto";
 import { cosine } from "../ai/embed/port";
 import type { Obligation, ObligationKind } from "../contracts/obligations";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
-import type { Asset, Beneficiary } from "../contracts/estate";
+import type { Asset, AssetCategory, Beneficiary, Custodian, DigitalDisposition } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
+import type { Recipient, RecipientKind, RecipientUpsertReq } from "../contracts/recipient";
 import { buildNode, withDerivedStatus } from "../ledger/chain";
 import { maskIdentifier } from "./mask";
 import type { StorePort } from "./port";
@@ -24,6 +25,7 @@ import {
   type FamilyAckTarget,
   type HeartWillApplyResult,
   type HeartWillParagraph,
+  type HeartWillDelivery,
   type HeartWillParagraphDraft,
   type HeartWillVersion,
   type LedgerAppendInput,
@@ -343,6 +345,9 @@ export class InMemoryStore implements StorePort {
   }
 
   private profiles = new Map<string, ProfileRecord>();
+  /** 소유자를 값에 넣어 둔다 — 계약(Recipient)에는 userId가 없다.
+   *  나가는 값에서 빼는 이유: 소유자는 쿠키가 정하지 응답이 알려줄 것이 아니다 */
+  private recipients = new Map<string, Recipient & { userId: string }>();
 
   async getProfile(userId: string): Promise<ProfileRecord | undefined> {
     const p = this.profiles.get(userId);
@@ -366,6 +371,45 @@ export class InMemoryStore implements StorePort {
     };
     this.profiles.set(userId, next);
     return { ...next };
+  }
+
+  async listRecipients(userId: string, kind?: RecipientKind): Promise<Recipient[]> {
+    return [...this.recipients.values()]
+      .filter((r) => r.userId === userId && (kind ? r.kind === kind : true))
+      .map(({ userId: _u, ...r }) => ({ ...r }))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async upsertRecipient(userId: string, input: RecipientUpsertReq): Promise<Recipient> {
+    // 같은 (역할·이메일)이 이미 있으면 그것을 고친다. 중복 등록은 통지를 두 번 보낸다
+    const dup = [...this.recipients.values()].find(
+      (r) =>
+        r.userId === userId &&
+        r.kind === input.kind &&
+        r.email.toLowerCase() === input.email.toLowerCase(),
+    );
+    const id = input.id ?? dup?.id ?? crypto.randomUUID();
+    const prev = this.recipients.get(id);
+    const row = {
+      userId,
+      id,
+      kind: input.kind,
+      name: input.name,
+      email: input.email,
+      relation: input.relation ?? null,
+      createdAt: prev?.createdAt ?? new Date().toISOString(),
+    };
+    this.recipients.set(id, row);
+    const { userId: _u, ...out } = row;
+    return { ...out };
+  }
+
+  async deleteRecipient(userId: string, id: string): Promise<boolean> {
+    // 소유자를 확인하고 지운다 — id만 받으면 남의 것을 지울 수 있다
+    const row = this.recipients.get(id);
+    if (!row || row.userId !== userId) return false;
+    this.recipients.delete(id);
+    return true;
   }
 
   async listDocumentsByUser(
@@ -479,6 +523,36 @@ export class InMemoryStore implements StorePort {
     return hw ? this.heartWillView(hw) : undefined;
   }
 
+  /** 전달 설정 — 문서(=intent)당 한 벌. Supabase의 heart_will_delivery와 같은 규칙 */
+  private deliveries = new Map<string, HeartWillDelivery>();
+
+  async getHeartWillDelivery(sessionId: string): Promise<HeartWillDelivery | undefined> {
+    const hw = this.heartWills.get(sessionId);
+    if (!hw) return undefined; // 문서가 없으면 전할 글도 없다
+    const saved = this.deliveries.get(hw.documentId);
+    // 없으면 기본값을 돌려준다 — "아직 안 정했다"도 상태이고, 그 기본은 사후 공개다
+    return saved
+      ? { ...saved }
+      : { documentId: hw.documentId, revealPolicy: "POSTHUMOUS", revealAt: null, recipientIds: [] };
+  }
+
+  async saveHeartWillDelivery(
+    sessionId: string,
+    patch: { revealPolicy: HeartWillDelivery["revealPolicy"]; revealAt?: string | null; recipientIds: string[] },
+  ): Promise<HeartWillDelivery | undefined> {
+    const hw = this.heartWills.get(sessionId);
+    if (!hw) return undefined;
+    const row: HeartWillDelivery = {
+      documentId: hw.documentId,
+      revealPolicy: patch.revealPolicy,
+      // 예약이 아니면 날짜를 비운다 — 남겨 두면 "언제 가는 거지"가 화면마다 갈린다
+      revealAt: patch.revealPolicy === "SCHEDULED" ? (patch.revealAt ?? null) : null,
+      recipientIds: [...patch.recipientIds],
+    };
+    this.deliveries.set(hw.documentId, row);
+    return { ...row };
+  }
+
   async applyHeartWill(
     sessionId: string,
     acceptedParagraphIds: string[],
@@ -544,6 +618,59 @@ export class InMemoryStore implements StorePort {
 
   async listLedgerNodes(subjectId: string): Promise<LedgerNode[]> {
     return withDerivedStatus(this.ledger.get(subjectId) ?? []);
+  }
+
+  private custodians = new Map<string, Custodian & { userId: string }>();
+
+  async listCustodians(userId: string): Promise<Custodian[]> {
+    return [...this.custodians.values()]
+      .filter((c) => c.userId === userId)
+      .map(({ userId: _u, ...c }) => ({ ...c }));
+  }
+
+  async upsertCustodian(
+    userId: string,
+    input: { recipientId: string; displayName: string; viewScope: AssetCategory[]; agreementDraftId?: string | null },
+  ): Promise<Custodian> {
+    // 같은 상대를 두 번 지정하지 않는다 — 재초대는 상태 갱신이다 (DB unique와 같은 규칙)
+    const prev = [...this.custodians.values()].find(
+      (c) => c.userId === userId && c.recipientId === input.recipientId,
+    );
+    const row = {
+      userId,
+      id: prev?.id ?? randomUUID(),
+      recipientId: input.recipientId,
+      displayName: input.displayName,
+      viewScope: input.viewScope,
+      // 재초대해도 PENDING으로 되돌린다 — 새 약정서에 서명해야 다시 열린다 (NFR-713)
+      status: "PENDING" as const,
+      agreementDraftId: input.agreementDraftId ?? prev?.agreementDraftId ?? null,
+      grantedAt: null,
+      revokedAt: null,
+    };
+    this.custodians.set(row.id, row);
+    const { userId: _u, ...out } = row;
+    return { ...out };
+  }
+
+  async grantCustodian(agreementDraftId: string): Promise<Custodian | undefined> {
+    const row = [...this.custodians.values()].find(
+      (c) => c.agreementDraftId === agreementDraftId,
+    );
+    if (!row || row.status === "REVOKED") return undefined; // 회수된 권한은 서명으로 되살아나지 않는다
+    row.status = "ACTIVE";
+    row.grantedAt = new Date().toISOString();
+    const { userId: _u, ...out } = row;
+    return { ...out };
+  }
+
+  async revokeCustodian(userId: string, id: string): Promise<boolean> {
+    const row = this.custodians.get(id);
+    if (!row || row.userId !== userId || row.status === "REVOKED") return false;
+    row.status = "REVOKED";
+    row.revokedAt = new Date().toISOString();
+    // grantedAt은 지우지 않는다 — "언제 열렸다가 언제 닫혔나"가 남아야 한다
+    return true;
   }
 
   async getLedgerNode(nodeId: string): Promise<LedgerNode | undefined> {
@@ -707,6 +834,37 @@ export class InMemoryStore implements StorePort {
    *  응답으로 새어 나가는 경로가 생긴다 */
   private assets: { userId: string; asset: Asset }[] = [];
   private beneficiaries: { userId: string; beneficiary: Beneficiary }[] = [];
+
+  async updateAsset(
+    userId: string,
+    assetId: string,
+    patch: {
+      disposition?: DigitalDisposition | null;
+      confirmed?: true;
+      beneficiaryId?: string | null;
+      story?: string | null;
+    },
+  ): Promise<Asset | undefined> {
+    const found = this.assets.find((a) => a.asset.id === assetId && a.userId === userId);
+    if (!found) return undefined;
+    const row = found.asset as Asset & {
+      beneficiaryId?: string | null;
+      story?: string | null;
+      disposition?: DigitalDisposition;
+      confirmed: boolean;
+    };
+    // undefined는 "안 건드림", null은 "지움" — 둘을 섞으면 폼에서 비운 칸과
+    // 아예 안 보낸 칸이 같은 뜻이 되어 값을 잃는다 (profiles와 같은 규약)
+    if (patch.beneficiaryId !== undefined) row.beneficiaryId = patch.beneficiaryId;
+    if (patch.story !== undefined) row.story = patch.story;
+    // 처리 방식은 디지털 자산에만 있다 — 다른 종류에 붙이면 계약이 깨진다
+    if (patch.disposition != null && row.category === "DIGITAL") {
+      row.disposition = patch.disposition;
+    }
+    // 확정은 **올리기만** 한다. 내리는 것은 값이 바뀔 때 서버가 하는 일이다 (P1)
+    if (patch.confirmed === true) row.confirmed = true; // P1-CONFIRM-PATH: 사용자 확인
+    return { ...row } as Asset;
+  }
 
   async createAsset(input: AssetWriteInput): Promise<Asset> {
     const base = {

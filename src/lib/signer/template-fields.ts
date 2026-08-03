@@ -21,7 +21,8 @@ export type TemplateKey =
   | "HERITAGE_PLEDGE"
   | "ATTESTATION"
   | "FAMILY_ACK"
-  | "CUSTODIAN";
+  | "CUSTODIAN"
+  | "REVOCATION_NOTICE";
 
 /** 칸 한 줄의 표시 폭 상한. 한글·전각 1, ASCII·반각 0.5로 센다.
  *  v3에서 칸이 넓어져 실측 44.8자가 됐지만 상한은 36 그대로다 — 여유가 늘었을 뿐이다. */
@@ -106,6 +107,19 @@ export const FIELD_SPEC: Record<TemplateKey, Record<string, FieldSpec>> = {
     custodian_name: { lines: 1, required: true },
     view_scope: { lines: 2, required: true },
     duties: { lines: 3, required: true },
+  },
+  // 여섯 칸 전부 우리가 채운다 — 값의 출처가 전부 우리에게 있다.
+  // 서명자가 타이핑하면 문서에 인쇄된 내용과 원장이 갈라지고, 나중에
+  // "무엇을 철회했나"에 답이 둘이 된다
+  REVOCATION_NOTICE: {
+    revoker_name: { lines: 1, required: true },
+    revoker_contact: { lines: 1, required: true },
+    org_name: { lines: 1, required: true },
+    original_agreement: { lines: 2, required: true },
+    // 사용자가 자유롭게 쓰는 칸. 철회는 사유의 당부와 무관하게 효력이 있으므로
+    // (서식 제4조) 내용을 검사하지 않는다 — 길이만 본다
+    revocation_reason: { lines: 3, required: true },
+    revocation_date: { lines: 1, required: true },
   },
 };
 

@@ -54,6 +54,9 @@ export async function GET(req: Request) {
     data: {
       documents: documents.map((d) => ({
         draftId: d.draftId,
+        // 원장(Intent Ledger)의 subject는 draft가 아니라 **intent**다
+        // (intent_ledger_nodes.subject_id → intents.id). 철회·이력이 이 값을 쓴다
+        intentId: d.intentId,
         docType: d.docType,
         status: d.status,
         createdAt: d.createdAt,

@@ -9,6 +9,7 @@ import { judgeMateriality, verifyChain } from "@/lib/ledger/chain";
 import { store } from "@/lib/store";
 import { evaluateGate } from "@/lib/rules/validity-gate";
 import { createDraft } from "@/app/api/(m0)/documents/store";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 
 function bad(code: string, message: string, nextAction: string, status: number) {
   return Response.json({ ok: false, error: { code, message, nextAction } }, { status });
@@ -34,6 +35,18 @@ export async function POST(req: Request) {
       "무엇 때문에 마음이 바뀌셨는지 한 줄만 남겨 주세요.",
       "변경 사유를 적어 주세요.",
       400,
+    );
+  }
+
+  // 소유 확인 (2026-08-03) — subjectId만 알면 **남의 원장에 노드를 쌓을 수 있었다.**
+  // 원장은 append-only라 잘못 들어간 노드는 지울 수도 없다
+  const ownerId = await getCurrentUserId(req);
+  if (!ownerId) return loginRequired();
+  const owner = await store.getSession(parsed.data.subjectId);
+  if (!owner || owner.userId !== ownerId) {
+    return Response.json(
+      { ok: false, error: { code: "NOT_FOUND", message: "해당 기록을 찾을 수 없습니다.", nextAction: "목록에서 다시 골라 주세요." } },
+      { status: 404 },
     );
   }
 

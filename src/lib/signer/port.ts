@@ -12,6 +12,11 @@ export interface SignRequestInput {
   /** 서식에 인쇄될 값 (우리 키 기준). 어댑터가 콘솔 dataLabel로 번역한다 —
    *  번역은 어댑터의 일이지 호출부의 일이 아니다 */
   fields?: Record<string, unknown>;
+  /** 두 번째 서명자 — 역할이 2인인 서식에만 쓴다 (FAMILY_ACK · REVOCATION_NOTICE).
+   *  ⚠ **상대가 서명하지 않으면 문서가 완료되지 않는다.** 그 미완료가 결함이 아니라
+   *  사실인 서식에만 붙인다: 철회 통지서에서 기관 서명은 수령 확인이고, 안 해도
+   *  철회는 성립한다 (서식 제2조). 없으면 1인으로 나간다 */
+  counterparty?: { name: string; email: string } | null;
 }
 
 export interface SignRequestResult {

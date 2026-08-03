@@ -9,6 +9,7 @@
 import { RecallRes } from "@/lib/contracts";
 import { embedder } from "@/lib/ai/embed";
 import { store } from "@/lib/store";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 
 const TOP_K = 5;
 
@@ -21,6 +22,18 @@ export async function POST(req: Request) {
   const sessionId = new URL(req.url).searchParams.get("sessionId");
   if (!sessionId) {
     return bad("INVALID_REQUEST", "대화를 지정해 주세요.", "대화 화면에서 다시 시도해 주세요.", 400);
+  }
+
+  // 소유 확인 (2026-08-03) — 세션 id만 알면 **남의 발화가 검색 결과로 나왔다.**
+  // 회상 검색은 발화 원문을 그대로 돌려주는 경로라 특히 민감하다
+  const ownerId = await getCurrentUserId(req);
+  if (!ownerId) return loginRequired();
+  const owner = await store.getSession(sessionId);
+  if (!owner || owner.userId !== ownerId) {
+    return Response.json(
+      { ok: false, error: { code: "NOT_FOUND", message: "해당 기록을 찾을 수 없습니다.", nextAction: "목록에서 다시 골라 주세요." } },
+      { status: 404 },
+    );
   }
 
   const pending = await store.listUnembeddedUtterances(sessionId);
@@ -58,7 +71,10 @@ export async function GET(req: Request) {
     return bad("INVALID_REQUEST", "대화를 지정해 주세요.", "대화 화면에서 다시 시도해 주세요.", 400);
   }
 
-  const session = await store.getSession(sessionId);
+  const readerId = await getCurrentUserId(req);
+  if (!readerId) return loginRequired();
+  const looked = await store.getSession(sessionId);
+  const session = looked && looked.userId === readerId ? looked : undefined;
   if (!session) {
     return bad("NOT_FOUND", "해당 대화를 찾을 수 없습니다.", "대화를 먼저 시작해 주세요.", 404);
   }

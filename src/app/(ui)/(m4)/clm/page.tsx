@@ -11,9 +11,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorNote, Notice, Shell } from "@/app/(ui)/_components/Shell";
+import { RevokeCell } from "./RevokeCell";
+import { DOC_LABEL as DOC_LABEL_MAP, docLabel } from "@/lib/docs/labels";
 
 interface Row {
   draftId: string;
+  /** 원장 subject — 이력·철회가 쓴다 (intent_ledger_nodes.subject_id → intents.id) */
+  intentId: string;
   docType: string;
   status: string;
   createdAt: string;
@@ -22,18 +26,7 @@ interface Row {
 }
 
 /** 표시명 — 코드값을 그대로 보여주지 않는다 (NFR-705) */
-const DOC_LABEL: Record<string, string> = {
-  DONATION_PLEDGE: "기부 약정서",
-  RECURRING_CONSENT: "정기후원 약정서",
-  PRIVACY_TAX_CONSENT: "개인정보 동의서",
-  VOLUNTEER_PLEDGE: "봉사 약정서",
-  HERITAGE_SUPPORT_PLEDGE: "문화유산 후원 약정서",
-  LEGACY_GIFT_AGREEMENT: "유산 기부 약정서",
-  CUSTODIAN_AGREEMENT: "보관·집행 협조 약정서",
-  INTENT_AFFIRMATION: "의사 확인서",
-  HANDWRITTEN_WILL: "자필 유언",
-  HEART_LETTER: "마음 편지",
-};
+// 표시명은 lib/docs/labels가 갖는다 — 서버(철회 통지서)도 같은 이름을 쓴다
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "초안",
@@ -106,7 +99,7 @@ export default function ClmPage() {
             aria-label="서류 종류"
           >
             <option value="">모든 종류</option>
-            {Object.entries(DOC_LABEL).map(([v, label]) => (
+            {Object.entries(DOC_LABEL_MAP).map(([v, label]) => (
               <option key={v} value={v}>
                 {label}
               </option>
@@ -154,7 +147,8 @@ export default function ClmPage() {
                   <th className="py-2 pr-3 font-normal">서류</th>
                   <th className="py-2 pr-3 font-normal">상태</th>
                   <th className="py-2 pr-3 font-normal">효력</th>
-                  <th className="py-2 font-normal">보기</th>
+                  <th className="py-2 pr-3 font-normal">보기</th>
+                  <th className="py-2 font-normal">그만두기</th>
                 </tr>
               </thead>
               <tbody>
@@ -164,7 +158,7 @@ export default function ClmPage() {
                       {new Date(r.createdAt).toLocaleDateString("ko-KR")}
                     </td>
                     <td className="py-3 pr-3 text-stone-900">
-                      {DOC_LABEL[r.docType] ?? r.docType}
+                      {docLabel(r.docType)}
                     </td>
                     <td className="py-3 pr-3 text-stone-700">
                       {STATUS_LABEL[r.status] ?? r.status}
@@ -181,6 +175,21 @@ export default function ClmPage() {
                       >
                         열기
                       </Link>
+                      {/* 이력 진입점 — 지금까지 /ledger 화면이 있는데 갈 길이 없었다.
+                          subjectId가 필요해 곁칸(NavSidebar)에는 둘 수 없고, 이 줄에는
+                          그 문서의 id가 있으니 여기가 자리다 */}
+                      <Link
+                        href={`/ledger/${r.intentId}`}
+                        className="ml-3 text-stone-500 underline underline-offset-4"
+                      >
+                        이력
+                      </Link>
+                    </td>
+                    {/* 그만두기 — 버튼 글자가 서류마다 다르다. 네 단어(취소·철회·해지·회수)를
+                        한 말로 뭉개면 사용자가 자기가 무엇을 하는지 모른다 (lib/rules/revocation).
+                        철회할 수 없는 서류는 버튼 대신 왜 그런지를 보여 준다 */}
+                    <td className="py-3">
+                      <RevokeCell row={r} onDone={() => void load()} />
                     </td>
                   </tr>
                 ))}

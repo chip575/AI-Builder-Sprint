@@ -9,7 +9,7 @@ import type {
 import type { AssetOrigin, AssetUpsertReq, BeneficiaryUpsertReq } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
-import type { LedgerNodeReq, Materiality } from "../contracts/ledger";
+import type { LedgerNodeReq, Materiality, LedgerNodeStatus } from "../contracts/ledger";
 
 /** dev·인메모리 경로의 user_id — NULL 대신 이 값 (0002가 SET NOT NULL 한 줄로 끝나게) */
 export const DEV_USER_ID = "00000000-0000-4000-8000-0000000000de";
@@ -119,6 +119,16 @@ export interface HeartWillVersion {
   createdAt: string;
 }
 
+/** 전달 설정 (FR-112) — "언제, 누구에게".
+ *  ⚠ 보관과 발송은 다른 층이다. 이 값이 있다고 전달이 일어나는 것이 아니다 */
+export interface HeartWillDelivery {
+  documentId: string;
+  revealPolicy: "IMMEDIATE" | "SCHEDULED" | "POSTHUMOUS";
+  /** SCHEDULED일 때만 의미가 있다 */
+  revealAt: string | null;
+  recipientIds: string[];
+}
+
 /** 새 버전 + 직전 버전의 **본문**(승인 문단만).
  *  diff 계산은 두 어댑터에 같은 로직을 심지 않으려고 호출부(라우트)로 뺐다 */
 export interface HeartWillApplyResult {
@@ -132,6 +142,9 @@ export interface HeartWillApplyResult {
  *  "누가 계산했는지"가 갈려 체인이 증거이길 그만둔다. */
 export interface LedgerAppendInput extends LedgerNodeReq {
   materiality: Materiality;
+  /** 철회 노드로 쌓는다 (FR-405 · 민법 §1108①). 생략하면 ACTIVE.
+   *  원장은 append-only라(NFR-704) 지난 노드를 고칠 수 없어, 철회도 **쌓아서** 한다 */
+  status?: LedgerNodeStatus;
   /** MATERIAL일 때 의사 확인서 draft (FR-552). 재서명 흐름은 M3 범위 밖 — 지금은 null */
   draftId?: string | null;
 }

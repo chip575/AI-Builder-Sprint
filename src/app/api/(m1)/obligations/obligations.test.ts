@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { store } from "@/lib/store";
+import { DEV_USER_ID } from "@/lib/store/types";
 import { GET as summary } from "@/app/api/(m1)/admin/summary/route";
 import { POST as advanceTime } from "@/app/api/(m1)/dev/advance-time/route";
 import { GET as listFired, POST as fire } from "./fire/route";
@@ -77,14 +78,44 @@ describe("M-OBLIGATIONS — 발화", () => {
     expect(after).toBe(before); // 재발화 없음
   });
 
-  it("GET이 현황을 준다", async () => {
-    const subjectId = randomUUID();
-    await store.createObligation({ kind: "RESUME_INVITE", subjectId, dueAt: monthsFromNow(-1) });
+  it("GET이 현황을 준다 — 내 것만", async () => {
+    // 약속의 subjectId는 draftId다. 소유자는 그 draft가 매달린 intent가 안다 —
+    // 임의 uuid로는 "내 것"이 아니므로 실제 문서를 만들어 쓴다
+    const session = await store.getOrCreateSession(null, DEV_USER_ID);
+    const draft = await store.createDraft(session.id, "DONATION_PLEDGE", {
+      verdict: "ESIGN_OK",
+      statutes: [],
+    });
+    await store.createObligation({
+      kind: "RESUME_INVITE",
+      subjectId: draft.draftId,
+      dueAt: monthsFromNow(-1),
+    });
     const res = await listFired(
-      new Request(`http://localhost/api/obligations/fire?subjectId=${subjectId}`),
+      new Request(`http://localhost/api/obligations/fire?subjectId=${draft.draftId}`),
     );
     const { data } = await res.json();
     expect(data.obligations).toHaveLength(1);
+  });
+
+  it("🔴 남의 약속은 보이지 않는다 (NFR-714)", async () => {
+    // 전에는 전체를 돌려줘서 다계정이 되는 순간 남의 약속이 보이는 모양이었다
+    const other = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const session = await store.getOrCreateSession(null, other);
+    const draft = await store.createDraft(session.id, "DONATION_PLEDGE", {
+      verdict: "ESIGN_OK",
+      statutes: [],
+    });
+    await store.createObligation({
+      kind: "RESUME_INVITE",
+      subjectId: draft.draftId,
+      dueAt: monthsFromNow(-1),
+    });
+    const res = await listFired(
+      new Request(`http://localhost/api/obligations/fire?subjectId=${draft.draftId}`),
+    );
+    const { data } = await res.json();
+    expect(data.obligations).toHaveLength(0);
   });
 });
 

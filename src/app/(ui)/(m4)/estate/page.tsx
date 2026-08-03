@@ -7,14 +7,18 @@
 // 있었지만 사용자가 볼 곳이 없었다. P5("증빙은 서명 이후에도 살아있다")의 화면이다.
 //
 // ⚠ 알려진 한계 (BE-2 요청서 — PR 코멘트 참조):
-//   · 약정 "목록" API가 없어 약속(obligation)이 걸린 문서만 보인다
-//   · GET /api/obligations/fire 는 관리 화면용이라 사용자 필터가 없다 —
-//     다계정 운영 전에 사용자 범위 목록 API가 필요하다 (NFR-714)
+//   · GET /api/obligations/fire 는 관리 화면용이라 **사용자 필터가 없다** —
+//     다계정 운영 전에 사용자 범위 목록 API가 필요하다 (NFR-714). 지금 이 화면에서
+//     약속 목록만 그 API를 쓴다 (약정 목록은 /api/clm/documents로 옮겼다)
 "use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
+import { AssetStatus } from "./AssetStatus";
+import { CustodianBook } from "./CustodianBook";
+import { DigitalLegacy } from "./DigitalLegacy";
+import type { InventorySummary } from "@/lib/contracts";
 
 interface Obligation {
   id: string;
@@ -76,6 +80,9 @@ export default function EstatePage() {
   const [obligations, setObligations] = useState<Obligation[]>([]);
   const [pledges, setPledges] = useState<Pledge[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
+  // 서버가 내려주는 집계. **화면이 다시 세지 않는다** — 세면 대화가 말하는 값과 갈라진다
+  const [summary, setSummary] = useState<InventorySummary | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
   const [ledger, setLedger] = useState<LedgerNode[]>([]);
   const [error, setError] = useState<{ message: string; nextAction: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -96,21 +103,33 @@ export default function EstatePage() {
     ]);
     const obs: Obligation[] = ob?.ok ? ob.data.obligations : [];
     setObligations(obs);
-    if (inv?.ok) setAssets(inv.data.assets ?? []);
+    if (inv?.ok) {
+      setAssets(inv.data.assets ?? []);
+      setSummary(inv.data.summary ?? null);
+    }
 
-    // 약정 상태 — 목록 API가 없어 약속에 걸린 문서로 역추적한다 (파일 머리 주석)
-    const subjects = [...new Set(obs.map((o) => o.subjectId))];
-    const found: Pledge[] = [];
+    // 약정 목록은 **문서 목록 API**에서 온다.
+    // 예전에는 약속(obligation)에 걸린 문서로 역추적했는데 두 가지가 틀렸다:
+    //   ① 약속이 없는 약정은 아예 안 보였다 (파일 머리의 "알려진 한계")
+    //   ② obligation.subjectId는 **draftId**인데 /api/ledger는 **intentId**를 받는다
+    //      (intent_ledger_nodes.subject_id → intents.id). 그래서 이력이 늘 비어 있었고,
+    //      .catch(() => null)이 그 사실까지 삼켰다 (2026-08-03 실측)
+    const docs = await fetch("/api/clm/documents").then((r) => r.json()).catch(() => null);
+    const rows: { draftId: string; intentId: string; status: string; createdAt: string }[] =
+      docs?.ok ? docs.data.documents : [];
+    setPledges(
+      rows.map((d) => ({ draftId: d.draftId, status: d.status, completedAt: null })),
+    );
+
+    // 이력은 intent 단위다. 한 intent에 문서가 여럿이면 이력은 하나뿐이라 중복 조회를 뺀다
+    const intents = [...new Set(rows.map((d) => d.intentId))];
     const nodes: LedgerNode[] = [];
     await Promise.all(
-      subjects.map(async (id) => {
-        const st = await fetch(`/api/sign/${id}/status`).then((r) => r.json()).catch(() => null);
-        if (st?.ok) found.push({ draftId: id, status: st.data.status, completedAt: st.data.completedAt });
+      intents.map(async (id) => {
         const lg = await fetch(`/api/ledger/${id}`).then((r) => r.json()).catch(() => null);
         if (lg?.ok) nodes.push(...(lg.data.nodes ?? []));
       }),
     );
-    setPledges(found);
     setLedger(nodes);
     setLoaded(true);
   }, []);
@@ -303,11 +322,45 @@ export default function EstatePage() {
           )}
         </section>
 
+        {/* ── 디지털 유산 (FR-403) ── */}
+        <DigitalLegacy onChanged={() => void load()} />
+
+        {/* ── 지킴이 (FR-405 · NFR-713) ── */}
+        <CustodianBook />
+
         {/* ── 내 자산 (FR-402) ── */}
         <section className="space-y-3">
           {/* "종이 문서로 등록"은 서류 서랍으로 옮겼다 — 여기서는 밑줄 링크라
               터치 영역이 44px에 못 미쳤고, 서류로 가는 문은 한곳에 모으는 편이 낫다 */}
-          <h2 className="font-serif text-lg font-semibold text-stone-900">내 자산</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-serif text-lg font-semibold text-stone-900">내 자산</h2>
+            {/* 점검은 **접어 둔다.** 펴 두면 화면을 열 때마다 총액이 먼저 눈에 들어오고,
+                이 화면은 관리하러 오는 곳이지 재산을 확인하러 오는 곳이 아니다.
+                누른 사람에게만 보이는 편이 P4(재촉하지 않는다)와도 맞는다 */}
+            <button
+              type="button"
+              onClick={() => setStatusOpen((v) => !v)}
+              aria-expanded={statusOpen}
+              aria-controls="asset-status"
+              className="min-h-11 rounded-xl border border-stone-300 bg-white px-4 text-sm text-stone-700 transition hover:bg-stone-100"
+            >
+              자산 상태 점검
+            </button>
+          </div>
+
+          {/* 닫혀 있어도 DOM에 남긴다 — 버튼의 aria-controls가 가리킬 대상이 있어야 한다 */}
+          <div id="asset-status" hidden={!statusOpen}>
+            {summary ? (
+              <AssetStatus summary={summary} />
+            ) : (
+              <p className="text-sm text-stone-500">
+                {loaded
+                  ? "지금은 자산 현황을 불러오지 못했습니다. 잠시 뒤 다시 열어 봐 주세요."
+                  : "불러오는 중…"}
+              </p>
+            )}
+          </div>
+
           {assets.map((a) => (
             <div
               key={a.id}

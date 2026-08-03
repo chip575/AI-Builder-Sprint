@@ -61,7 +61,7 @@ export interface NodeSeed extends Omit<SealedNode, "seq" | "createdAt"> {
  *  이 파일이 시각·난수를 만들면 같은 입력이 같은 해시를 내지 않게 된다. */
 export function buildNode(
   prev: LedgerNode | undefined,
-  seed: NodeSeed,
+  seed: NodeSeed & { status?: LedgerNodeStatus },
   stamp: { id: string; createdAt: string },
 ): LedgerNode {
   const sealed: SealedNode = {
@@ -81,7 +81,10 @@ export function buildNode(
     id: stamp.id,
     prevHash,
     nodeHash: computeNodeHash(sealed, prevHash),
-    status: "ACTIVE", // 저장값. 읽을 때 withDerivedStatus가 다시 판정한다
+    // 저장값. 읽을 때 withDerivedStatus가 다시 판정한다.
+    // 철회만 **쌓을 때 정해진다** — 원장은 append-only라(NFR-704) 지난 노드를
+    // 고칠 수 없기 때문이다. 철회 노드 하나가 체인 전체를 닫는다
+    status: seed.status ?? "ACTIVE",
   };
 }
 
@@ -163,18 +166,24 @@ export function judgeMateriality(
 /** FR-555 최신성 — 가장 큰 seq가 지금의 뜻이고 그 앞은 전부 지나간 뜻이다.
  *  저장된 status를 믿지 않고 **매번 유도한다**. 저장값을 믿으면 갱신이 하나라도
  *  누락된 순간 "유효 노드가 둘"이 되고, 그게 곧 소송거리다.
- *  단 REVOKED(철회)는 유도의 대상이 아니다 — 철회는 사용자의 행위지 순서의 결과가 아니다. */
+ *
+ *  ⚠ 철회는 예외다. **마지막 노드가 REVOKED면 체인 전체가 닫힌다** —
+ *  살아 있는 뜻이 하나도 없는 상태다.
+ *
+ *  왜 지난 노드를 고치지 않고 이렇게 하나: 원장은 append-only이고 트리거가
+ *  UPDATE를 막는다 (NFR-704). 지난 노드의 status를 REVOKED로 바꾸려던 첫 설계는
+ *  인메모리에서만 돌고 실 DB에서 터졌다 (2026-08-03, 공유 계약 스위트가 잡았다).
+ *  철회는 **쌓는 행위**여야 하고, 그래야 "언제 왜 철회했는가"도 함께 남는다. */
 export function withDerivedStatus(nodes: LedgerNode[]): LedgerNode[] {
   const ordered = [...nodes].sort((a, b) => a.seq - b.seq);
-  const activeSeq =
-    ordered.filter((n) => n.status !== "REVOKED").at(-1)?.seq ?? null;
+  const revoked = ordered.at(-1)?.status === "REVOKED";
+  const activeSeq = revoked ? null : (ordered.at(-1)?.seq ?? null);
   return ordered.map((n) => {
-    const status: LedgerNodeStatus =
-      n.status === "REVOKED"
-        ? "REVOKED"
-        : n.seq === activeSeq
-          ? "ACTIVE"
-          : "SUPERSEDED";
+    const status: LedgerNodeStatus = revoked
+      ? "REVOKED"
+      : n.seq === activeSeq
+        ? "ACTIVE"
+        : "SUPERSEDED";
     return { ...n, status };
   });
 }

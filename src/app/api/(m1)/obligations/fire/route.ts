@@ -6,6 +6,7 @@
 // ⚠ 문구에 긴급성을 넣지 않는다 (FR-113 · NFR-708). 이건 독촉이 아니라 초대다.
 //   기한 경과를 통보하는 문장이 아니라 "다시 살펴보실 때가 되었습니다"이다.
 import { ObligationFireRes } from "@/lib/contracts";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 import { store } from "@/lib/store";
 import { track } from "@/lib/observability/track";
 
@@ -34,10 +35,22 @@ export async function POST(req: Request) {
   });
 }
 
-/** 현황 조회 — 관리 화면이 부른다 */
+/**
+ * 현황 조회.
+ *
+ * ⚠ 소유 필터 (2026-08-03 추가). 전에는 **전체**를 돌려줘서 다계정이 되는 순간
+ *   남의 약속이 보이는 모양이었다 (화면 머리 주석의 "알려진 한계").
+ *   약속의 subjectId는 draftId이고, 소유자는 그 draft가 매달린 intent가 안다 —
+ *   그래서 내 문서 목록으로 거른다.
+ */
 export async function GET(req: Request) {
+  const userId = await getCurrentUserId(req);
+  if (!userId) return loginRequired();
+
   const subjectId = new URL(req.url).searchParams.get("subjectId") ?? undefined;
-  const obligations = await store.listObligations(subjectId);
+  const all = await store.listObligations(subjectId);
+  const mine = new Set((await store.listDocumentsByUser(userId)).map((d) => d.draftId));
+  const obligations = all.filter((o) => mine.has(o.subjectId));
   return Response.json({
     ok: true,
     data: ObligationFireRes.parse({

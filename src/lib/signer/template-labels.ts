@@ -101,6 +101,23 @@ export const TEMPLATE_LABELS = {
     _sign:           "0a308312", // 서명란 · 지킴이
   },
 
+  // 철회 통지서 (민법 §1108① · 대법원 2017다245330).
+  // ✔ 2026-08-03 템플릿 상세 조회 API 덤프에서 생성 — 손으로 옮겨 적지 않았다.
+  //   서명 칸이 **참여자 안에 중첩되어** 오므로 좌표로 가르지 않았다: 어느 서명이
+  //   누구 것인지 API가 직접 말해 준다 (8종 때는 x좌표로 갈라야 했다).
+  REVOCATION_NOTICE: {
+    revoker_name:       "f97cbd46", // 철회하는 사람 성명
+    revoker_contact:    "d0c67927", // 연락처
+    org_name:           "1566ffd4", // 통지를 받는 기관
+    original_agreement: "554a703a", // 철회 대상 약정 (문서명 · 체결일)
+    revocation_reason:  "5eb14748", // 본인이 밝힌 철회 사유
+    revocation_date:    "60acbc82", // 철회 의사표시일
+    _selfName:          "05b7988c", // 서명란 · 본인
+    _selfSign:          "5619b791", // 서명란 · 본인
+    _orgName:           "d5cb892c", // 서명란 · 기관
+    _orgSign:           "cd8014e7", // 서명란 · 기관
+  },
+
 } as const;
 
 /**
@@ -117,6 +134,9 @@ export const TEMPLATE_ROLES = {
   ATTESTATION:       ["본인"],
   FAMILY_ACK:        ["본인", "가족"], // 순서 고정 — 본인이 먼저 (서식 제5조)
   CUSTODIAN:         ["지킴이"],
+  // 순서 고정 — 본인이 먼저다. 철회 의사표시의 주체가 본인이고,
+  // 기관 서명은 수령 확인일 뿐 효력 요건이 아니다 (서식 제2조)
+  REVOCATION_NOTICE: ["본인", "기관"],
 } as const;
 
 /**
@@ -137,6 +157,7 @@ export const DOCTYPE_TO_TEMPLATE: Record<string, keyof typeof TEMPLATE_LABELS> =
   HERITAGE_SUPPORT_PLEDGE: "HERITAGE_PLEDGE",
   INTENT_AFFIRMATION: "ATTESTATION",
   CUSTODIAN_AGREEMENT: "CUSTODIAN",
+  REVOCATION_NOTICE: "REVOCATION_NOTICE",
 };
 
 /** DocType이든 서식 코드든 받아 서식 코드로 맞춘다. 모르면 던진다 */

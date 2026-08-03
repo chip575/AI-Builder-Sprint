@@ -83,6 +83,22 @@ export const AssetUpsertReq = z.discriminatedUnion("category", [
 ]);
 export type AssetUpsertReq = z.infer<typeof AssetUpsertReq>;
 
+/** 이미 있는 자산 고치기 (FR-401 · FR-403).
+ *  ⚠ 종류(category)와 이름(label)은 여기서 바꾸지 않는다 — 바꾸면 다른 자산이다.
+ *    잘못 넣으셨으면 지우고 새로 넣는 편이 이력이 정직하다.
+ *  ⚠ `confirmed`는 **true만 받는다.** 확정을 되돌리는 것은 사용자의 일이 아니라
+ *    값이 바뀔 때 서버가 하는 일이다 (P1) — 여기서 false를 허용하면 확정 이력이
+ *    사용자 손으로 지워진다. */
+export const AssetPatchReq = z.object({
+  /** 디지털 자산의 처리 방식. 계약이 "이전에는 받을 사람이 있다"까지 강제하고,
+   *  그 사람이 실재하는지는 라우트가 본다 */
+  disposition: DigitalDisposition.nullish(),
+  confirmed: z.literal(true).optional(),
+  beneficiaryId: z.string().uuid().nullish(),
+  story: z.string().max(500).nullish(),
+});
+export type AssetPatchReq = z.infer<typeof AssetPatchReq>;
+
 /** 수증자. 연락처·주소·식별번호를 담지 않는다 — 통지가 필요하면 recipientId로 참조한다
  *  (heartwill DeliveryPatch·FamilyAckReq의 recipientIds와 같은 규약) */
 export const Beneficiary = z.object({

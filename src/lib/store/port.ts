@@ -1,11 +1,12 @@
 // StorePort — 영속화 어댑터 경계 (D-18). 인메모리·Supabase가 같은 규칙을 구현한다.
 // "같은 규칙"의 증명은 문서가 아니라 store-contract.ts 공유 스위트다 — 한 스위트, 두 구현.
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
-import type { Asset, Beneficiary } from "../contracts/estate";
+import type { Asset, AssetCategory, Beneficiary, Custodian, DigitalDisposition } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode } from "../contracts/ledger";
 import type { Obligation, ObligationKind } from "../contracts/obligations";
+import type { Recipient, RecipientKind, RecipientUpsertReq } from "../contracts/recipient";
 import type {
   AssetWriteInput,
   BeneficiaryWriteInput,
@@ -21,6 +22,7 @@ import type {
   ProfileRecord,
   EvidenceRecord,
   HeartWillApplyResult,
+  HeartWillDelivery,
   HeartWillParagraphDraft,
   HeartWillVersion,
   SessionRecord,
@@ -123,6 +125,54 @@ export interface StorePort {
   /** 부분 수정. 보내지 않은 항목은 그대로 둔다 */
   saveProfile(userId: string, patch: Partial<Omit<ProfileRecord, "userId">>): Promise<ProfileRecord>;
 
+  /** 알릴 상대 — 기관·유가족·지킴이 (FR-405 · FR-112).
+   *  계약 넷(Beneficiary·Custodian·FamilyAck·DeliveryPatch)의 recipientId가 가리키던 실체다.
+   *  ⚠ 이메일은 개인정보라 audit·로그에 원문을 남기지 않는다 (보안 1조) */
+  listRecipients(userId: string, kind?: RecipientKind): Promise<Recipient[]>;
+  /** id가 있으면 수정, 없으면 생성. 같은 (역할·이메일)이 이미 있으면 그것을 고친다 —
+   *  중복 등록은 통지를 두 번 보내는 결과가 된다 */
+  upsertRecipient(userId: string, input: RecipientUpsertReq): Promise<Recipient>;
+  /** 남의 것을 지우지 않도록 userId를 함께 받는다. 없으면 false */
+  deleteRecipient(userId: string, id: string): Promise<boolean>;
+
+  /** 지킴이 (FR-405 · NFR-713).
+   *  ⚠ 열람 권한의 기준은 `grantedAt`이지 status가 아니다 — 서명 완료 웹훅만 채운다.
+   *    PENDING = 열람 0건이고, 그것이 기본값이라 조용히 열리는 경로가 없다 */
+  /** 이미 있는 자산 고치기 (FR-401 · FR-403).
+   *  남의 것을 고치지 않도록 userId를 함께 받는다. 없으면 undefined.
+   *  ⚠ confirmed는 **올리기만** 한다 — 내리는 것은 값이 바뀔 때 서버가 하는 일이다 (P1) */
+  updateAsset(
+    userId: string,
+    assetId: string,
+    patch: {
+      disposition?: DigitalDisposition | null;
+      confirmed?: true;
+      beneficiaryId?: string | null;
+      story?: string | null;
+    },
+  ): Promise<Asset | undefined>;
+
+  /** 마음 유언 전달 설정 (FR-112). 문서가 없으면 undefined —
+   *  문단을 승인한 적이 없으면 전할 글도 없다 */
+  getHeartWillDelivery(sessionId: string): Promise<HeartWillDelivery | undefined>;
+  /** 설정을 남긴다. **보관까지가 지금 할 수 있는 일이다** — 실제 발송 경로는
+   *  정책마다 준비 상태가 다르고, 무엇이 아직 안 되는지는 화면이 말한다 */
+  saveHeartWillDelivery(
+    sessionId: string,
+    patch: { revealPolicy: HeartWillDelivery["revealPolicy"]; revealAt?: string | null; recipientIds: string[] },
+  ): Promise<HeartWillDelivery | undefined>;
+
+  listCustodians(userId: string): Promise<Custodian[]>;
+  /** 같은 상대를 두 번 지정하지 않는다 — 재초대는 상태 갱신이다 (DB unique) */
+  upsertCustodian(
+    userId: string,
+    input: { recipientId: string; displayName: string; viewScope: AssetCategory[]; agreementDraftId?: string | null },
+  ): Promise<Custodian>;
+  /** 서명 완료 — 이때만 열람이 열린다 */
+  grantCustodian(agreementDraftId: string): Promise<Custodian | undefined>;
+  /** 권한 회수. 남의 것을 거두지 않도록 userId를 함께 받는다 */
+  revokeCustodian(userId: string, id: string): Promise<boolean>;
+
   listDocumentsByUser(
     userId: string,
     filter?: { docType?: DocType; status?: DocStatus; from?: string; to?: string },
@@ -176,6 +226,7 @@ export interface StorePort {
   listLedgerNodes(subjectId: string): Promise<LedgerNode[]>;
   /** 노드 1건 — 가족 인지 요청이 대상 노드를 확인할 때 쓴다 */
   getLedgerNode(nodeId: string): Promise<LedgerNode | undefined>;
+
 
   // ── 가족 인지 (FR-554) ────────────────────────────────────
   /** 통지 대상에게 인지 요청을 남긴다. **빈 배열이면 아무것도 만들지 않는다** —

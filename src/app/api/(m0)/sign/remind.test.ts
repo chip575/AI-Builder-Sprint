@@ -7,6 +7,8 @@ import { REMIND_AFTER_MS, tooEarlyCopy, whenAgain } from "@/lib/signer/remind";
 import { createDraft, getDraft } from "@/app/api/(m0)/documents/store";
 import { POST as signPost } from "./[draftId]/route";
 import { POST as remindPost } from "./[draftId]/remind/route";
+import { store } from "@/lib/store";
+import { DEV_USER_ID } from "@/lib/store/types";
 
 /** 경로와 바디를 **따로** 넘긴다 — 둘을 하나로 묶으면 불일치를 잴 수 없다 */
 function remind(pathId: string, bodyId: string = pathId) {
@@ -23,7 +25,7 @@ function remind(pathId: string, bodyId: string = pathId) {
 /** 서명 요청까지 끝난 draft — 리마인드가 성립하는 최소 상태 */
 async function requested() {
   const draft = await createDraft(
-    crypto.randomUUID(),
+    await ownedIntent(),
     "DONATION_PLEDGE",
     evaluateGate("DONATION_PLEDGE"),
   );
@@ -47,6 +49,13 @@ function travel(ms: number) {
 const PAST_THRESHOLD = REMIND_AFTER_MS + 60_000;
 
 afterEach(() => vi.useRealTimers());
+
+/** 소유자가 있는 draft를 만든다.
+ *  draft는 intent에 매달리고 **소유자는 intent가 안다** — 임의 uuid를 intentId로 쓰면
+ *  주인 없는 문서가 되어 소유 확인이 붙은 라우트에서 404가 된다 (2026-08-03). */
+async function ownedIntent() {
+  return (await store.getOrCreateSession(null, DEV_USER_ID)).id;
+}
 
 describe("M-SIGN-LIFECYCLE — 리마인드 대상 식별 (FR-507)", () => {
   it("🔴 경로 A + 바디 B → 400, B에는 아무것도 보내지 않는다", async () => {
@@ -74,7 +83,7 @@ describe("M-SIGN-LIFECYCLE — 리마인드 대상 식별 (FR-507)", () => {
     expect((await remind(crypto.randomUUID())).status).toBe(404);
 
     const fresh = await createDraft(
-      crypto.randomUUID(),
+    await ownedIntent(),
       "DONATION_PLEDGE",
       evaluateGate("DONATION_PLEDGE"),
     );

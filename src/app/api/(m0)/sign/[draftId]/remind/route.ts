@@ -6,6 +6,8 @@ import { RemindReq, RemindRes } from "@/lib/contracts";
 import { signer } from "@/lib/signer";
 import { recordRemind, remindAvailableAt, remindHistory, tooEarlyCopy } from "@/lib/signer/remind";
 import { getDraft } from "../../../documents/store";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
+import { store } from "@/lib/store";
 
 function fail(status: number, code: string, message: string, nextAction: string) {
   return Response.json({ ok: false, error: { code, message, nextAction } }, { status });
@@ -47,7 +49,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ draftId: strin
     );
   }
 
-  const draft = await getDraft(draftId);
+  // 소유 확인 (2026-08-03) — draftId만 알면 **남의 문서에 대해 알림 메일을 보낼 수
+  // 있었다.** 발송은 되돌릴 수 없고, 받는 사람에게는 우리 이름으로 간다
+  const ownerId = await getCurrentUserId(req);
+  if (!ownerId) return loginRequired();
+  const owned = new Set((await store.listDocumentsByUser(ownerId)).map((d) => d.draftId));
+  const draft = owned.has(draftId) ? await getDraft(draftId) : undefined;
   if (!draft) {
     return fail(404, "NOT_FOUND", "해당 문서를 찾을 수 없습니다.", "문서를 먼저 생성해 주세요.");
   }

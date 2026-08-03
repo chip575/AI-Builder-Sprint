@@ -4,8 +4,10 @@
 import { SessionMessageReq, SessionMessageRes } from "@/lib/contracts";
 import { addUtterance, getOrCreateSession, saveFacts } from "@/lib/ai/session/store";
 import { createProposal, proposeBranches } from "@/lib/ai/branch/propose";
-import { detectGuide } from "@/lib/ai/session/guide";
+import { detectGuide, isQuestionShaped } from "@/lib/ai/session/guide";
 import { handoffReply } from "@/lib/ai/session/handoff";
+import { assetReadback } from "@/lib/ai/prompts/asset-readback";
+import { summarize } from "@/app/api/(m4)/estate/inventory";
 import { responder } from "@/lib/ai/session/responder";
 import { computeCoverage, nextQuestion } from "@/lib/rules/question-bank";
 import { MockExtractor } from "@/lib/ai/extract/mock-extractor";
@@ -63,12 +65,41 @@ export async function POST(req: Request) {
   // 로그인하지 않았으면 발화를 저장하지 않는다 — 익명 신원이 없으므로 소유자를 정할 수 없다
   const userId = await getCurrentUserId(req);
   if (!userId) return loginRequired();
+  // 재산은 **매 턴 읽는다.** 발화를 정규식으로 걸러 조회할지 정하면, 재산어가 없는 말
+  // ("이거 애들한테 어떻게 하면 좋을까요")을 놓치고 그때 모델은 아무것도 모르는 채로 답한다.
+  // 여기서 먼저 띄우고 응답기에 넘기기 직전에 거둔다 — 첫 토큰 2초(NFR-702)에 왕복을 더하지 않게.
+  // 대화는 재산을 **읽기만 한다.** 등록은 화면(POST /estate/assets)이 받는다: 회상 인터뷰는
+  // 이야기를 끌어내려고 넓게 묻는데 자산 목록은 정확해야 해서, 한 통로로 합치면
+  // "아버지가 땅을 좀 주셨는데"가 부동산 1건이 된다.
+  const assetsPending = store
+    .listAssets(userId)
+    .then(summarize)
+    .catch((err) => {
+      // 조회 실패를 "자산 없음"으로 바꾸지 않는다 — 없다고 말하면 거짓이 된다 (보안 7조)
+      console.warn("[session] 자산 조회 실패:", (err as Error).message);
+      return null;
+    });
+
   const session = await getOrCreateSession(parsed.data.sessionId, userId);
   const isFirstUtterance = session.utterances.length === 0;
   const utterance = await addUtterance(session.id, parsed.data.text);
 
   // 안내 층 — 질문형 발화는 LLM 없이 코드가 답한다 (P3 · lib/ai/session/guide.ts)
   const guide = detectGuide(parsed.data.text);
+
+  // 안내 커버리지 — **무엇을 카드로 만들지 짐작으로 정하지 않기 위한 계측.**
+  //
+  // 미스 전부를 세지 않는다. "고향에 기부하고 싶어요"는 미스지만 결함이 아니라
+  // 가지 대화다. 셀 값은 **질문 모양인데 주제를 모르는 것** 하나다 — 그게 우리가
+  // 답해야 하는데 못 답하는 목록이다.
+  //
+  // ⚠ 발화 원문을 남기지 않는다 (보안 1조). 무엇을 물었는지는 이미 세션 발화로
+  //   저장되어 있고 RLS가 지킨다 — 여기서 로그로 한 번 더 흘리면 그 보호를 우회한다.
+  if (!guide && isQuestionShaped(parsed.data.text)) {
+    console.info("[guide] MISS — 질문형인데 주제 없음");
+  } else if (guide) {
+    console.info(`[guide] HIT topic=${guide.topic}`);
+  }
 
   // Express 판정은 첫 발화에만 적용된다 (FR-115B "첫 발화가 명시적 의사").
   // 코드 판정이 우선 — UNCERTAIN은 Solar 분류 대상이지만 mock에선 축으로 (결정론).
@@ -215,6 +246,7 @@ export async function POST(req: Request) {
             knownFacts,
             missingRequired: scan.missingRequired,
             nextAxisQuestion,
+            assetLine: assetReadback(await assetsPending),
           })) {
             controller.enqueue(sse("token", chunk));
             if (!firstTokenSent) {

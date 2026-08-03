@@ -4,11 +4,12 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import type { BranchOrigin, BranchType, DocStatus, DocType } from "../contracts/common";
-import type { Asset, AssetOrigin, Beneficiary, DigitalDisposition } from "../contracts/estate";
+import type { Asset, AssetCategory, AssetOrigin, Beneficiary, Custodian, DigitalDisposition } from "../contracts/estate";
 import type { IntentFact } from "../contracts/extract";
 import type { GateVerdict } from "../contracts/gate";
 import type { LedgerNode, LedgerNodeStatus, Materiality } from "../contracts/ledger";
 import type { Obligation, ObligationKind } from "../contracts/obligations";
+import type { Recipient, RecipientKind, RecipientUpsertReq } from "../contracts/recipient";
 import { buildNode, withDerivedStatus } from "../ledger/chain";
 import { maskIdentifier } from "./mask";
 import type { StorePort } from "./port";
@@ -26,6 +27,7 @@ import {
   type HeartWillApplyResult,
   type HeartWillOrigin,
   type HeartWillParagraph,
+  type HeartWillDelivery,
   type HeartWillParagraphDraft,
   type HeartWillVersion,
   type LedgerAppendInput,
@@ -89,6 +91,31 @@ const toAsset = (r: Row): Asset => {
     ? { ...base, category: "DIGITAL", disposition: r.disposition as DigitalDisposition }
     : { ...base, category: r.category };
 };
+
+/** ⚠ createdAt에 iso()를 **반드시** 통과시킨다. PostgREST는 '+00:00' 오프셋으로 주는데
+ *  계약(z.string().datetime())은 Z 표기만 허용해서, 빼먹으면 라우트의 parse가 던진다.
+ *  증상은 DB 오류가 아니라 **500 + "Cannot set property message"** 라 원인이 안 보인다
+ *  (2026-08-03 실측). 인메모리는 처음부터 Z라 이 경로에서만 터진다. */
+const toRecipient = (r: Row): Recipient => ({
+  id: r.id,
+  kind: r.kind as RecipientKind,
+  name: r.name,
+  email: r.email,
+  relation: r.relation ?? null,
+  createdAt: iso(r.created_at),
+});
+
+const toCustodian = (r: Row): Custodian => ({
+  id: r.id,
+  recipientId: r.recipient_id,
+  displayName: r.display_name,
+  // jsonb — 빈 배열이 기본값이고 그것이 최소 권한이다 (NFR-713)
+  viewScope: (r.view_scope ?? []) as AssetCategory[],
+  status: r.status,
+  agreementDraftId: r.agreement_draft_id ?? null,
+  grantedAt: iso(r.granted_at) ?? null,
+  revokedAt: iso(r.revoked_at) ?? null,
+});
 
 const toBeneficiary = (r: Row): Beneficiary => ({
   id: r.id,
@@ -585,6 +612,68 @@ export class SupabaseStore implements StorePort {
     return (await this.getProfile(userId))!;
   }
 
+  async listRecipients(userId: string, kind?: RecipientKind): Promise<Recipient[]> {
+    let q = this.db
+      .from("recipients")
+      .select("id, kind, name, email, relation, created_at")
+      .eq("user_id", userId);
+    if (kind) q = q.eq("kind", kind);
+    const { data, error } = await q.order("created_at", { ascending: true });
+    if (error) this.fail("recipients.list", error);
+    return (data ?? []).map(toRecipient);
+  }
+
+  async upsertRecipient(userId: string, input: RecipientUpsertReq): Promise<Recipient> {
+    // 유니크 인덱스가 (user_id, kind, lower(email))라 같은 상대를 두 번 넣으면 충돌한다.
+    // 충돌을 오류로 올리지 않고 **그 행을 고치는 것**으로 받는다 — 사용자에게는
+    // "이미 있습니다"보다 "고쳐졌습니다"가 맞는 결과다
+    const existing = input.id
+      ? null
+      : (
+          await this.db
+            .from("recipients")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("kind", input.kind)
+            .ilike("email", input.email)
+            .maybeSingle()
+        ).data;
+
+    const id = input.id ?? (existing?.id as string | undefined);
+    const row = {
+      ...(id ? { id } : {}),
+      user_id: userId,
+      kind: input.kind,
+      name: input.name,
+      email: input.email,
+      relation: input.relation ?? null,
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await this.db
+      .from("recipients")
+      .upsert(row, { onConflict: "id" })
+      .select("id, kind, name, email, relation, created_at")
+      .single();
+    if (error) this.fail("recipients.upsert", error);
+    // ⚠ 이메일을 audit에 남기지 않는다 (보안 1조) — 무엇을 했는지와 역할까지만
+    await this.audit("recipient.save", userId, { kind: input.kind });
+    return toRecipient(data!);
+  }
+
+  async deleteRecipient(userId: string, id: string): Promise<boolean> {
+    // user_id를 조건에 함께 건다 — id만 걸면 남의 행이 지워진다 (D-18과 같은 정신)
+    const { data, error } = await this.db
+      .from("recipients")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select("id");
+    if (error) this.fail("recipients.delete", error);
+    const removed = (data ?? []).length > 0;
+    if (removed) await this.audit("recipient.delete", userId, {});
+    return removed;
+  }
+
   async listDocumentsByUser(
     userId: string,
     filter?: { docType?: DocType; status?: DocStatus; from?: string; to?: string },
@@ -797,6 +886,49 @@ export class SupabaseStore implements StorePort {
     return this.heartWillVersion(documentId, head);
   }
 
+  async getHeartWillDelivery(sessionId: string): Promise<HeartWillDelivery | undefined> {
+    const documentId = await this.heartWillDocId(sessionId, false);
+    if (documentId == null) return undefined; // 문서가 없으면 전할 글도 없다
+    const { data, error } = await this.db
+      .from("heart_will_delivery")
+      .select("document_id, reveal_policy, reveal_at, recipient_ids")
+      .eq("document_id", documentId)
+      .maybeSingle();
+    if (error) this.fail("heart_will_delivery.select", error);
+    // 없으면 기본값 — "아직 안 정했다"도 상태이고 그 기본은 사후 공개다
+    return data
+      ? {
+          documentId: data.document_id,
+          revealPolicy: data.reveal_policy,
+          revealAt: iso(data.reveal_at) ?? null,
+          recipientIds: (data.recipient_ids ?? []) as string[],
+        }
+      : { documentId, revealPolicy: "POSTHUMOUS", revealAt: null, recipientIds: [] };
+  }
+
+  async saveHeartWillDelivery(
+    sessionId: string,
+    patch: { revealPolicy: HeartWillDelivery["revealPolicy"]; revealAt?: string | null; recipientIds: string[] },
+  ): Promise<HeartWillDelivery | undefined> {
+    const documentId = await this.heartWillDocId(sessionId, false);
+    if (documentId == null) return undefined;
+    const row = {
+      document_id: documentId,
+      reveal_policy: patch.revealPolicy,
+      // 예약이 아니면 날짜를 비운다 — 남겨 두면 "언제 가는 거지"가 화면마다 갈린다
+      reveal_at: patch.revealPolicy === "SCHEDULED" ? (patch.revealAt ?? null) : null,
+      recipient_ids: patch.recipientIds,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await this.db
+      .from("heart_will_delivery")
+      .upsert(row, { onConflict: "document_id" });
+    if (error) this.fail("heart_will_delivery.upsert", error);
+    // ⚠ 받는 분 id만 남긴다 — 이름·주소는 audit에 넣지 않는다 (보안 1조)
+    await this.audit("heartwill.delivery", documentId, { policy: patch.revealPolicy });
+    return this.getHeartWillDelivery(sessionId);
+  }
+
   async applyHeartWill(
     sessionId: string,
     acceptedParagraphIds: string[],
@@ -856,6 +988,8 @@ export class SupabaseStore implements StorePort {
         draft_id: node.draftId ?? null,
         prev_hash: node.prevHash,
         node_hash: node.nodeHash,
+        // 철회 노드는 쌓을 때 정해진다 — UPDATE가 막혀 있어 나중에 바꿀 수 없다
+        status: node.status,
         created_at: node.createdAt,
       })
       .select()
@@ -874,6 +1008,70 @@ export class SupabaseStore implements StorePort {
       .order("seq");
     if (error) this.fail("ledger.select", error);
     return withDerivedStatus((data ?? []).map(toLedgerNode));
+  }
+
+  async listCustodians(userId: string): Promise<Custodian[]> {
+    const { data, error } = await this.db
+      .from("custodians")
+      .select("id, recipient_id, display_name, view_scope, status, agreement_draft_id, granted_at, revoked_at")
+      .eq("user_id", userId)
+      .order("created_at");
+    if (error) this.fail("custodians.list", error);
+    return (data ?? []).map(toCustodian);
+  }
+
+  async upsertCustodian(
+    userId: string,
+    input: { recipientId: string; displayName: string; viewScope: AssetCategory[]; agreementDraftId?: string | null },
+  ): Promise<Custodian> {
+    const { data, error } = await this.db
+      .from("custodians")
+      .upsert(
+        {
+          user_id: userId,
+          recipient_id: input.recipientId,
+          display_name: input.displayName,
+          view_scope: input.viewScope,
+          // 재초대해도 PENDING으로 되돌린다 — 새 약정서에 서명해야 다시 열린다
+          status: "PENDING",
+          agreement_draft_id: input.agreementDraftId ?? null,
+          granted_at: null,
+        },
+        { onConflict: "user_id,recipient_id" },
+      )
+      .select("id, recipient_id, display_name, view_scope, status, agreement_draft_id, granted_at, revoked_at")
+      .single();
+    if (error) this.fail("custodians.upsert", error);
+    await this.audit("custodian.invite", userId, { scope: input.viewScope });
+    return toCustodian(data!);
+  }
+
+  async grantCustodian(agreementDraftId: string): Promise<Custodian | undefined> {
+    // 회수된 권한은 서명으로 되살아나지 않는다 — status 조건을 함께 건다
+    const { data, error } = await this.db
+      .from("custodians")
+      .update({ status: "ACTIVE", granted_at: new Date().toISOString() })
+      .eq("agreement_draft_id", agreementDraftId)
+      .neq("status", "REVOKED")
+      .select("id, recipient_id, display_name, view_scope, status, agreement_draft_id, granted_at, revoked_at")
+      .maybeSingle();
+    if (error) this.fail("custodians.grant", error);
+    return data ? toCustodian(data) : undefined;
+  }
+
+  async revokeCustodian(userId: string, id: string): Promise<boolean> {
+    // grantedAt은 지우지 않는다 — "언제 열렸다가 언제 닫혔나"가 남아야 한다
+    const { data, error } = await this.db
+      .from("custodians")
+      .update({ status: "REVOKED", revoked_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", userId)
+      .neq("status", "REVOKED")
+      .select("id");
+    if (error) this.fail("custodians.revoke", error);
+    const done = (data ?? []).length > 0;
+    if (done) await this.audit("custodian.revoke", userId, {});
+    return done;
   }
 
   async getLedgerNode(nodeId: string): Promise<LedgerNode | undefined> {
@@ -1069,6 +1267,40 @@ export class SupabaseStore implements StorePort {
     if (error) this.fail("familyAcks.resolve", error);
     const row = (data ?? [])[0];
     return row ? toFamilyAck(row) : undefined;
+  }
+
+  async updateAsset(
+    userId: string,
+    assetId: string,
+    patch: {
+      disposition?: DigitalDisposition | null;
+      confirmed?: true;
+      beneficiaryId?: string | null;
+      story?: string | null;
+    },
+  ): Promise<Asset | undefined> {
+    const row: Row = {};
+    if (patch.beneficiaryId !== undefined) row.beneficiary_id = patch.beneficiaryId;
+    if (patch.story !== undefined) row.story = patch.story;
+    if (patch.disposition !== undefined) row.disposition = patch.disposition;
+    // 확정은 올리기만 한다 (P1) — 내리는 값은 아예 받지 않는다
+    if (patch.confirmed === true) row.confirmed = true; // P1-CONFIRM-PATH: 사용자 확인
+    if (Object.keys(row).length === 0) {
+      // 바꿀 것이 없으면 쓰지 않는다. 빈 update는 updated_at만 흔들어 이력을 더럽힌다
+      const { data } = await this.db.from("assets").select("*").eq("id", assetId).eq("user_id", userId).maybeSingle();
+      return data ? toAsset(data as Row) : undefined;
+    }
+    // user_id를 조건에 함께 건다 — id만 걸면 남의 자산이 바뀐다 (D-18과 같은 정신)
+    const { data, error } = await this.db
+      .from("assets")
+      .update(row)
+      .eq("id", assetId)
+      .eq("user_id", userId)
+      .select()
+      .maybeSingle();
+    if (error) this.fail("assets.update", error);
+    if (data) await this.audit("asset.update", userId, { fields: Object.keys(row) });
+    return data ? toAsset(data as Row) : undefined;
   }
 
   async createAsset(input: AssetWriteInput): Promise<Asset> {

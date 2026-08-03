@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { postSse } from "@/lib/sse";
 import { ErrorNote, Shell } from "@/app/(ui)/_components/Shell";
+import { AssetPeek } from "@/app/(ui)/_components/AssetPeek";
+import { suggestionTexts } from "@/lib/ai/session/suggested";
 
 interface Turn {
   role: "user" | "assistant";
@@ -37,6 +39,9 @@ export default function ChatPage() {
   const router = useRouter();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
+  // 처음엔 펴 둔다 — 지금 사용자가 겪는 문제는 "무엇을 물어봐도 되는지 모르는 것"이다.
+  // 한 번 말을 걸면 접는다: 대화가 시작된 뒤에도 계속 떠 있으면 화면이 빽빽해진다
+  const [suggestOpen, setSuggestOpen] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,9 +87,12 @@ export default function ChatPage() {
       .catch(() => setSavedCount(null));
   }, []);
 
-  async function send() {
-    const text = input.trim();
+  async function send(preset?: string) {
+    // 추천 질문은 입력창을 거치지 않고 바로 보낸다 — 칸에 넣어 두고 다시 누르게 하면
+    // "이걸 눌러도 되나" 하고 멈춘다
+    const text = (preset ?? input).trim();
     if (!text || busy) return;
+    setSuggestOpen(false);
     setInput("");
     setError(null);
     setBusy(true);
@@ -212,6 +220,43 @@ export default function ChatPage() {
             >
               나중에 생각할래요
             </Link>
+          </div>
+
+          {/* 자산 확인 — 유산·기부를 정리하는 중에 "내가 뭘 가지고 있더라"를
+              여기서 본다. 나가면 쓰던 내용이 사라지므로 화면 안에서 편다 */}
+          <div className="mb-2">
+            <AssetPeek />
+          </div>
+
+          {/* 추천 질문 — 목록은 안내층(lib/ai/session/suggested)에서 온다.
+              손으로 예시를 박아두면 주제 규칙이 바뀔 때 눌러도 답이 안 나오는 버튼이 된다.
+              여기 있는 문장은 전부 detectGuide가 답한다는 것을 테스트가 고정한다 */}
+          <div className="mb-2">
+            {suggestOpen ? (
+              <div className="flex flex-wrap gap-2">
+                {suggestionTexts().map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => void send(q)}
+                    disabled={busy}
+                    className="min-h-11 rounded-full border border-stone-300 bg-white px-4 text-sm text-stone-700 transition hover:border-stone-500 hover:bg-stone-100 disabled:opacity-50"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              // 접힌 뒤에도 다시 열 수 있어야 한다 — 대화 중에 막혔을 때가 오히려
+              // 이 목록이 가장 필요한 순간이다
+              <button
+                type="button"
+                onClick={() => setSuggestOpen(true)}
+                className="min-h-11 rounded-xl px-2 text-sm text-stone-500 transition hover:bg-stone-100 hover:text-stone-700"
+              >
+                무엇을 여쭤볼 수 있나요?
+              </button>
+            )}
           </div>
 
           <form

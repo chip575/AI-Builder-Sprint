@@ -6,6 +6,7 @@ import { ExtractReq } from "@/lib/contracts";
 import { extractor } from "@/lib/ai/extract";
 import { getSession, saveFacts } from "@/lib/ai/session/store";
 import { track } from "@/lib/observability/track";
+import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
 
 export async function POST(req: Request) {
   const t0 = Date.now(); // NFR-709 관측 지점
@@ -25,7 +26,13 @@ export async function POST(req: Request) {
     );
   }
 
-  const session = await getSession(parsed.data.intentId);
+  // 소유 확인 (2026-08-03 추가) — 전에는 세션 id만 알면 남의 대화를 구조화해
+  // 그 값을 받아볼 수 있었다. 추출은 읽기이면서 **쓰기**이기도 해서(saveFacts)
+  // 남의 세션에 값을 남기는 경로이기도 했다
+  const userId = await getCurrentUserId(req);
+  if (!userId) return loginRequired();
+  const owned = await getSession(parsed.data.intentId);
+  const session = owned && owned.userId === userId ? owned : undefined;
   if (!session) {
     return Response.json(
       {

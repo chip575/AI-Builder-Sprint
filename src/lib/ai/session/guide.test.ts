@@ -40,6 +40,40 @@ describe("detectGuide — 잡아야 할 질문형", () => {
     expect(g?.reply).not.toMatch(/절반|2분의|3분의|[0-9]+%/);
   });
 
+  it("세금 질문 → 계산하지 않고 문의처로 보낸다", () => {
+    // 그럴듯한 세액은 침묵보다 나쁘다 — 사용자가 그 숫자를 기준으로 결정한다
+    const g = detectGuide("상속세는 얼마나 나오나요?");
+    expect(g?.topic).toBe("TAX");
+    expect(g?.reply).toContain("계산해 드리지 않습니다");
+    expect(g?.reply).toContain("국세상담센터");
+    expect(g?.reply).toContain("126");
+    // 근거 조문을 붙이지 않는다 — 근거가 달리면 답처럼 읽힌다
+    expect(g?.statutes).toHaveLength(0);
+    expect(g?.reply).not.toMatch(/[0-9]+%|[0-9,]{4,}원/);
+  });
+
+  it("세금 질문이 기한 안내를 가로채지 않는다 — 순서 검사", () => {
+    // "상속세 신고 기한"이 DEADLINE에 걸리면 묻지도 않은 상속 포기 기간을 답한다
+    expect(detectGuide("상속세 신고 기한이 언제까지인가요?")?.topic).toBe("TAX");
+    // 그러면서 진짜 기한 질문은 여전히 DEADLINE이어야 한다 — 통과 케이스
+    expect(detectGuide("상속 포기는 언제까지 할 수 있나요?")?.topic).toBe("DEADLINE");
+  });
+
+  it("우리 서식의 기부 공제는 문의처로 보내지 않는다 — 그건 우리 일이다", () => {
+    // "공제"를 세법 패턴에 넣으면 기부 대화가 통째로 "문의하세요"로 끝난다
+    const g = detectGuide("기부하면 공제는 어떻게 되나요?");
+    expect(g?.topic).toBe("DONATION");
+    expect(g?.reply).not.toContain("국세상담센터");
+  });
+
+  it("법률 판단 안내는 갈 곳을 함께 준다 — 거절만 남기지 않는다", () => {
+    for (const ask of ["상속은 어떻게 되나요?", "상속 포기는 언제까지 할 수 있나요?"]) {
+      const g = detectGuide(ask);
+      expect(g?.reply, ask).toContain("대한법률구조공단");
+      expect(g?.reply, ask).toContain("132");
+    }
+  });
+
   it("모든 안내에 근거의 확인일자가 붙는다 (P3) · 재촉 표현이 없다 (P4)", () => {
     const asks = [
       "유언장은 어떻게 남기나요?",
