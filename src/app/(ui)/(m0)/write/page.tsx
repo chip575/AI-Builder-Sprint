@@ -81,7 +81,11 @@ export default function WritePage() {
 function WriteWorkspace() {
   const router = useRouter();
   /** 내 유산에서 넘어온 자산 — "무엇을 남기는가"가 대화의 첫 문장에 실린다 */
-  const assetParam = useSearchParams().get("asset");
+  const params = useSearchParams();
+  const assetParam = params.get("asset");
+  /** 안내 대화에서 "이 서류 쓰러 가기"로 넘어온 경우 — 고른 상태로 시작한다.
+   *  이 통로가 없으면 안내가 서류를 권해 놓고 사용자는 선택 화면에서 다시 찾아야 한다 */
+  const docParam = params.get("doc");
   const [docType, setDocType] = useState<SignableDoc | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -112,6 +116,13 @@ function WriteWorkspace() {
         "LEGACY_GIFT_AGREEMENT",
         `유산 기부를 하고 싶어요. ${assetParam}을(를) 남기고 싶습니다.`,
       );
+      return;
+    }
+    // 서류를 지정해 들어온 진입은 이어쓰기보다 우선한다 — 방금 고른 것이 지금의 의사다
+    if (docParam && DOC_ENTRY[docParam as SignableDoc]) {
+      if (startedFromAsset.current) return;
+      startedFromAsset.current = true;
+      void pick(docParam as SignableDoc);
       return;
     }
     const savedSession = localStorage.getItem(SESSION_KEY);

@@ -4,7 +4,13 @@
 import { SessionMessageReq, SessionMessageRes } from "@/lib/contracts";
 import { addUtterance, getOrCreateSession, saveFacts } from "@/lib/ai/session/store";
 import { createProposal, proposeBranches } from "@/lib/ai/branch/propose";
-import { detectGuide, isQuestionShaped } from "@/lib/ai/session/guide";
+import {
+  detectGuide,
+  docIntroGuide,
+  guideForLabel,
+  isQuestionShaped,
+} from "@/lib/ai/session/guide";
+import { guideClassifier } from "@/lib/ai/session/classifier";
 import { CORRECT_REPLY, STOP_REPLY, detectCorrection } from "@/lib/ai/session/correction";
 import { handoffReply } from "@/lib/ai/session/handoff";
 import { assetReadback } from "@/lib/ai/prompts/asset-readback";
@@ -18,6 +24,9 @@ import { isHeavy } from "@/lib/rules/branch-weight";
 import { store } from "@/lib/store";
 import { track } from "@/lib/observability/track";
 import { getCurrentUserId, loginRequired } from "@/lib/auth/session";
+
+/** 안내 문단과 진행 한 줄 사이 — 한 덩어리로 읽히지 않게 띄운다 */
+const NL_GAP = "\n\n";
 
 const encoder = new TextEncoder();
 
@@ -87,7 +96,31 @@ export async function POST(req: Request) {
   const utterance = await addUtterance(session.id, parsed.data.text);
 
   // 안내 층 — 질문형 발화는 LLM 없이 코드가 답한다 (P3 · lib/ai/session/guide.ts)
-  const guide = detectGuide(parsed.data.text, parsed.data.docType);
+  //
+  // 규칙이 먼저다. 규칙이 잡으면 모델을 부르지 않는다 — 비용도 지연도 0이고 결정론이다.
+  // **규칙이 놓쳤을 때만** 분류기가 라벨을 골라 준다: 실측에서 "이거 연말정산에 쓸 수
+  // 있어요?"·"마음이 바뀌면 어떻게 하죠?"·"서명하고 후회하면요?"가 전부 빠져나갔다
+  // (2026-08-03). 표현을 계속 더하는 것으로는 못 따라간다.
+  //
+  // ⚠ 분류기는 **라벨만** 고른다. 문장은 guideForLabel이 코드 표에서 꺼낸다 —
+  //   법령 문장이 프롬프트에도 모델 출력에도 없으므로 환각이 낄 자리가 없다.
+  let guide = detectGuide(parsed.data.text, parsed.data.docType);
+  if (!guide && isQuestionShaped(parsed.data.text)) {
+    const label = await guideClassifier
+      .classify(parsed.data.text, parsed.data.docType ?? null)
+      // 분류 실패가 대화를 죽이지 않는다 — 규칙만으로 진행한다
+      .catch(() => null);
+    if (label) {
+      guide = guideForLabel(label.label, parsed.data.text, parsed.data.docType, label.doc);
+      if (guide) console.info(`[guide] CLASSIFIED label=${label.label}`);
+    }
+  }
+
+  // 작성실을 **여는 첫 턴**은 그 서류의 고지가 먼저다. 모델이 지어내게 두면
+  // 유류분 같은 개념을 뒤집어 말한다 (2026-08-03 실측). 뒤에 진행 한 줄이 붙는다.
+  if (!guide && parsed.data.docType && session.utterances.length === 0) {
+    guide = docIntroGuide(parsed.data.docType);
+  }
 
   // 안내 커버리지 — **무엇을 카드로 만들지 짐작으로 정하지 않기 위한 계측.**
   //
@@ -227,8 +260,11 @@ export async function POST(req: Request) {
     .filter((p) => p.id !== proposal?.id)
     .at(-1);
   // 정정·중단 턴에는 handoff(슬롯 질문)를 하지 않는다. 사용자가 "아니"라고 한 직후에
-  // 준비된 질문을 던지는 것이 바로 그 자동응답기 느낌의 정체다
-  const handoff = guide || correction.kind !== "NONE"
+  // 준비된 질문을 던지는 것이 바로 그 자동응답기 느낌의 정체다.
+  // ⚠ **안내(guide)가 있을 때는 이제 handoff를 함께 낸다.** 예전에는 배타 선택이라
+  //   안내가 답하면 그 턴은 진행이 없었고, 진행이 답하면 질문이 무시됐다 —
+  //   "유류분이 뭐예요?"에 "말씀하신 내용이 정리되었습니다"가 나온 원인이다.
+  const handoff = correction.kind !== "NONE"
     ? null
     : handoffReply({
         branchType,
@@ -276,6 +312,7 @@ export async function POST(req: Request) {
     expressBranch: proposal
       ? { branchType: proposal.branchType, proposalId: proposal.id }
       : null,
+    suggestedDoc: guide?.suggestedDoc ?? null,
   });
 
   const stream = new ReadableStream<Uint8Array>({
@@ -291,7 +328,8 @@ export async function POST(req: Request) {
         // 결정론적 응답 — 첫 토큰이 곧 전체다. 응답기(LLM)는 이 턴을 건너뛴다.
         // 감지(proposal)와 meta는 그대로 흘린다: 안내를 받았어도 발화에 의사가
         // 실려 있으면 확인형 제안이 뒤따라야 한다 (FR-115A)
-        controller.enqueue(sse("token", guide?.reply ?? handoff!));
+        // 안내 + 진행을 **같은 턴에** 낸다. 질문에 답하면서 가지도 계속 굴러간다
+        controller.enqueue(sse("token", [guide?.reply, handoff].filter(Boolean).join(NL_GAP)));
         firstTokenSent = true;
         track("CONVERSE", true, Date.now() - t0);
       } else {

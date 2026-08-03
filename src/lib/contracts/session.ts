@@ -39,5 +39,9 @@ export const SessionMessageRes = z.object({
   utteranceId: z.string().uuid(),
   axisCoverage: AxisCoverage,
   expressBranch: ExpressBranch.nullish(),
+  /** 안내가 권한 서류. 화면은 이걸로 "이 서류로 시작하기" 버튼을 띄운다.
+   *  말로만 권하고 끝나면 사용자가 그 서류를 직접 찾아가야 한다 — 안내가 길을
+   *  알려 주고 문은 안 열어 주는 셈이다 (2026-08-03) */
+  suggestedDoc: DocType.nullish(),
 });
 export type SessionMessageRes = z.infer<typeof SessionMessageRes>;
